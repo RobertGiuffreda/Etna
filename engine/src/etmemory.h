@@ -1,11 +1,17 @@
-#include "stdio.h"
+#pragma once
 
-typedef enum memory_tags {
+#include "defines.h"
+
+typedef enum memory_tag {
     MEMORY_TAG_UNKNOWN,
+    MEMORY_TAG_STRING,
+    MEMORY_TAG_MAX
+} memory_tag;
 
-    
-} memory_tags;
+void memory_init(void);
 
-struct memory_state {
+void* etallocate(u64 size, memory_tag tag);
 
-};
+void etfree(void* block, u64 size, memory_tag tag);
+
+u64 get_total_allocs(void);

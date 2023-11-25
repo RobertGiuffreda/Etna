@@ -1,0 +1,40 @@
+{
+    "todohighlight.isEnable": true,
+    "todohighlight.keywords": [
+        {
+            "text": "TODO:",
+            "color": "red",
+            "backgroundColor": "rgba(0,0,0,0)"
+        },
+        {
+            "text": "HACK:",
+            "color": "#ff6600",
+            "backgroundColor": "rgba(0,0,0,0)"
+        },
+        {
+            "text": "NOTE:",
+            "color": "green",
+            "backgroundColor": "rgba(0,0,0,0)"
+        }
+    ],
+    "todohighlight.isCaseSensitive": true,
+    "todohighlight.defaultStyle": {
+        "color": "red",
+        "backgroundColor": "#ffab00",
+        "overviewRulerColor": "rgba(0,0,0,0)",
+        "isWholeLine": false,
+    },
+    "files.associations": {
+        "defines.h": "c",
+        "etmemory.h": "c",
+        "stdio.h": "c",
+        "stdlib.h": "c",
+        "string.h": "c",
+        "corecrt_memory.h": "c",
+        "vcruntime_string.h": "c",
+        "corecrt_search.h": "c",
+        "corecrt_malloc.h": "c",
+        "corecrt_wstdlib.h": "c",
+        "corecrt.h": "c"
+    }
+}

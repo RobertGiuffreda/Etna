@@ -1,0 +1,4 @@
+C:/Users/Robert/Desktop/TestEtna/build/CMakeFiles/sandbox.dir
+C:/Users/Robert/Desktop/TestEtna/build/CMakeFiles/engine.dir
+C:/Users/Robert/Desktop/TestEtna/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/Robert/Desktop/TestEtna/build/CMakeFiles/ZERO_CHECK.dir

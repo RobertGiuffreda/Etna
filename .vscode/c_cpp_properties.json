@@ -3,17 +3,17 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/TestEtna",
+                "${workspaceFolder}/engine/src/**",
                 "${VULKAN_SDK}/include"
             ],
             "defines": [
                 "UNICODE"
             ],
-            "windowsSdkVersion" : "10.1.22000.8",
-            "intelliSenseMode": "clang-x64",
-            "compilerPath" : "C:\\Program Files\\llvm\\release\\bin\\clang.exe",
             "cStandard": "c17",
-            "cppStandard": "c++17"
+            "windowsSdkVersion" : "10.1.22000.8",
+            // TODO: Move intellisense compiler to msvc compiler
+            "compilerPath" : "C:\\Program Files\\llvm\\release\\bin\\clang.exe",
+            "intelliSenseMode": "clang-x64"
         }
     ],
     "version": 4
