@@ -1,5 +1,7 @@
 TODO: Move Entry point to engine & create application struct to be called
+TODO: Create basic portable timing feature from the standard library time.h (clock() && CLOCKS_PER_SEC)
+
 TODO: Set up unit tests
 
 TODO: Set up vulkan to work. (Check via code in engine for now)
-TODO: Open window using GLFW & Vulkan
+TODO: Open window using GLFW & Vulkandd
