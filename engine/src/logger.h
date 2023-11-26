@@ -18,8 +18,8 @@ typedef enum log_level {
     LOG_LEVEL_MAX
 } log_level;
 
-b8 logger_initialize();
-void logger_shutdown();
+b8 logger_initialize(void);
+void logger_shutdown(void);
 
 void log_output(log_level level, const char* message, ...);
 

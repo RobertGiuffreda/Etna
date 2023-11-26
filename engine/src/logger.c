@@ -10,7 +10,7 @@
 
 // TODO: Linear allocator for this
 
-b8 logger_initialize() {
+b8 logger_initialize(void) {
     ETFATAL("This is a FATAL message.");
     ETERROR("This is a ERROR message.");
     ETWARN("This is a WARN message.");
@@ -20,7 +20,7 @@ b8 logger_initialize() {
     return true;
 }
 
-void logger_shutdown() {}
+void logger_shutdown(void) {}
 
 // TODO: Linear allocator for 
 void log_output(log_level level, const char* format, ...) {
@@ -44,4 +44,8 @@ void log_output(log_level level, const char* format, ...) {
 
     printf("%s\n", output);
     etfree(output, sizeof(char) * (format_len + log_str_len + 1), MEMORY_TAG_STRING);
+}
+
+void log_assert_failure(const char* expression, const char* message, const char* file, i32 line) {
+    log_output(LOG_FATAL, "Assertion Failure: %s, message: '%s', in file: %s, line %d\n", expression, message, file, line);
 }

@@ -2,8 +2,9 @@
 
 #include "etmemory.h"
 #include "logger.h"
+#include "asserts.h"
 
-b8 engine_initialize() {
+b8 engine_initialize(void) {
     if (!memory_initialize()) {
         ETFATAL("Unable to initialize memory.");
         return false;
@@ -15,12 +16,11 @@ b8 engine_initialize() {
     return true;
 }
 
-b8 engine_run() {
-    
+b8 engine_run(void) {
     return true;
 }
 
-void engine_shutdown() {
+void engine_shutdown(void) {
     logger_shutdown();
     memory_shutdown();
 }
