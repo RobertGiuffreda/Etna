@@ -1,4 +1,17 @@
 {
+    // Italicize comments
+    "editor.tokenColorCustomizations": {
+        // "comments": "#FF0000",
+        "textMateRules": [
+            {
+                "scope": "comment",
+                "settings": {
+                    "fontStyle": "italic",
+                },
+            }
+        ]
+    },
+
     "todohighlight.isEnable": true,
     "todohighlight.keywords": [
         {
@@ -14,6 +27,11 @@
         {
             "text": "NOTE:",
             "color": "green",
+            "backgroundColor": "rgba(0,0,0,0)"
+        },
+        {
+            "text": "TEMP:",
+            "color": "#ADD8E6",
             "backgroundColor": "rgba(0,0,0,0)"
         }
     ],
@@ -35,6 +53,13 @@
         "corecrt_search.h": "c",
         "corecrt_malloc.h": "c",
         "corecrt_wstdlib.h": "c",
-        "corecrt.h": "c"
+        "corecrt.h": "c",
+        "stdint.h": "c",
+        "engine.h": "c",
+        "logger.h": "c",
+        "list": "c",
+        "system_error": "c",
+        "stdarg.h": "c",
+        "ios": "c"
     }
 }

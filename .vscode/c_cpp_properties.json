@@ -4,16 +4,17 @@
             "name": "Win32",
             "includePath": [
                 "${workspaceFolder}/engine/src/**",
-                "${VULKAN_SDK}/include"
+                "${VULKAN_SDK}/include",
+                "${workspaceFolder}/extern/glfw/include"
             ],
             "defines": [
                 "UNICODE"
             ],
             "cStandard": "c17",
             "windowsSdkVersion" : "10.1.22000.8",
-            // TODO: Move intellisense compiler to msvc compiler
-            "compilerPath" : "C:\\Program Files\\llvm\\release\\bin\\clang.exe",
-            "intelliSenseMode": "clang-x64"
+            // TODO: Configure cmake to setup visual studio with clang
+            "compilerPath" : "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.34.31933\\bin\\Hostx64\\x64\\cl.exe",
+            "intelliSenseMode": "windows-msvc-x64"
         }
     ],
     "version": 4

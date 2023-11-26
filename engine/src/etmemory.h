@@ -8,7 +8,9 @@ typedef enum memory_tag {
     MEMORY_TAG_MAX
 } memory_tag;
 
-void memory_init(void);
+b8 memory_initialize(void);
+
+void memory_shutdown(void);
 
 void* etallocate(u64 size, memory_tag tag);
 
