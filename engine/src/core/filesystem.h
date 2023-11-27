@@ -57,6 +57,17 @@ b8 filesystem_size(etfile* file, u64* out_size);
  * @param file Pointer to the file to read from.
  * @param out_bytes A pointer to a block of memory to be populated by this function.
  * @param out_bytes_read A pointer to a number which will be populated with the number of bytes read from the file.
- * @return True if sucessful; false otherwise.
+ * @return True if sucessful, false otherwise.
  */
 b8 filesystem_read_all_bytes(etfile* file, u8* out_bytes, u64* out_bytes_read);
+
+/** 
+ * @brief Writes provided data to the file.
+ * 
+ * @param handle A pointer to a file_handle structure.
+ * @param data_size The size of the data in bytes.
+ * @param data The data to be written.
+ * @param out_bytes_written A pointer to a number which will be populated with the number of bytes actually written to the file.
+ * @returns True if successful, false otherwise.
+ */
+b8 filesystem_write(etfile* file, u64 data_size, const void* data, u64* out_bytes_written);

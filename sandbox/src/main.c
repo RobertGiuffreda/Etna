@@ -1,11 +1,25 @@
 #include <defines.h>
-#include <engine.h>
-#include <logger.h>
+#include <core/engine.h>
+#include <application_types.h>
 
-#include <stdio.h>
+#include <entry_point.h>
 
-int main(int argc, char** argv) {
-    engine_initialize();
-    engine_run();
-    engine_shutdown();
+#include "application.h"
+
+b8 define_configuration(engine_config* engine_details, application_config* app_details) {
+    engine_details->x_start_pos = 100;
+    engine_details->y_start_pos = 100;
+
+    engine_details->width = 720;
+    engine_details->height = 480;
+
+    app_details->initialize = application_initialize;
+    app_details->shutdown = application_shutdown;
+    app_details->update = application_update;
+    app_details->render = application_render;
+
+    app_details->state_size = sizeof(struct application_state_t);
+    app_details->state = 0;
+
+    return true;
 }

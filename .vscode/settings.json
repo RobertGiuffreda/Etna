@@ -60,6 +60,25 @@
         "list": "c",
         "system_error": "c",
         "stdarg.h": "c",
-        "ios": "c"
+        "ios": "c",
+        "application_types.h": "c",
+        "entry_point.h": "c",
+        "iosfwd": "c",
+        "ctime": "cpp",
+        "initializer_list": "cpp",
+        "vector": "cpp",
+        "xhash": "cpp",
+        "xiosbase": "cpp",
+        "xstring": "cpp",
+        "xtree": "cpp",
+        "time.h": "c",
+        "xutility": "c",
+        "dynarray.h": "c",
+        "testclock.h": "c",
+        "test_manager.h": "c",
+        "test_clock.h": "c",
+        "xlocale": "c",
+        "cstdlib": "c",
+        "test_manager_tests.h": "c"
     }
 }

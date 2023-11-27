@@ -22,7 +22,8 @@ b8 logger_initialize(void) {
 
 void logger_shutdown(void) {}
 
-// TODO: Linear allocator for 
+// TODO: Linear allocator for this
+// TODO: Parse the va_list correctly
 void log_output(log_level level, const char* format, ...) {
     const char* log_level_strings[LOG_LEVEL_MAX] = {
         "[FATAL]: ", "[ERROR]: ", "[WARN]:  ", "[INFO]:  ", "[DEBUG]: ", "[TRACE]: ",
@@ -30,20 +31,20 @@ void log_output(log_level level, const char* format, ...) {
     
     const u8 log_str_len = 9;
     const u32 format_len = strlen(format);
-
+    const u32 total_len = log_str_len + format_len + 1 /* To avoid parsing string to get true length: */ + 1024;
     // 1 added for null terminator
-    char* output = etallocate(sizeof(char) * (format_len + log_str_len + 1), MEMORY_TAG_STRING);
+    char* output = etallocate(sizeof(char) * total_len, MEMORY_TAG_STRING);
 
     // NOTE: Could be a memcpy
     sprintf(output, "%s", log_level_strings[level]);
     
     va_list list;
     va_start(list, format);
-    vsprintf(output + log_str_len, format, list);
+    vsnprintf(output + log_str_len, total_len - log_str_len, format, list);
     va_end(list);
 
     printf("%s\n", output);
-    etfree(output, sizeof(char) * (format_len + log_str_len + 1), MEMORY_TAG_STRING);
+    etfree(output, sizeof(char) * total_len, MEMORY_TAG_STRING);
 }
 
 void log_assert_failure(const char* expression, const char* message, const char* file, i32 line) {

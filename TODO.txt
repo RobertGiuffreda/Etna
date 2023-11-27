@@ -1,7 +1,8 @@
-TODO: Move Entry point to engine & create application struct to be called
-TODO: Create basic portable timing feature from the standard library time.h (clock() && CLOCKS_PER_SEC)
-
-TODO: Set up unit tests
-
 TODO: Set up vulkan to work. (Check via code in engine for now)
-TODO: Open window using GLFW & Vulkandd
+TODO: Open window using GLFW & Vulkan
+
+TODO: Setup Debug & Release configurations
+
+TODO: Dynamic vs static library. ??
+
+TODO: Instead of passing function pointers, just say the functions are external and get them from the sandbox file??.

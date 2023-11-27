@@ -6,8 +6,7 @@
 #include <sys/stat.h>
 #include <stdio.h>
 
-//TODO: Determine what works for text files vs binary files
-//TODO: Platform specific code for file size detection
+//TODO: Platform specific code for filesytem
 //TODO: Replace checks with asserts or pass responsibility to the caller
 
 static inline void _filesystem_size(FILE* file, u64* out_size);
@@ -73,6 +72,19 @@ b8 filesystem_read_all_bytes(etfile* file, u8* out_bytes, u64* out_bytes_read) {
 
         *out_bytes_read = fread(out_bytes, 1, size, file_handle);
         return *out_bytes_read == size;
+    }
+    return false;
+}
+
+b8 filesystem_write(etfile* file, u64 data_size, const void* data, u64* out_bytes_written) {
+    if (file->handle) {
+        FILE* file_handle = (FILE*)file->handle;
+        *out_bytes_written = fwrite(data, 1, data_size, file_handle);
+        if (*out_bytes_written != data_size) {
+            return false;
+        }
+        fflush(file_handle);
+        return true;
     }
     return false;
 }

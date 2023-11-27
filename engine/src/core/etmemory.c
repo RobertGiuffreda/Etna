@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+// NOTE: string.h included for memset & memcpy
 #include <string.h>
 
 struct memory_state {
@@ -13,10 +14,14 @@ struct memory_state {
 static struct memory_state state;
 
 static const char* memory_strings[MEMORY_TAG_MAX] = {
-    "Unknown: ",
-    "String:  "
+    "Unknown:    ",
+    "Engine:     ",
+    "Dynarray:   ",
+    "File System:",
+    "String:     ",
+    "Application:"
 };
-static const u32 mem_tag_str_len = 9;
+static const u32 mem_tag_str_len = 13;
 
 void print_memory_allocations(void);
 
@@ -46,6 +51,19 @@ void etfree(void* block, u64 size, memory_tag tag) {
     state.total_allocated -= size;
     state.allocated[tag] -= size;
     free(block);
+}
+
+void* etzero_memory(void* block, u64 size) {
+    return memset(block, 0, size);
+}
+
+/* Dest & source can overlapp compared to etcopy_memory. */
+void* etmove_memory(void* dest, const void* source, u64 size) {
+    return memmove(dest, source, size);
+}
+
+void* etcopy_memory(void* dest, const void* source, u64 size) {
+    return memcpy(dest, source, size);
 }
 
 u64 get_total_allocs(void) {

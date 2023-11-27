@@ -23,6 +23,8 @@ void logger_shutdown(void);
 
 void log_output(log_level level, const char* message, ...);
 
+// TODO: Remove ; from the end of log macros
+
 // Log messages
 #define ETFATAL(message, ...) log_output(LOG_FATAL, message, ##__VA_ARGS__);
 
