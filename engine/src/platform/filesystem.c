@@ -1,7 +1,7 @@
 #include "filesystem.h"
 
-#include "logger.h"
-#include "etmemory.h"
+#include "core/logger.h"
+#include "core/etmemory.h"
 
 #include <sys/stat.h>
 #include <stdio.h>

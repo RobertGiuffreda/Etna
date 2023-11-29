@@ -79,6 +79,10 @@
         "test_clock.h": "c",
         "xlocale": "c",
         "cstdlib": "c",
-        "test_manager_tests.h": "c"
+        "test_manager_tests.h": "c",
+        "etwindow.h": "c",
+        "clock.h": "c",
+        "events.h": "c",
+        "asserts.h": "c"
     }
 }

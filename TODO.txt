@@ -1,8 +1,22 @@
+TODO: Unit tests 
+
 TODO: Set up vulkan to work. (Check via code in engine for now)
-TODO: Open window using GLFW & Vulkan
+
+TODO: FIFO Struct to place events into
+TODO: Setup event overwritting or adding based on behavior of event. When event is fired,
+it would be able to overwrite the event waiting in the event queue or
+it would be able to combine its parameters in a predefined way(func pointer??)
+
+TODO: previous & current keyboard & mouse states.
 
 TODO: Setup Debug & Release configurations
 
 TODO: Dynamic vs static library. ??
+TODO: If static: Instead of passing function pointers, just say the functions are external and get them from the sandbox file??.
+TODO: If dynamic: Use volk included with the vulkan sdk to dynamically load vulkan functions.
 
-TODO: Instead of passing function pointers, just say the functions are external and get them from the sandbox file??.
+TODO: When systems fail they should be able to call shutdown procedures if the failure is recoverable
+
+-- When finally rendering --
+NOTE: Sample 2D slice of 3D texture for wierd patterns.
+Like mod world position with texture limits to index into tiling 3D texture.

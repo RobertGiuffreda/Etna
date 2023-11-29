@@ -1,5 +1,6 @@
 #include "logger.h"
-#include "etmemory.h"
+
+#include "core/etmemory.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -23,7 +24,7 @@ b8 logger_initialize(void) {
 void logger_shutdown(void) {}
 
 // TODO: Linear allocator for this
-// TODO: Parse the va_list correctly
+// TODO: Parse the string & correctly count bytes needed to allocate the string. 
 void log_output(log_level level, const char* format, ...) {
     const char* log_level_strings[LOG_LEVEL_MAX] = {
         "[FATAL]: ", "[ERROR]: ", "[WARN]:  ", "[INFO]:  ", "[DEBUG]: ", "[TRACE]: ",

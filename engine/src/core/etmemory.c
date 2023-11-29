@@ -1,5 +1,6 @@
 #include "etmemory.h"
-#include "logger.h"
+
+#include "core/logger.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,10 +17,13 @@ static struct memory_state state;
 static const char* memory_strings[MEMORY_TAG_MAX] = {
     "Unknown:    ",
     "Engine:     ",
-    "Dynarray:   ",
+    "Application:",
+    "Events:     ",
+    "Input:      ",
+    "Window:     ",
     "File System:",
-    "String:     ",
-    "Application:"
+    "Dynarray:   ",
+    "String:     "
 };
 static const u32 mem_tag_str_len = 13;
 

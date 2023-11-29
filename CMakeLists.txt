@@ -15,18 +15,13 @@ project(TestEtna VERSION 1.0.1 DESCRIPTION "Test writing Etna")
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED True)
 
-#HACK: Glob_recurse for now as structure is uncertain.
-#Get executable source files:
-file(GLOB_RECURSE SANDBOX_SRC_FILES "sandbox/src/*.c")
-file(GLOB_RECURSE SANDBOX_HEADER_FILES "sandbox/src/*.h")
-
-#Specify exectuable
-add_executable(sandbox ${SANDBOX_SRC_FILES} ${SANDBOX_HEADER_FILES})
-#Compiler defines for sandbox
-target_compile_definitions(sandbox PRIVATE _DEBUG)
-
-#Include directories for executable
-target_include_directories(sandbox PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
+#NOTE: External dependencies
+#Add glfw as dependency to be built alongside project
+set(GLFW_BUILD_DOCS False)
+set(GLFW_BUILD_EXAMPLES False)
+set(GLFW_BUILD_TESTS False)
+set(GLFW_VULKAN_STATIC True)
+add_subdirectory(${CMAKE_SOURCE_DIR}/extern/glfw)
 
 #HACK: Glob_recurse for now as structure is uncertain.
 #Get library source files:
@@ -41,19 +36,30 @@ target_compile_definitions(engine PRIVATE _DEBUG)
 #Include directories for engine library
 target_include_directories(engine
     PRIVATE ${CMAKE_SOURCE_DIR}/engine/src
-    PRIVATE ${CMAKE_SOURCE_DIR}/extern/glfw/include)
+    PRIVATE ${CMAKE_SOURCE_DIR}/extern/glfw/include
+    PRIVATE $ENV{VULKAN_SDK}/include)
 
-#Link library to executable
-target_link_libraries(sandbox PRIVATE engine)
-
-#Add glfw as dependency to be built alongside project
-set(GLFW_BUILD_DOCS False)
-set(FLFW_BUILD_EXAMPLES False)
-set(FLFW_BUILD_TESTS False)
-set(FLFW_VULKAN_STATIC True)
-add_subdirectory(${CMAKE_SOURCE_DIR}/extern/glfw)
-
+    #Link libraries to engine
 target_link_libraries(engine PRIVATE glfw)
+
+#HACK: Glob_recurse for now as structure is uncertain.
+#Get executable source files:
+file(GLOB_RECURSE SANDBOX_SRC_FILES "sandbox/src/*.c")
+file(GLOB_RECURSE SANDBOX_HEADER_FILES "sandbox/src/*.h")
+
+#Specify executable
+add_executable(sandbox ${SANDBOX_SRC_FILES} ${SANDBOX_HEADER_FILES})
+#Compiler defines for sandbox
+target_compile_definitions(sandbox PRIVATE _DEBUG)
+#Include directories for sandbox
+target_include_directories(sandbox PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
+#Link libraries to sandbox
+target_link_directories(sandbox PRIVATE $ENV{VULKAN_SDK}/Lib)
+target_link_libraries(sandbox 
+    PRIVATE engine
+    PRIVATE vulkan-1)
+
+
 
 #Build unit tests
 #HACK: Glob_recurse for now as structure is uncertain.

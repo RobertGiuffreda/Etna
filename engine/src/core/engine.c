@@ -1,18 +1,27 @@
 #include "engine.h"
 
+#include "core/asserts.h"
 #include "core/etmemory.h"
 #include "core/logger.h"
-#include "core/asserts.h"
+#include "core/events.h"
+#include "core/input.h"
+#include "core/clock.h"
+
+#include "platform/platform.h"
+#include "platform/etwindow.h"
 
 #include "application_types.h"
 
 typedef struct engine_state {
-    i32 x_pos;
-    i32 y_pos;
-    i32 width;
-    i32 height;
+    // TODO: Transfer these to a visible window_state_struct or something
+    // i32 x_pos;
+    // i32 y_pos;
+    // i32 width;
+    // i32 height;
 
-    // Application functions
+    b8 is_running;
+
+    // Application data
     b8 (*app_initialize)(application_state* app_state);
     void (*app_shutdown)(application_state* app_state);
     b8 (*app_update)(application_state* app_state);
@@ -20,9 +29,20 @@ typedef struct engine_state {
 
     u64 app_state_size;
     application_state* app_state;
+
+    // TODO: u64 etwindow_state_size for when engine will allocate the memory
+    etwindow_state* window_state;
+
+    // TODO: u64 events_state_size for when engine will allocate the memory
+    events_state* events_state;
+
+    // TODO: u64 input_state_size for when engine will allocate the memory
+    input_state* input_state;
 } engine_state;
 
 static engine_state* state;
+
+b8 engine_on_resize(u16 event_code, event_data data);
 
 b8 engine_initialize(engine_config engine_details, application_config app_details) {
     // Initialize memory first, so all memory allocations are tracked.
@@ -31,8 +51,9 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     };
 
-    // Initialize engine state
+    // Allocate engine state memory
     state = (engine_state*)etallocate(sizeof(engine_state), MEMORY_TAG_ENGINE);
+    state->is_running = false;
 
     // Initialize the logger. When log file is implemented this is where it will initialized
     if (!logger_initialize()) {
@@ -54,6 +75,32 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         );
     }
 
+    // Events
+    events_initialize(&state->events_state);
+    event_observer_register(EVENT_CODE_RESIZED, state, engine_on_resize);
+
+    // Input
+    input_initialize(&state->input_state);
+
+    // Initialize platform
+    if (!platform_initialize()) {
+        ETFATAL("Platfrom failed to initialize.");
+        return false;
+    }
+
+    // Create window
+    etwindow_config window_config = {
+        .name = "Etna Window",
+        .x_start_pos = 100,
+        .y_start_pos = 100,
+        .width = 720,
+        .height = 480
+    };
+    if (!etwindow_initialize(&window_config, &state->window_state)) {
+        ETFATAL("Window failed to initialize.");
+        return false;
+    }
+
     // Transfer app information
     state->app_initialize = app_details.initialize;
     state->app_shutdown = app_details.shutdown;
@@ -71,20 +118,39 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
 }
 
 b8 engine_run(void) {
-    if (!state->app_update(state->app_state)) {
-        ETFATAL("application_update returned false.");
-        return false;
+    state->is_running = true;
+    while (state->is_running) {
+
+        
+
+        
+        // Belong to platform or window??
+        etwindow_pump_messages();
+        state->is_running = !etwindow_should_close(state->window_state);
     }
+    state->is_running = false;
     return true;
 }
 
 void engine_shutdown(void) {
-
     // Call the passed in shutdown function for the application
     state->app_shutdown(state->app_state);
 
     // Free the app_state memory
     etfree(state->app_state, state->app_state_size, MEMORY_TAG_APPLICATION);
+
+    // Shutdown the window
+    etwindow_shutdown(state->window_state);
+
+    // Shutdown platform
+    platform_shutdown();
+
+    // Shutdown input system
+    input_shutdown(state->input_state);
+
+    // Deregister engine events & Shutdown event system
+    event_observer_deregister(EVENT_CODE_RESIZED, state, engine_on_resize);
+    events_shutdown(state->events_state);
 
     // Shutdown log file
     logger_shutdown();
@@ -94,4 +160,11 @@ void engine_shutdown(void) {
 
     // Close memory
     memory_shutdown();
+}
+
+b8 engine_on_resize(u16 event_code, event_data data) {
+    ETDEBUG("X-pos: %d | Y-pos: %d", data.i32[0], data.i32[1]);
+
+    // Other events should handle this event code as well
+    return false;
 }
