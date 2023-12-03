@@ -10,7 +10,11 @@
 #include "platform/platform.h"
 #include "platform/etwindow.h"
 
+#include "renderer/renderer.h"
+
 #include "application_types.h"
+
+// TODO: Add application name to config
 
 typedef struct engine_state {
     // TODO: Transfer these to a visible window_state_struct or something
@@ -38,6 +42,9 @@ typedef struct engine_state {
 
     // TODO: u64 input_state_size for when engine will allocate the memory
     input_state* input_state;
+
+    // TODO: u64 input_state_size for when engine will allocate the memory
+    renderer_state* renderer_state;
 } engine_state;
 
 static engine_state* state;
@@ -77,7 +84,6 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
 
     // Events
     events_initialize(&state->events_state);
-    event_observer_register(EVENT_CODE_RESIZED, state, engine_on_resize);
 
     // Input
     input_initialize(&state->input_state);
@@ -101,6 +107,9 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
+    // Initialize renderer
+    renderer_initialize(&state->renderer_state, state->window_state, "App");
+
     // Transfer app information
     state->app_initialize = app_details.initialize;
     state->app_shutdown = app_details.shutdown;
@@ -120,8 +129,7 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
 b8 engine_run(void) {
     state->is_running = true;
     while (state->is_running) {
-
-        
+        renderer_draw_frame(state->renderer_state);
 
         
         // Belong to platform or window??
@@ -139,6 +147,8 @@ void engine_shutdown(void) {
     // Free the app_state memory
     etfree(state->app_state, state->app_state_size, MEMORY_TAG_APPLICATION);
 
+    renderer_shutdown(state->renderer_state);
+
     // Shutdown the window
     etwindow_shutdown(state->window_state);
 
@@ -149,7 +159,6 @@ void engine_shutdown(void) {
     input_shutdown(state->input_state);
 
     // Deregister engine events & Shutdown event system
-    event_observer_deregister(EVENT_CODE_RESIZED, state, engine_on_resize);
     events_shutdown(state->events_state);
 
     // Shutdown log file

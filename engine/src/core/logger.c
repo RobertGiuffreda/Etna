@@ -1,6 +1,7 @@
 #include "logger.h"
 
 #include "core/etmemory.h"
+#include "core/etstring.h"
 
 #include <stdarg.h>
 #include <stdio.h>

@@ -83,6 +83,12 @@
         "etwindow.h": "c",
         "clock.h": "c",
         "events.h": "c",
-        "asserts.h": "c"
+        "asserts.h": "c",
+        "renderer_types.h": "c",
+        "renderer.h": "c",
+        "vulkan.h": "c",
+        "etstring.h": "c",
+        "glfw3.h": "c",
+        "cmath": "c"
     }
 }

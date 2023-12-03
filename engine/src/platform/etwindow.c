@@ -5,6 +5,10 @@
 #include "core/events.h"
 #include "core/input.h"
 
+#include "renderer/renderer_types.h"
+
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_core.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -24,6 +28,10 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_stat
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
+    // TEMP: Temporary until swappchain recreation implemented
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    // TEMP: END
+
     GLFWwindow* window = glfwCreateWindow(config->width, config->height, config->name, 0, 0);
     if (!window) {
         ETFATAL("Failed to create glfw window. Function glfwCreateWindow returned false.");
@@ -35,7 +43,7 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_stat
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    glfwSetWindowSizeCallback(window, resize_callback);
+    // glfwSetWindowSizeCallback(window, resize_callback);
 
 
     glfwSetWindowPos(window, config->x_start_pos, config->y_start_pos);
@@ -74,7 +82,7 @@ void cursor_position_callback(GLFWwindow* window, f64 xpos, f64 ypos) {
     input_process_mouse_move((i32)xpos, (i32)ypos);
 }
 
-// TODO: Change scrolling to accept a larger value
+// TODO: This is wrong; fix it
 void scroll_callback(GLFWwindow* window, f64 xoffset, f64 yoffset) {
     input_process_mouse_wheel((u8)yoffset);
 }
@@ -83,5 +91,18 @@ void resize_callback(GLFWwindow* window, i32 width, i32 height) {
     event_data e;
     e.i32[0] = width;
     e.i32[1] = height;
-    event_fire(EVENT_CODE_RESIZED, e);
+    event_fire(EVENT_CODE_RESIZE, e);
+}
+
+b8 window_create_vulkan_surface(struct renderer_state* renderer_state, etwindow_state* window_state) {
+    VkResult result = glfwCreateWindowSurface(
+        renderer_state->instance,
+        window_state->impl_window,
+        renderer_state->allocator,
+        &renderer_state->surface);
+    return result == VK_SUCCESS;
+}
+
+const char** window_get_required_extension_names(i32* count) {
+    return glfwGetRequiredInstanceExtensions(count);
 }

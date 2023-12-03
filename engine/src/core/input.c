@@ -51,11 +51,11 @@ void input_process_key(keys key, u8 action) {
     {
     case KEY_RELEASE:
         state->current_keys[key] = KEY_RELEASE;
-        event_fire(EVENT_CODE_KEY_RELEASED, e);
+        event_fire(EVENT_CODE_KEY_RELEASE, e);
         break;
     case KEY_PRESS:
         state->current_keys[key] = KEY_PRESS;
-        event_fire(EVENT_CODE_KEY_PRESSED, e);
+        event_fire(EVENT_CODE_KEY_PRESS, e);
         break;
     case KEY_REPEAT:
         state->current_keys[key] |= KEY_REPEAT;
@@ -68,9 +68,9 @@ void input_process_button(buttons button, b8 pressed) {
     event_data e;
     e.i32[0] = (i32)button;
     if (pressed) {
-        event_fire(EVENT_CODE_BUTTON_PRESSED, e);
+        event_fire(EVENT_CODE_BUTTON_PRESS, e);
     } else {
-        event_fire(EVENT_CODE_BUTTON_RELEASED, e);
+        event_fire(EVENT_CODE_BUTTON_RELEASE, e);
     }
 }
 
@@ -81,7 +81,7 @@ void input_process_mouse_move(i32 x, i32 y) {
         event_data e;
         e.i32[0] = x;
         e.i32[1] = y;
-        event_fire(EVENT_CODE_MOUSE_MOVED, e);
+        event_fire(EVENT_CODE_MOUSE_MOVE, e);
     }
 }
 

@@ -24,21 +24,32 @@ typedef struct dynarray {
 static const u64 header_size = sizeof(dynarray);
 
 static inline dynarray* _dynarray_create(u64 capacity, u64 stride);
+static inline dynarray* _dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* data);
 static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity);
 
 // TODO: Test and ensure correct behavoir
 static inline dynarray* _dynarray_resize_index(dynarray* header, u64 length, u64 index);
 static inline void _dynarray_shift_index(dynarray* header, u64 index);
 
-void* dynarray_create(u64 length, u64 stride)
+void* dynarray_create(u64 capacity, u64 stride)
 {
-    dynarray* header = _dynarray_create(length, stride);
+    dynarray* header = _dynarray_create(capacity, stride);
     header->length = 0;
-    header->capacity = length;
+    header->capacity = capacity;
     header->stride = stride;
 
     // Move forward by a value of 1 * sizeof(dynarray).
-    return (void *)(header + 1);
+    return (void*)(header + 1);
+}
+
+void* dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* data) {
+    // If the given capacity is too small to hold all the data. Cut it off
+    u64 new_length = (capacity < length) ? capacity : length;
+    dynarray* header = _dynarray_create_data(capacity, stride, new_length, data);
+    header->capacity = capacity;
+    header->length = new_length;
+    header->stride = stride;
+    return (void*)(header + 1);
 }
 
 void dynarray_destroy(void* array)
@@ -55,10 +66,8 @@ void dynarray_destroy(void* array)
 void dynarray_resize(void** array_ptr, u64 length)
 {
     dynarray* header = (dynarray*)(*array_ptr) - 1;
-    header = _dynarray_resize(header, length);
-    if (header->length >= header->capacity) 
-    {
-        // If the index of the array is larger than the length
+    if (length > header->capacity)  {
+        header = _dynarray_resize(header, length);
         header->length = header->capacity;
     }
     *array_ptr = (void*)(header + 1);
@@ -155,6 +164,12 @@ void dynarray_remove(void* array, void* dest, u64 index)
 dynarray* _dynarray_create(u64 capacity, u64 stride)
 {
    return (dynarray*)etallocate(header_size + (capacity * stride), MEMORY_TAG_DYNARRAY);
+}
+
+dynarray* _dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* data) {
+    dynarray* new_dynarray = (dynarray*)etallocate(header_size + (capacity * stride), MEMORY_TAG_DYNARRAY);
+    etcopy_memory((new_dynarray + 1), data, stride * length);
+    return new_dynarray;
 }
 
 // static inline here????

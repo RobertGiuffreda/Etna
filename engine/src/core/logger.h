@@ -26,30 +26,30 @@ void log_output(log_level level, const char* message, ...);
 // TODO: Remove ; from the end of log macros
 
 // Log messages
-#define ETFATAL(message, ...) log_output(LOG_FATAL, message, ##__VA_ARGS__);
+#define ETFATAL(message, ...) log_output(LOG_FATAL, message, ##__VA_ARGS__)
 
-#define ETERROR(message, ...) log_output(LOG_ERROR, message, ##__VA_ARGS__);
+#define ETERROR(message, ...) log_output(LOG_ERROR, message, ##__VA_ARGS__)
 
 #ifdef LOG_WARN_ENABLED
-#define ETWARN(message, ...) log_output(LOG_WARN, message, ##__VA_ARGS__);
+#define ETWARN(message, ...) log_output(LOG_WARN, message, ##__VA_ARGS__)
 #else
 #define ETWARN(message, ...)
 #endif
 
 #ifdef LOG_INFO_ENABLED
-#define ETINFO(message, ...) log_output(LOG_INFO, message, ##__VA_ARGS__);
+#define ETINFO(message, ...) log_output(LOG_INFO, message, ##__VA_ARGS__)
 #else
 #define ETINFO(message, ...)
 #endif
 
 #ifdef LOG_DEBUG_ENABLED
-#define ETDEBUG(message, ...) log_output(LOG_DEBUG, message, ##__VA_ARGS__);
+#define ETDEBUG(message, ...) log_output(LOG_DEBUG, message, ##__VA_ARGS__)
 #else
 #define ETDEBUG(message, ...)
 #endif
 
 #ifdef LOG_TRACE_ENABLED
-#define ETTRACE(message, ...) log_output(LOG_TRACE, message, ##__VA_ARGS__);
+#define ETTRACE(message, ...) log_output(LOG_TRACE, message, ##__VA_ARGS__)
 #else
 #define ETTRACE(message, ...)
 #endif

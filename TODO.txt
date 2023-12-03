@@ -1,13 +1,33 @@
-TODO: Unit tests 
+TODO: Create swapchain 
+TODO: Destroy swapchain
+TODO: Recreate swapchain:
+// TEMP: Checking for old_swapchain seems kinda scuffed.
+if (old_swapchain != VK_NULL_HANDLE) {
+    for (u32 i = 0; i < state->image_count; ++i) {
+        vkDestroyImageView(
+            state->device.handle,
+            state->swapchain_image_views[i],
+            state->allocator);
+    }
+    vkDestroySwapchainKHR(
+        state->device.handle,
+        old_swapchain,
+        state->allocator);
+}
 
-TODO: Set up vulkan to work. (Check via code in engine for now)
+^^^^^^^^^^^^^^^^^^^^^^^^^ Use this code for requerying the swapchain when recreating ^^^^^^^^^^^^^^^^^^^^^^^^^
+TODO: Insert VK_CHECK where appropriate. 
+
+TODO: Rework Queue's and Queue Families & Command buffers.
+I haven't event finished writing the code & it already needs a rewrite.
+
+TODO: Unit tests
 
 TODO: FIFO Struct to place events into
 TODO: Setup event overwritting or adding based on behavior of event. When event is fired,
 it would be able to overwrite the event waiting in the event queue or
 it would be able to combine its parameters in a predefined way(func pointer??)
-
-TODO: previous & current keyboard & mouse states.
+TODO: Events: Data struct to support insertions with ordering(priority) value
 
 TODO: Setup Debug & Release configurations
 

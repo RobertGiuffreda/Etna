@@ -19,9 +19,20 @@ If this becomes an issue: Create implementation of something like a shared point
 /*
  * Creates a dynamic array of (length) elements with a size of
  * (stride) each.
- * Calling with a length of zero is fine as we add one to length on resize
+ * The end index used for pushing and popping is set to length
  */
-void* dynarray_create(u64 length, u64 stride);
+void* dynarray_create(u64 capacity, u64 stride);
+
+/**
+ * @brief Create a new dynamic array from an existing source of data.
+ * 
+ * @param capacity The amount of elements the underlying array should contain
+ * @param stride The size in bytes of each array element
+ * @param length The amount of elements in data
+ * @param data The data to be transferred to the new dynamic array
+ * @return void* 
+ */
+void* dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* data);
 
 void dynarray_destroy(void* array);
 
