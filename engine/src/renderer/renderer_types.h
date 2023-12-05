@@ -9,10 +9,22 @@
 
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
 
+// TODO: Width and height to 
+typedef struct image {
+    VkImage handle;
+    VkImageView view;
+    VkDeviceMemory memory;
+
+    VkImageType type;
+    VkExtent3D extent;
+    VkFormat format;
+} image;
+
 // TODO: GPU limits
 typedef struct device {
     VkDevice handle;
-    VkPhysicalDevice physical_device;
+    VkPhysicalDevice gpu;
+    VkPhysicalDeviceMemoryProperties gpu_memory_props;
 
     // TODO: Better name which reflect that it is a queue family index
     // Not just a queue index
@@ -34,7 +46,6 @@ typedef struct renderer_state {
 #endif
     VkAllocationCallbacks* allocator;
 
-    // Window data
     VkSurfaceKHR surface;
     i32 width;
     i32 height;
@@ -42,19 +53,19 @@ typedef struct renderer_state {
 
     device device;
 
-    // Swapchain data
     VkSwapchainKHR swapchain;
     VkFormat swapchain_image_format;
-    VkImage* swapchain_images;
-    VkImageView* swapchain_image_views;
+
     // Determines amount of frames: Length of perframe arrays
     u32 image_count;
+    VkImage* swapchain_images;
+    VkImageView* swapchain_image_views;
+
+    image render_image;
 
     u32 current_frame;
 
-    // TEMP: 
-    i32 frame_number;
-    // TEMP: END
+    i32 frame_number; // TEMP: THIS LINE
 
     // NOTE: Per frame structures/data. Add to separate struct??
     VkSemaphore* swapchain_semaphores;

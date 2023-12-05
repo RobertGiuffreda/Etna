@@ -8,7 +8,7 @@
 b8 initialize_swapchain(renderer_state* state) {
     VkSurfaceCapabilitiesKHR surface_capabilities;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-        state->device.physical_device,
+        state->device.gpu,
         state->surface,
         &surface_capabilities));
     
@@ -18,14 +18,14 @@ b8 initialize_swapchain(renderer_state* state) {
     
     u32 format_count = 0;
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
-        state->device.physical_device,
+        state->device.gpu,
         state->surface,
         &format_count,
         0));
     // TODO: Change from dynarray to regular allocation
     VkSurfaceFormatKHR* formats = dynarray_create(format_count, sizeof(VkSurfaceFormatKHR));
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
-        state->device.physical_device,
+        state->device.gpu,
         state->surface,
         &format_count,
         formats));
@@ -102,7 +102,8 @@ b8 initialize_swapchain(renderer_state* state) {
         .imageColorSpace = color_space,
         .imageExtent = swapchain_dimensions,
         .imageArrayLayers = 1,
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT /* TEMP: For vkCmdClearColorImage */ | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        // .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         // Image sharing mode & queue family indices below
         .preTransform = pre_transform,
         .compositeAlpha = composite,

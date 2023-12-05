@@ -1,8 +1,11 @@
 #include "renderer_types.h"
 #include "renderer.h"
 
+#include "renderer/vkutils.h"
+
 #include "renderer/device.h"
 #include "renderer/swapchain.h"
+#include "renderer/image.h"
 
 #include "window/renderer_window.h"
 
@@ -50,8 +53,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
         .applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
         .pEngineName = "Etna",
         .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_3
-    };
+        .apiVersion = VK_API_VERSION_1_3};
 
     i32 win_ext_count = 0;
     const char** window_extensions = window_get_required_extension_names(&win_ext_count);
@@ -129,9 +131,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
         .enabledExtensionCount = required_extension_count,
         .ppEnabledExtensionNames = required_extensions,
         .enabledLayerCount = required_layer_count,
-        .ppEnabledLayerNames = required_layers,
-    };
-
+        .ppEnabledLayerNames = required_layers,};
     VK_CHECK(vkCreateInstance(&vkinstance_cinfo, state->allocator, &state->instance));
     ETINFO("Vulkan Instance Created");
 
@@ -154,8 +154,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
         .messageType= VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
         .pfnUserCallback = vk_debug_callback,
-        .pUserData = NULL
-    };
+        .pUserData = NULL};
     VK_CHECK(pfnCreateDebugUtilsMessengerEXT(state->instance, &callback1, NULL, &state->debug_messenger));
     ETINFO("Vulkan debug messenger created.");
 #endif
@@ -172,6 +171,20 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     }
 
     initialize_swapchain(state);
+
+    // Render image initialization
+    VkExtent3D render_image_extent = {
+        .width = state->width,
+        .height = state->height,
+        .depth = 1};
+    image2D_create(state, 
+        render_image_extent,
+        state->swapchain_image_format,
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT /* TEMP: For vkCmdClearColorImage */ | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &state->render_image);
+    ETINFO("Render image created");
 
     create_frame_command_structures(state);
     ETINFO("Frame command structures created.");
@@ -191,6 +204,9 @@ void renderer_shutdown(renderer_state* state) {
 
     destroy_frame_command_structures(state);
     ETINFO("Frame command structures destroyed.");
+
+    image2D_destroy(state, &state->render_image);
+    ETINFO("Render image destroyed.");
 
     shutdown_swapchain(state);
     ETINFO("Swapchain shutdown.");
@@ -220,8 +236,6 @@ b8 renderer_prepare_frame(renderer_state* state) {
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
-    VkCommandBuffer frame_cmd = state->main_graphics_command_buffers[state->current_frame];
-
     // Wait for the current frame to end rendering by waiting on its render fence
     // Reset the render fence for reuse
     VK_CHECK(vkWaitForFences(
@@ -230,11 +244,6 @@ b8 renderer_draw_frame(renderer_state* state) {
         &state->render_fences[state->current_frame],
         VK_TRUE,
         1000000000));
-    // TODO: Swapchain nonsense maybe
-    VK_CHECK(vkResetFences(
-        state->device.handle,
-        1,
-        &state->render_fences[state->current_frame]));
     
     u32 swapchain_index;
     VK_CHECK(vkAcquireNextImageKHR(
@@ -244,69 +253,24 @@ b8 renderer_draw_frame(renderer_state* state) {
         state->swapchain_semaphores[state->current_frame],
         VK_NULL_HANDLE,
         &swapchain_index));
+
+    VK_CHECK(vkResetFences(
+        state->device.handle,
+        1,
+        &state->render_fences[state->current_frame]));
+
+    VK_CHECK(vkResetCommandBuffer(state->main_graphics_command_buffers[state->current_frame], 0));
+
+    VkCommandBuffer frame_cmd = state->main_graphics_command_buffers[state->current_frame];
     
-    VkCommandBufferBeginInfo begin_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .pNext = 0,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-        .pInheritanceInfo = 0};
+    VkCommandBufferBeginInfo begin_info = init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VK_CHECK(vkBeginCommandBuffer(frame_cmd, &begin_info));
 
-    vkBeginCommandBuffer(frame_cmd, &begin_info);
-
-    // Transition the swapchain image layout to writing suitable
-    
-    VkImageSubresourceRange acquire_subresource_range = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1
-    };
-
-    VkImageMemoryBarrier2 acquire_barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-        .pNext = 0,
-
-        .srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-        .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-
-        .srcAccessMask = VK_ACCESS_2_NONE,
-        .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-
-        .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-
-        .image = state->swapchain_images[swapchain_index],
-        .subresourceRange = acquire_subresource_range};
-
-    // VkImageMemoryBarrier2 acquire_barrier = {
-    //     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-    //     .pNext = 0,
-
-    //     .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-    //     .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-
-    //     .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
-    //     .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-
-    //     .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-    //     .newLayout = VK_IMAGE_LAYOUT_GENERAL,
-
-    //     .image = state->swapchain_images[swapchain_index],
-    //     .subresourceRange = acquire_subresource_range};
-    
-    VkDependencyInfo acquire_dependency = {
-        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .pNext = 0,
-        .dependencyFlags = 0,
-        .memoryBarrierCount = 0,
-        .pBufferMemoryBarriers = 0,
-        .bufferMemoryBarrierCount = 0,
-        .pBufferMemoryBarriers = 0,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &acquire_barrier};
-
-    vkCmdPipelineBarrier2(frame_cmd, &acquire_dependency);
+    // Image barrier to transition render_image from undefined to general layout for clear value command
+    image_barrier(frame_cmd, state->render_image.handle,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
     // Clear the screen
     VkClearColorValue clear_value;
@@ -316,117 +280,64 @@ b8 renderer_draw_frame(renderer_state* state) {
     clear_value.float32[2] = flash;
     clear_value.float32[3] = 1.0f;
 
-    VkImageSubresourceRange clear_range = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1};
-    
+    VkImageSubresourceRange clear_range = init_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+
     vkCmdClearColorImage(frame_cmd,
-        state->swapchain_images[swapchain_index],
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        state->render_image.handle,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         &clear_value,
         1,
         &clear_range);
 
-    // vkCmdClearColorImage(frame_cmd,
-    //     state->swapchain_images[swapchain_index],
-    //     VK_IMAGE_LAYOUT_GENERAL,
-    //     &clear_value,
-    //     1,
-    //     &clear_range);
+    // Image barrier to transition render image to transfer source optimal layout
+    image_barrier(frame_cmd, state->render_image.handle,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
-    VkImageSubresourceRange present_subresource_range = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel = 0,
-        .levelCount = 1,
-        .baseArrayLayer = 0,
-        .layerCount = 1};
+    // Image barrier to transition swapchain image to transfer destination optimal
+    image_barrier(frame_cmd, state->swapchain_images[swapchain_index],
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_ACCESS_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
-    // Transition image back to presentable layout
-    VkImageMemoryBarrier2 present_barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-        .pNext = 0,
+    // Blit command to copy from render image to swapchain
+    VkExtent3D blit_extent = {
+        .width = state->width,
+        .height = state->height,
+        .depth = 1};
+    blit_image2D_to_image2D(
+        frame_cmd,
+        state->render_image.handle,
+        state->swapchain_images[swapchain_index],
+        blit_extent,
+        VK_IMAGE_ASPECT_COLOR_BIT);
 
-        .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-        .dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
-
-        .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_2_NONE,
-
-        .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-
-        .image = state->swapchain_images[swapchain_index],
-        .subresourceRange = present_subresource_range};
-
-    // VkImageMemoryBarrier2 present_barrier = {
-    //     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-    //     .pNext = 0,
-
-    //     .srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-    //     .dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-
-    //     .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
-    //     .dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
-
-    //     .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
-    //     .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-
-    //     .image = state->swapchain_images[swapchain_index],
-    //     .subresourceRange = present_subresource_range};
-    
-    VkDependencyInfo present_dependency = {
-        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-        .pNext = 0,
-        .dependencyFlags = 0,
-        .memoryBarrierCount = 0,
-        .pBufferMemoryBarriers = 0,
-        .bufferMemoryBarrierCount = 0,
-        .pBufferMemoryBarriers = 0,
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &present_barrier};
-
-    vkCmdPipelineBarrier2(frame_cmd, &present_dependency);
+    // Image barrier to transition the swapchian image from transfer destination optimal to present khr
+    image_barrier(frame_cmd, state->swapchain_images[swapchain_index],
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_NONE,
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
 
     // End command buffer recording
-    vkEndCommandBuffer(frame_cmd);
+    VK_CHECK(vkEndCommandBuffer(frame_cmd));
 
     // Begin command buffer submission
-    VkCommandBufferSubmitInfo cmd_submit_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
-        .pNext = 0,
-        .commandBuffer = frame_cmd};
-
-    VkSemaphoreSubmitInfo wait_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .pNext = 0,
-        .semaphore = state->swapchain_semaphores[swapchain_index],
-        .stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT};
-
-    VkSemaphoreSubmitInfo signal_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
-        .pNext = 0,
-        .semaphore = state->render_semaphores[state->current_frame],
-        .stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT};
-    
-    VkSubmitInfo2 queue_submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
-        .pNext = 0,
-        .waitSemaphoreInfoCount = 1,
-        .pWaitSemaphoreInfos = &wait_info,
-        .commandBufferInfoCount = 1,
-        .pCommandBufferInfos = &cmd_submit_info,
-        .signalSemaphoreInfoCount = 1,
-        .pSignalSemaphoreInfos = &signal_info};
+    VkCommandBufferSubmitInfo cmd_submit = init_command_buffer_submit_info(frame_cmd);
+    VkSemaphoreSubmitInfo wait_submit = init_semaphore_submit_info(
+        state->swapchain_semaphores[swapchain_index],
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
+    VkSemaphoreSubmitInfo signal_submit = init_semaphore_submit_info(
+        state->render_semaphores[state->current_frame],
+        VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT);
+    VkSubmitInfo2 submit_info = init_submit_info2(
+        1, &wait_submit,
+        1, &cmd_submit,
+        1, &signal_submit);
     
     // Submit commands
-    VK_CHECK(vkQueueSubmit2(
-        state->device.graphics_queue,
-        1,
-        &queue_submit_info,
-        state->render_fences[state->current_frame]));
+    VK_CHECK(vkQueueSubmit2(state->device.graphics_queue, 1,
+        &submit_info, state->render_fences[state->current_frame]));
 
     // Present the image
     VkPresentInfoKHR present_info = {
@@ -434,12 +345,9 @@ b8 renderer_draw_frame(renderer_state* state) {
         .pNext = 0,
         .swapchainCount = 1,
         .pSwapchains = &state->swapchain,
-        
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &state->render_semaphores[state->current_frame],
-        
         .pImageIndices = &swapchain_index};
-    
     VK_CHECK(vkQueuePresentKHR(state->device.present_queue, &present_info));
 
     state->frame_number++;
@@ -457,24 +365,20 @@ static void create_frame_command_structures(renderer_state* state) {
         sizeof(VkCommandBuffer) * state->image_count,
         MEMORY_TAG_RENDERER);
     for (u32 i= 0; i < state->image_count; ++i) {
-        VkCommandPoolCreateInfo graphics_pool_cinfo = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-            .pNext = 0,
-            .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            .queueFamilyIndex = state->device.graphics_queue_index};
+        VkCommandPoolCreateInfo gpool_info = init_command_pool_create_info(
+            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            state->device.graphics_queue_index);
         VK_CHECK(vkCreateCommandPool(state->device.handle,
-            &graphics_pool_cinfo,
+            &gpool_info,
             state->allocator,
             &state->graphics_pools[i]));
-        VkCommandBufferAllocateInfo main_graphics_buffer_allocate_cinfo = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-            .pNext = 0,
-            .commandPool = state->graphics_pools[i],
-            .level = 0,
-            .commandBufferCount = 1};
+        
+        // Allocate one primary
+        VkCommandBufferAllocateInfo command_buffer_alloc_info = init_command_buffer_allocate_info(
+            state->graphics_pools[i], VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
         VK_CHECK(vkAllocateCommandBuffers(
             state->device.handle,
-            &main_graphics_buffer_allocate_cinfo,
+            &command_buffer_alloc_info,
             &state->main_graphics_command_buffers[i]));
     }
 }
@@ -507,27 +411,23 @@ static void create_frame_synchronization_structures(renderer_state* state) {
         sizeof(VkFence) * state->image_count,
         MEMORY_TAG_RENDERER);
 
-    VkSemaphoreCreateInfo semaphores_cinfo = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-        .pNext = 0,
-        .flags = 0};
-    VkFenceCreateInfo render_fence_cinfo = {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .pNext = 0,
-        .flags = VK_FENCE_CREATE_SIGNALED_BIT};
+    VkSemaphoreCreateInfo semaphore_info = init_semaphore_create_info(0);
+    VkFenceCreateInfo fence_info = init_fence_create_info(
+        VK_FENCE_CREATE_SIGNALED_BIT);
+    
     for (u32 i = 0; i < state->image_count; ++i) {
         VK_CHECK(vkCreateSemaphore(
             state->device.handle,
-            &semaphores_cinfo,
+            &semaphore_info,
             state->allocator,
             &state->swapchain_semaphores[i]));
         VK_CHECK(vkCreateSemaphore(
             state->device.handle, 
-            &semaphores_cinfo, 
+            &semaphore_info, 
             state->allocator, 
             &state->render_semaphores[i]));
         VK_CHECK(vkCreateFence(state->device.handle,
-            &render_fence_cinfo,
+            &fence_info,
             state->allocator,
             &state->render_fences[i]));
     }
@@ -589,17 +489,3 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     }
     return VK_FALSE;
 }
-
-// // TODO: Move to another file. Image.h or something
-// VkImageMemoryBarrier2 image_barrier(
-//     VkCommandBuffer cmd,
-//     VkImage img,
-//     VkImageLayout old_layout,
-//     VkImageLayout new_layout,
-//     VkAccessFlags2 src_access_mask,
-//     VkAccessFlags2 dst_access_mask,
-//     VkPipelineStageFlags2 src_stage_mask,
-//     VkPipelineStageFlags2 dst_stage_mask)
-// {
-
-// }

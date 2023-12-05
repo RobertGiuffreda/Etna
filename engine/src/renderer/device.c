@@ -1,5 +1,7 @@
 #include "device.h"
 
+#include "renderer/vkutils.h"
+
 #include "containers/dynarray.h"
 #include "core/etmemory.h"
 #include "core/logger.h"
@@ -22,6 +24,7 @@ typedef struct physical_device_requirements {
     b8 sampler_anisotropy;
     b8 dynamic_rendering;
     b8 synchronization2;
+    b8 maintenance4;
 
     b8 graphics_capable;
     b8 presentation_capable;
@@ -57,29 +60,35 @@ b8 device_create(renderer_state* state, device* out_device) {
         .sampler_anisotropy = true,
         .dynamic_rendering = true,
         .synchronization2 = true,
+        .maintenance4 = true,
         
         .graphics_capable = true,
         .presentation_capable = true,
         .compute_capable = true,
-        .transfer_capable = true,
-    };
+        .transfer_capable = true};
     if (!pick_physical_device(state, &requirements, out_device)) {
         ETFATAL("Unable to select gpu.");
         return false;
     }
 
+    // Get memory properties from gpu
+    VkPhysicalDeviceMemoryProperties2 props = init_physical_device_memory_properties2();
+    vkGetPhysicalDeviceMemoryProperties2(out_device->gpu, &props);
+    out_device->gpu_memory_props = props.memoryProperties;
+
+
     // TODO: Rework when multithreading to take into account the posibility
     // that the graphics, presentation, compute, transfer queues can be the same queue 
 
     u32 queue_family_count = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties2(out_device->physical_device, &queue_family_count, 0);
+    vkGetPhysicalDeviceQueueFamilyProperties2(out_device->gpu, &queue_family_count, 0);
     VkQueueFamilyProperties2* qf_props = 
         (VkQueueFamilyProperties2*)etallocate(sizeof(VkQueueFamilyProperties2) * queue_family_count, MEMORY_TAG_RENDERER);
     for (u32 i = 0; i < queue_family_count; ++i) {
         qf_props[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
         qf_props[i].pNext = 0;
     }
-    vkGetPhysicalDeviceQueueFamilyProperties2(out_device->physical_device, &queue_family_count, qf_props);
+    vkGetPhysicalDeviceQueueFamilyProperties2(out_device->gpu, &queue_family_count, qf_props);
 
     // Create bitmasks for each possible queue family
     u32* qfi_bitmasks = (u32*)etallocate(sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
@@ -128,15 +137,14 @@ b8 device_create(renderer_state* state, device* out_device) {
     VkPhysicalDeviceVulkan13Features enabled_features13 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
         .pNext = 0,
-        .dynamicRendering = VK_TRUE,
-        .synchronization2 = VK_TRUE};
+        .dynamicRendering = requirements.dynamic_rendering,
+        .synchronization2 = requirements.synchronization2,
+        .maintenance4 = requirements.maintenance4};
     VkPhysicalDeviceFeatures2 enabled_features2 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .pNext = &enabled_features13,
         .features = {
-            .samplerAnisotropy = VK_TRUE,
-        }
-    };
+            .samplerAnisotropy = requirements.sampler_anisotropy}};
 
     // TODO: Logical device creation
     VkDeviceCreateInfo device_cinfo = {
@@ -153,7 +161,7 @@ b8 device_create(renderer_state* state, device* out_device) {
         .ppEnabledLayerNames = 0,   // Depricated
     };
     VK_CHECK(vkCreateDevice(
-        out_device->physical_device, 
+        out_device->gpu, 
         &device_cinfo,
         state->allocator,
         &out_device->handle));
@@ -250,14 +258,11 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
         }
 
         // Requirements met so all good
-        out_device->physical_device = physical_devices[i];
+        out_device->gpu = physical_devices[i];
         out_device->graphics_queue_index = requirements->g_index;
         out_device->compute_queue_index = requirements->c_index;
         out_device->transfer_queue_index = requirements->t_index;
         out_device->present_queue_index = requirements->p_index;
-
-        
-
 
         ETINFO("Device: %s", properties2.properties.deviceName);
         ETINFO(
@@ -303,6 +308,9 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
     if (requirements->synchronization2 && !features13.synchronization2) {
         ETFATAL("Feature Dynamic Rendering is required & not supported on this device.");
         return false;
+    }
+    if (requirements->maintenance4 && !features13.maintenance4) {
+        ETFATAL("Feature maintenance4 is required & not supported on this device.");
     }
 
     // Enumerate supported extnesions

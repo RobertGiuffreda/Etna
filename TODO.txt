@@ -1,6 +1,27 @@
-TODO: Create swapchain 
-TODO: Destroy swapchain
-TODO: Recreate swapchain:
+--------Immediate--------
+TODO: Math library to use. Wrapper on (cglm)
+TODO: Shaders & Descriptor Set creation for shaders
+TODO: Compute pipeline
+TODO: Hardcode a starting cube
+TODO: Graphics pipeline
+TODO: Render the cube
+
+TODO: Model loading library
+TODO: Staging buffer implementation
+
+TODO: Spir-V Reflect to automate shader descriptor sets
+--------After Immediate--------
+TODO: Result of vulkan commands checking done with VK_CHECK & other result checking when unnecessary
+
+TODO: Recreate swapchain implementation
+
+TODO: FIFO Struct to place events into
+TODO: Setup event overwritting or adding based on behavior of event. When event is fired,
+it would be able to overwrite the event waiting in the event queue or
+it would be able to combine its parameters in a predefined way(func pointer??)
+TODO: Events: Data struct to support insertions with ordering(priority) value
+
+NOTE: Recreate swapchain:
 // TEMP: Checking for old_swapchain seems kinda scuffed.
 if (old_swapchain != VK_NULL_HANDLE) {
     for (u32 i = 0; i < state->image_count; ++i) {
@@ -15,28 +36,33 @@ if (old_swapchain != VK_NULL_HANDLE) {
         state->allocator);
 }
 
-^^^^^^^^^^^^^^^^^^^^^^^^^ Use this code for requerying the swapchain when recreating ^^^^^^^^^^^^^^^^^^^^^^^^^
-TODO: Insert VK_CHECK where appropriate. 
+--------Refactor & Structure Decisions--------
+NOTE: Actual coding
+TODO: Different formats for swapchain image and render target image
+TODO: Explicitly Reset command buffers in draw function
+TODO: Use the transfer queue to copy the data from rendering image to the swapchain image
 
-TODO: Rework Queue's and Queue Families & Command buffers.
-I haven't event finished writing the code & it already needs a rewrite.
-
+NOTE: Really boring stuff
 TODO: Unit tests
-
-TODO: FIFO Struct to place events into
-TODO: Setup event overwritting or adding based on behavior of event. When event is fired,
-it would be able to overwrite the event waiting in the event queue or
-it would be able to combine its parameters in a predefined way(func pointer??)
-TODO: Events: Data struct to support insertions with ordering(priority) value
-
 TODO: Setup Debug & Release configurations
 
+NOTE: Code Structure and spec reading
 TODO: Dynamic vs static library. ??
 TODO: If static: Instead of passing function pointers, just say the functions are external and get them from the sandbox file??.
 TODO: If dynamic: Use volk included with the vulkan sdk to dynamically load vulkan functions.
 
 TODO: When systems fail they should be able to call shutdown procedures if the failure is recoverable
 
+TODO: Rework Queue's and Queue Families & Command buffers.
+I haven't event finished writing the code & it already needs a rewrite.
+
+TODO: VkImageViewUsageCreateInfo: check out
+
+
 -- When finally rendering --
 NOTE: Sample 2D slice of 3D texture for wierd patterns.
 Like mod world position with texture limits to index into tiling 3D texture.
+
+TODO: Staging buffer improvment. For loading on the fly
+
+TODO: Make the game code a dynamic plugin.

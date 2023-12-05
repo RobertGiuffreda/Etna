@@ -89,6 +89,10 @@
         "vulkan.h": "c",
         "etstring.h": "c",
         "glfw3.h": "c",
-        "cmath": "c"
+        "cmath": "c",
+        "vkutils.h": "c",
+        "device.h": "c",
+        "renderer_window.h": "c",
+        "image.h": "c"
     }
 }
