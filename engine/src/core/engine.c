@@ -108,7 +108,10 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     }
 
     // Initialize renderer
-    renderer_initialize(&state->renderer_state, state->window_state, "App");
+    if (!renderer_initialize(&state->renderer_state, state->window_state, "App")) {
+        ETFATAL("Renderer failed to initialize.");
+        return false;
+    }
 
     // Transfer app information
     state->app_initialize = app_details.initialize;
@@ -126,12 +129,15 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     return true;
 }
 
+// TODO: Handle minimizing
 b8 engine_run(void) {
     state->is_running = true;
+
+    state->app_update(state->app_state);
+
     while (state->is_running) {
         renderer_draw_frame(state->renderer_state);
 
-        
         // Belong to platform or window??
         etwindow_pump_messages();
         state->is_running = !etwindow_should_close(state->window_state);

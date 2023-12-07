@@ -93,6 +93,16 @@
         "vkutils.h": "c",
         "device.h": "c",
         "renderer_window.h": "c",
-        "image.h": "c"
+        "image.h": "c",
+        "math_types.h": "c",
+        "etmath.h": "c",
+        "cglm.h": "c",
+        "vec4.h": "c",
+        "struct.h": "c",
+        "vec2.h": "c",
+        "types-struct.h": "c",
+        "application.h": "c",
+        "filesystem.h": "c",
+        "vkinit.h": "c"
     }
 }

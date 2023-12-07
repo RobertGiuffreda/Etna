@@ -102,7 +102,6 @@ b8 initialize_swapchain(renderer_state* state) {
         .imageColorSpace = color_space,
         .imageExtent = swapchain_dimensions,
         .imageArrayLayers = 1,
-        // .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         // Image sharing mode & queue family indices below
         .preTransform = pre_transform,

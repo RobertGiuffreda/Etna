@@ -1,15 +1,28 @@
 --------Immediate--------
-TODO: Math library to use. Wrapper on (cglm)
-TODO: Shaders & Descriptor Set creation for shaders
-TODO: Compute pipeline
+TODO: How does updating and writing VkDescriptorSets work
+
+VkDescriptorPoolSize -- One for each VkDescriptorType with amount of allocations from descriptor type
+VkDescriptorPool
+
+VkDescriptorSetLayoutBinding
+VkDescriptorSetLayout
+
+VkDescriptorSet
+
+VkWriteDescriptorSet
+VkCopyDescriptorSet
+vkUpdateDescriptorSets
+
 TODO: Hardcode a starting cube
-TODO: Graphics pipeline
 TODO: Render the cube
+
+TODO: Spir-V Reflect to automate shader descriptor sets
+
+TODO: Graphics pipelines
 
 TODO: Model loading library
 TODO: Staging buffer implementation
 
-TODO: Spir-V Reflect to automate shader descriptor sets
 --------After Immediate--------
 TODO: Result of vulkan commands checking done with VK_CHECK & other result checking when unnecessary
 
@@ -20,6 +33,10 @@ TODO: Setup event overwritting or adding based on behavior of event. When event 
 it would be able to overwrite the event waiting in the event queue or
 it would be able to combine its parameters in a predefined way(func pointer??)
 TODO: Events: Data struct to support insertions with ordering(priority) value
+
+TODO: Logger outputs to log file.
+
+TODO: Use multiple queue families instead of just the one
 
 NOTE: Recreate swapchain:
 // TEMP: Checking for old_swapchain seems kinda scuffed.
@@ -35,12 +52,13 @@ if (old_swapchain != VK_NULL_HANDLE) {
         old_swapchain,
         state->allocator);
 }
-
 --------Refactor & Structure Decisions--------
 NOTE: Actual coding
 TODO: Different formats for swapchain image and render target image
 TODO: Explicitly Reset command buffers in draw function
 TODO: Use the transfer queue to copy the data from rendering image to the swapchain image
+TODO: Validate that the device is able to create the descriptor set layouts gotten from the shaders
+^^vkGetDescriptorSetLayoutSupport & (VkPhysicalDeviceMaintenance3Properties + vkGetPhysicalDeviceProperties2) 
 
 NOTE: Really boring stuff
 TODO: Unit tests
@@ -56,13 +74,51 @@ TODO: When systems fail they should be able to call shutdown procedures if the f
 TODO: Rework Queue's and Queue Families & Command buffers.
 I haven't event finished writing the code & it already needs a rewrite.
 
-TODO: VkImageViewUsageCreateInfo: check out
+TODO: VkImageViewUsageCreateInfo structure to the pNext chain, but the view usage must be a subset of the image usage.
 
+TODO: SPIR-V optimizer commands in cmake
+TODO: Runtime compilation of shader for realtime updating & loading
+
+TODO: Deletion queue / shutdown queue implementation??
+
+TODO: Check if image format has VkFormatFeatureFlagBits set for what I want to use it for
+
+TODO: Renderer to be made configurable:
+-Render image format
+
+Refactoring 
+Make functions not all return booleans when unnecessary
+Change from passing by pointer unless value is changing
+Filesystem typedef FILE etfile instead of struct nonsense
+Better way of doing the filesystem.
 
 -- When finally rendering --
 NOTE: Sample 2D slice of 3D texture for wierd patterns.
 Like mod world position with texture limits to index into tiling 3D texture.
 
+NOTE: Use a procedural fragment shader output (from shader toy or something) & map a mesh as a viewport to it.
+NOTE: 3D texture coords to warp the viewport for neat effects
+NOTE: Use post processing texture group code to styilize procedurally generated textures
+
 TODO: Staging buffer improvment. For loading on the fly
 
 TODO: Make the game code a dynamic plugin.
+
+
+======================================================= Past Code I might still need but is in the way =======================================================
+    // Clear the screen
+    VkClearColorValue clear_value;
+    f32 flash = (f32)fabs(sin(state->frame_number / 120.0f));
+    clear_value.float32[0] = 0.0f;
+    clear_value.float32[1] = 0.0f;
+    clear_value.float32[2] = flash;
+    clear_value.float32[3] = 1.0f;
+
+    VkImageSubresourceRange clear_range = init_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+
+    vkCmdClearColorImage(frame_cmd,
+        state->render_image.handle,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        &clear_value,
+        1,
+        &clear_range);

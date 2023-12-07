@@ -1,4 +1,4 @@
-#include "vkutils.h"
+#include "vkinit.h"
 
 VkCommandPoolCreateInfo init_command_pool_create_info(
     VkCommandPoolCreateFlags flags,
@@ -200,7 +200,63 @@ VkPhysicalDeviceMemoryProperties2 init_physical_device_memory_properties2(void) 
     return properties;
 }
 
+VkShaderModuleCreateInfo init_shader_module_create_info(void) {
+    VkShaderModuleCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .pNext = 0};
+    return info;
+}
 
+VkPipelineLayoutCreateInfo init_pipline_layout_create_info(void) {
+    VkPipelineLayoutCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = 0};
+    return info;
+}
+
+VkDescriptorSetLayoutCreateInfo init_descriptor_set_layout_create_info(void) {
+    VkDescriptorSetLayoutCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = 0};
+    return info;
+}
+
+VkDescriptorPoolCreateInfo init_descriptor_pool_create_info(void) {
+    VkDescriptorPoolCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .pNext = 0};
+    return info;
+}
+
+VkDescriptorSetAllocateInfo init_descriptor_set_allocate_info(void) {
+    VkDescriptorSetAllocateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext = 0};
+    return info;
+}
+
+VkPipelineLayoutCreateInfo init_pipeline_layout_create_info(void) {
+    VkPipelineLayoutCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = 0};
+    return info;
+}
+
+VkPipelineShaderStageCreateInfo init_pipeline_shader_stage_create_info(void) {
+    VkPipelineShaderStageCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext = 0};
+    return info;
+}
+
+VkComputePipelineCreateInfo init_compute_pipeline_create_info(void) {
+    VkComputePipelineCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .pNext = 0};
+    return info;
+}
+
+// TODO: Move this to a utilities file
 i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
     u32 memory_type_bits_requirement, VkMemoryPropertyFlags required_properties)
 {

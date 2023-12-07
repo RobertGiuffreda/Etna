@@ -1,6 +1,6 @@
 #include "image.h"
 
-#include "renderer/vkutils.h"
+#include "renderer/utilities/vkinit.h"
 
 #include "core/logger.h"
 

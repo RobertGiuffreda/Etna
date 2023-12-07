@@ -7,7 +7,11 @@
 #include <stdio.h>
 
 //TODO: Platform specific code for filesytem
-//TODO: Replace checks with asserts or pass responsibility to the caller
+//TODO: Replace if checks with asserts to pass responsibility to the caller
+
+struct etfile {
+    FILE* handle;
+};
 
 static inline void _filesystem_size(FILE* file, u64* out_size);
 
@@ -21,7 +25,7 @@ b8 filesystem_exists(const char* path) {
 #endif
 }
 
-b8 filesystem_open(const char* path, etfile_flags flags, etfile* out_file) {
+b8 filesystem_open(const char* path, etfile_flags flags, etfile** out_file) {
     const char* mode_str;
     b8 is_read = flags & FILE_READ_FLAG;
     b8 is_write = flags & FILE_WRITE_FLAG;
@@ -41,21 +45,22 @@ b8 filesystem_open(const char* path, etfile_flags flags, etfile* out_file) {
         return false;
     }
 
-    out_file->handle = (void*)file;
+    *out_file = etallocate(sizeof(struct etfile), MEMORY_TAG_FILESYSTEM);
+    (*out_file)->handle = file;
     return true;
 }
 
 void filesystem_close(etfile* file) {
-    if (file->handle) {
-        fclose((FILE*)file->handle);
-        file->handle = 0;
+    if (file && file->handle) {
+        fclose(file->handle);
+        etfree(file, sizeof(struct etfile), MEMORY_TAG_FILESYSTEM);
     }
 }
 
 // TODO: Check if works for not binary mode files
 b8 filesystem_size(etfile* file, u64* out_size) {
-    if (file->handle) {
-        _filesystem_size((FILE*)file->handle, out_size);
+    if (file && file->handle) {
+        _filesystem_size(file->handle, out_size);
         return true;
     }
     return false;
@@ -64,26 +69,23 @@ b8 filesystem_size(etfile* file, u64* out_size) {
 // TODO: Custom allocator for file reading
 // TODO: Check if works for not binary mode files
 b8 filesystem_read_all_bytes(etfile* file, u8* out_bytes, u64* out_bytes_read) {
-    if (file->handle) {
-        FILE* file_handle = (FILE*)file->handle;
-
+    if (file && file->handle) {
         u64 size = 0;
         _filesystem_size(file->handle, &size);
 
-        *out_bytes_read = fread(out_bytes, 1, size, file_handle);
+        *out_bytes_read = fread(out_bytes, 1, size, file->handle);
         return *out_bytes_read == size;
     }
     return false;
 }
 
 b8 filesystem_write(etfile* file, u64 data_size, const void* data, u64* out_bytes_written) {
-    if (file->handle) {
-        FILE* file_handle = (FILE*)file->handle;
-        *out_bytes_written = fwrite(data, 1, data_size, file_handle);
+    if (file && file->handle) {
+        *out_bytes_written = fwrite(data, 1, data_size, file->handle);
         if (*out_bytes_written != data_size) {
             return false;
         }
-        fflush(file_handle);
+        fflush(file->handle);
         return true;
     }
     return false;

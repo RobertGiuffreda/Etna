@@ -15,13 +15,34 @@ project(TestEtna VERSION 1.0.1 DESCRIPTION "Test writing Etna")
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED True)
 
+#Compile shaders and add them to the build directory
+set(SHADER_COMPILER $ENV{VULKAN_SDK}/Bin/glslangValidator.exe)
+
+file(GLOB_RECURSE SHADER_SRC_FILES "assets/shaders/*.vert" "assets/shaders/*.frag" "assets/shaders/*.comp")
+file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/assets/shaders/)
+
+foreach(SHADER_FILE ${SHADER_SRC_FILES})
+    get_filename_component(SHADER_FILE_NAME ${SHADER_FILE} NAME)
+    set(SPV_FILE ${PROJECT_BINARY_DIR}/assets/shaders/${SHADER_FILE_NAME}.spv)
+    execute_process(COMMAND ${SHADER_COMPILER} -g ${SHADER_FILE} -o ${SPV_FILE} --target-env vulkan1.3)
+endforeach(SHADER_FILE)
+
+
 #NOTE: External dependencies
-#Add glfw as dependency to be built alongside project
+#Add glfw as a dependency to be built alongside the engine
 set(GLFW_BUILD_DOCS False)
 set(GLFW_BUILD_EXAMPLES False)
 set(GLFW_BUILD_TESTS False)
 set(GLFW_VULKAN_STATIC True)
 add_subdirectory(${CMAKE_SOURCE_DIR}/extern/glfw)
+
+#Add cglm as a dependency to be built alongside the engine
+# NOTE: Using header only for now. Idk why not
+# set(CGLM_SHARED False)
+# set(CGLM_STATIC True)
+# set(CGLM_USE_C99 False)
+# set(CGLM_USE_TEST False)
+# add_subdirectory(${CMAKE_SOURCE_DIR}/extern/cglm/)
 
 #HACK: Glob_recurse for now as structure is uncertain.
 #Get library source files:
@@ -37,10 +58,16 @@ target_compile_definitions(engine PRIVATE _DEBUG)
 target_include_directories(engine
     PRIVATE ${CMAKE_SOURCE_DIR}/engine/src
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/glfw/include
+    PRIVATE ${CMAKE_SOURCE_DIR}/extern/cglm/include
     PRIVATE $ENV{VULKAN_SDK}/include)
 
-    #Link libraries to engine
-target_link_libraries(engine PRIVATE glfw)
+# target_link_libraries(engine
+#     PRIVATE glfw
+#     PRIVATE cglm)
+
+# Link libraries to engine
+target_link_libraries(engine
+    PRIVATE glfw)
 
 #HACK: Glob_recurse for now as structure is uncertain.
 #Get executable source files:
@@ -52,14 +79,14 @@ add_executable(sandbox ${SANDBOX_SRC_FILES} ${SANDBOX_HEADER_FILES})
 #Compiler defines for sandbox
 target_compile_definitions(sandbox PRIVATE _DEBUG)
 #Include directories for sandbox
-target_include_directories(sandbox PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
+target_include_directories(sandbox
+    PRIVATE ${CMAKE_SOURCE_DIR}/engine/src
+    PRIVATE ${CMAKE_SOURCE_DIR}/extern/cglm/include)
 #Link libraries to sandbox
 target_link_directories(sandbox PRIVATE $ENV{VULKAN_SDK}/Lib)
 target_link_libraries(sandbox 
     PRIVATE engine
     PRIVATE vulkan-1)
-
-
 
 #Build unit tests
 #HACK: Glob_recurse for now as structure is uncertain.

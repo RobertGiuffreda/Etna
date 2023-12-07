@@ -14,9 +14,7 @@ typedef enum etfile_flag_bits {
  */
 typedef u32 etfile_flags;
 
-typedef struct etfile {
-    void* handle;
-} etfile;
+typedef struct etfile etfile;
 
 /**
  * @brief Determines if the file exists
@@ -34,7 +32,7 @@ b8 filesystem_exists(const char* path);
  * @param out_file A pointer to an etfile struct, which holds the handle information. 
  * @return true if successful, false otherwise
  */
-b8 filesystem_open(const char* path, etfile_flags flags, etfile* out_file);
+b8 filesystem_open(const char* path, etfile_flags flags, etfile** out_file);
 
 /**
  * @brief Close the file using the handle in the file struct.

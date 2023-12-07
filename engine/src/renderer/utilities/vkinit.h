@@ -1,6 +1,6 @@
 #pragma once
 
-#include "renderer_types.h"
+#include "renderer/renderer_types.h"
 
 VkCommandPoolCreateInfo init_command_pool_create_info(
     VkCommandPoolCreateFlags flags,
@@ -44,8 +44,6 @@ VkImageViewCreateInfo init_image_view2D_create_info(
     VkImageAspectFlags aspect_flags);
 
 /* Initializers TODO:
-VkMemoryAllocateInfo
-
 VkBufferMemoryBarrier2
 VkImageMemoryBarrier2
 VkDependencyInfo
@@ -67,6 +65,23 @@ VkDeviceImageMemoryRequirements init_device_image_memory_requirements(
     const VkImageCreateInfo* image_create_info);
 
 VkPhysicalDeviceMemoryProperties2 init_physical_device_memory_properties2(void);
+
+VkShaderModuleCreateInfo init_shader_module_create_info(void);
+
+// TODO: Determine parameters to pass
+VkPipelineLayoutCreateInfo init_pipline_layout_create_info(void);
+
+VkDescriptorSetLayoutCreateInfo init_descriptor_set_layout_create_info(void);
+
+VkDescriptorPoolCreateInfo init_descriptor_pool_create_info(void);
+
+VkDescriptorSetAllocateInfo init_descriptor_set_allocate_info(void);
+
+VkPipelineLayoutCreateInfo init_pipeline_layout_create_info(void);
+
+VkPipelineShaderStageCreateInfo init_pipeline_shader_stage_create_info(void);
+
+VkComputePipelineCreateInfo init_compute_pipeline_create_info(void);
 
 i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
     u32 memory_type_bits_requirement, VkMemoryPropertyFlags required_properties);

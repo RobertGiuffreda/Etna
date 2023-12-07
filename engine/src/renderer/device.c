@@ -1,6 +1,6 @@
 #include "device.h"
 
-#include "renderer/vkutils.h"
+#include "renderer/utilities/vkinit.h"
 
 #include "containers/dynarray.h"
 #include "core/etmemory.h"
@@ -214,18 +214,18 @@ b8 device_create(renderer_state* state, device* out_device) {
     return true;
 }
 
-void device_destory(renderer_state* state, device device) {
-    device.graphics_queue = 0;
-    device.present_queue = 0;
-    device.compute_queue = 0;
-    device.transfer_queue = 0;
+void device_destory(renderer_state* state, device* device) {
+    device->graphics_queue = 0;
+    device->present_queue = 0;
+    device->compute_queue = 0;
+    device->transfer_queue = 0;
 
-    device.graphics_queue_index = -1;
-    device.present_queue_index = -1;
-    device.compute_queue_index = -1;
-    device.transfer_queue_index = -1;
+    device->graphics_queue_index = -1;
+    device->present_queue_index = -1;
+    device->compute_queue_index = -1;
+    device->transfer_queue_index = -1;
 
-    vkDestroyDevice(device.handle, state->allocator);
+    vkDestroyDevice(device->handle, state->allocator);
     ETINFO("Vulkan Device Destroyed");
 }
 
@@ -240,8 +240,7 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
         // Get physical device properties
         VkPhysicalDeviceProperties2 properties2 = {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-            .pNext = 0,
-        };
+            .pNext = 0};
         vkGetPhysicalDeviceProperties2(physical_devices[i], &properties2);
         VkPhysicalDeviceProperties* properties = &properties2.properties;
 
@@ -254,29 +253,28 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
 
         if (!device_meets_requirements(physical_devices[i], state->surface, requirements)) {
             ETFATAL("Device Requirements not met.");
-            return false;
+            continue;
         }
 
         // Requirements met so all good
         out_device->gpu = physical_devices[i];
+        out_device->gpu_limits = properties->limits;
         out_device->graphics_queue_index = requirements->g_index;
         out_device->compute_queue_index = requirements->c_index;
         out_device->transfer_queue_index = requirements->t_index;
         out_device->present_queue_index = requirements->p_index;
 
-        ETINFO("Device: %s", properties2.properties.deviceName);
+        ETINFO("Device: %s", properties->deviceName);
         ETINFO(
             "Api Version: %d.%d.%d",
             VK_API_VERSION_MAJOR(properties->apiVersion),
             VK_API_VERSION_MINOR(properties->apiVersion),
-            VK_API_VERSION_PATCH(properties->apiVersion)
-        );
+            VK_API_VERSION_PATCH(properties->apiVersion));
         ETINFO(
             "Driver Version: %d.%d.%d",
             VK_API_VERSION_MAJOR(properties->driverVersion),
             VK_API_VERSION_MINOR(properties->driverVersion),
-            VK_API_VERSION_PATCH(properties->driverVersion)
-        );
+            VK_API_VERSION_PATCH(properties->driverVersion));
     }
     
     // Clean up dynarrays
@@ -357,7 +355,8 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
         VkQueueFamilyProperties* q_props = &q_family_prop2s[i].queueFamilyProperties;
         if ((g_index == -1) && (q_props->queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
             g_index = i;
-            // Presentation
+
+            // TODO: Instead of this consider the compute queue that can present
             VkBool32 can_present = false;
             vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &can_present);
             if (can_present) {

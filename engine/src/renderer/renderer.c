@@ -1,11 +1,12 @@
 #include "renderer_types.h"
 #include "renderer.h"
 
-#include "renderer/vkutils.h"
+#include "renderer/utilities/vkinit.h"
 
 #include "renderer/device.h"
 #include "renderer/swapchain.h"
 #include "renderer/image.h"
+#include "renderer/pipeline.h"
 
 #include "window/renderer_window.h"
 
@@ -23,6 +24,8 @@ static void create_frame_command_structures(renderer_state* state);
 static void destroy_frame_command_structures(renderer_state* state);
 static void create_frame_synchronization_structures(renderer_state* state);
 static void destroy_frame_synchronization_structures(renderer_state* state);
+static void test_create_descriptor_pool(renderer_state* state);
+static void test_destroy_descriptor_pool(renderer_state* state);
 
 VkBool32 vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -39,7 +42,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     etzero_memory(state, sizeof(renderer_state));
     
     state->allocator = 0;
-    state->resized = false;
+    state->swapchain_dirty = false;
     state->swapchain = VK_NULL_HANDLE;
     state->current_frame = 0;
 
@@ -173,14 +176,15 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     initialize_swapchain(state);
 
     // Render image initialization
+    VkFormat cat;
     VkExtent3D render_image_extent = {
         .width = state->width,
         .height = state->height,
         .depth = 1};
     image2D_create(state, 
         render_image_extent,
-        state->swapchain_image_format,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT /* TEMP: For vkCmdClearColorImage */ | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        VK_FORMAT_R16G16B16A16_SFLOAT,
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &state->render_image);
@@ -191,6 +195,13 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     create_frame_synchronization_structures(state);
     ETINFO("Frame synchronization structures created.");
 
+    test_create_descriptor_pool(state);
+    ETINFO("Test descriptor pool created.");
+
+    compute_pipeline_config compute_config = { .shader = "build/assets/shaders/draw.comp.spv" };
+    compute_pipeline_create(state, compute_config, &state->test_comp_pipeline);
+    ETINFO("Test compute Pipeline created.");
+
     *out_state = state;
     return true;
 }
@@ -198,6 +209,12 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
 void renderer_shutdown(renderer_state* state) {
     vkDeviceWaitIdle(state->device.handle);
     // Destroy reverse order of creation
+
+    compute_pipeline_destroy(state, &state->test_comp_pipeline);
+    ETINFO("Test compute Pipeline destroyed.");
+
+    test_destroy_descriptor_pool(state);
+    ETINFO("Test descriptor pool destroyed.");
 
     destroy_frame_synchronization_structures(state);
     ETINFO("Frame synchronization structures destroyed.");
@@ -211,7 +228,7 @@ void renderer_shutdown(renderer_state* state) {
     shutdown_swapchain(state);
     ETINFO("Swapchain shutdown.");
 
-    device_destory(state, state->device);
+    device_destory(state, &state->device);
     ETINFO("Vulkan device destroyed");
     
     vkDestroySurfaceKHR(state->instance, state->surface, state->allocator);
@@ -268,32 +285,21 @@ b8 renderer_draw_frame(renderer_state* state) {
 
     // Image barrier to transition render_image from undefined to general layout for clear value command
     image_barrier(frame_cmd, state->render_image.handle,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+        VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT , VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
-    // Clear the screen
-    VkClearColorValue clear_value;
-    f32 flash = (f32)fabs(sin(state->frame_number / 120.0f));
-    clear_value.float32[0] = 0.0f;
-    clear_value.float32[1] = 0.0f;
-    clear_value.float32[2] = flash;
-    clear_value.float32[3] = 1.0f;
+    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->test_comp_pipeline.handle);
 
-    VkImageSubresourceRange clear_range = init_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->test_comp_pipeline.layout, 0, 1, &state->test_comp_pipeline.descriptor_set, 0, 0);
 
-    vkCmdClearColorImage(frame_cmd,
-        state->render_image.handle,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        &clear_value,
-        1,
-        &clear_range);
+    vkCmdDispatch(frame_cmd, ceil(state->width / 16.0f), ceil(state->height / 16.0f), 1);
 
     // Image barrier to transition render image to transfer source optimal layout
     image_barrier(frame_cmd, state->render_image.handle,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
-        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
+        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
     // Image barrier to transition swapchain image to transfer destination optimal
     image_barrier(frame_cmd, state->swapchain_images[swapchain_index],
@@ -459,10 +465,28 @@ static void destroy_frame_synchronization_structures(renderer_state* state) {
            MEMORY_TAG_RENDERER);
 }
 
+// NOTE: Code here is very hardcoded for the one compute shader I've written.
+static void test_create_descriptor_pool(renderer_state* state) {
+    VkDescriptorPoolSize storage_image_pool_size;
+    storage_image_pool_size.descriptorCount = 1;
+    storage_image_pool_size.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    
+    VkDescriptorPoolCreateInfo pool_info = init_descriptor_pool_create_info();
+    pool_info.maxSets = state->image_count;
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &storage_image_pool_size;
+
+    VK_CHECK(vkCreateDescriptorPool(state->device.handle, &pool_info, state->allocator, &state->descriptor_pool));
+}
+
+static void test_destroy_descriptor_pool(renderer_state* state) {
+    vkDestroyDescriptorPool(state->device.handle, state->descriptor_pool, state->allocator);
+}
+
 void renderer_on_resize(renderer_state* state, i32 width, i32 height) {
     state->width = width;
     state->height = height;
-    state->resized = true;
+    state->swapchain_dirty = true;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

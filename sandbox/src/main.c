@@ -18,7 +18,7 @@ b8 define_configuration(engine_config* engine_details, application_config* app_d
     app_details->update = application_update;
     app_details->render = application_render;
 
-    app_details->state_size = sizeof(struct application_state_t);
+    app_details->state_size = get_appstate_size();
     app_details->state = 0;
 
     return true;

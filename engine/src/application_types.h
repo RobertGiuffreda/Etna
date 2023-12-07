@@ -1,7 +1,6 @@
 #pragma once
 
 #include "defines.h"
-#include "core/engine.h"
 
 typedef struct application_state_t application_state;
 

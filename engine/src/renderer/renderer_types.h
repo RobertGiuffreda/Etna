@@ -9,7 +9,6 @@
 
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
 
-// TODO: Width and height to 
 typedef struct image {
     VkImage handle;
     VkImageView view;
@@ -20,13 +19,26 @@ typedef struct image {
     VkFormat format;
 } image;
 
-// TODO: GPU limits
+// TEMP: Very temporary until automation when I have a better
+// handle on the needs of pipelines & shaders.
+typedef struct compute_pipeline {
+    VkPipeline handle;
+    VkPipelineLayout layout;
+    VkShaderModule shader;
+    
+    // TEMP: Very temporary until automation when I have a better
+    // handle on the needs of pipelines & shaders.
+    VkDescriptorSetLayout descriptor_layout;
+    VkDescriptorSet descriptor_set;
+} compute_pipeline;
+
 typedef struct device {
     VkDevice handle;
     VkPhysicalDevice gpu;
+    VkPhysicalDeviceLimits gpu_limits;
     VkPhysicalDeviceMemoryProperties gpu_memory_props;
 
-    // TODO: Better name which reflect that it is a queue family index
+    // TODO: Better name which reflects that it is a queue family index
     // Not just a queue index
     i32 graphics_queue_index;
     i32 compute_queue_index;
@@ -49,7 +61,7 @@ typedef struct renderer_state {
     VkSurfaceKHR surface;
     i32 width;
     i32 height;
-    b8 resized;
+    b8 swapchain_dirty;
 
     device device;
 
@@ -61,11 +73,14 @@ typedef struct renderer_state {
     VkImage* swapchain_images;
     VkImageView* swapchain_image_views;
 
+    // Image to render to that get copied onto the swapchain image
     image render_image;
 
-    u32 current_frame;
-
-    i32 frame_number; // TEMP: THIS LINE
+    // Index into per frame arrays: TODO: Rename to frame_index maybe??
+    u32 current_frame; 
+    
+    // TEMP: THIS LINE
+    i32 frame_number;
 
     // NOTE: Per frame structures/data. Add to separate struct??
     VkSemaphore* swapchain_semaphores;
@@ -78,4 +93,10 @@ typedef struct renderer_state {
     VkCommandPool* graphics_pools;
     VkCommandBuffer* main_graphics_command_buffers;
     // NOTE: Per frame END
+
+    // TEMP: Descriptor set pool. Refactor to make descriptor set creation more automatic
+    VkDescriptorPool descriptor_pool;
+    // TEMP: END
+
+    compute_pipeline test_comp_pipeline;
 } renderer_state;
