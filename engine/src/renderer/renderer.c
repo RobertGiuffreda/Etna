@@ -176,7 +176,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     initialize_swapchain(state);
 
     // Render image initialization
-    VkFormat cat;
     VkExtent3D render_image_extent = {
         .width = state->width,
         .height = state->height,

@@ -142,7 +142,6 @@ b8 engine_run(void) {
         etwindow_pump_messages();
         state->is_running = !etwindow_should_close(state->window_state);
     }
-    state->is_running = false;
     return true;
 }
 

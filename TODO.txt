@@ -13,10 +13,11 @@ VkWriteDescriptorSet
 VkCopyDescriptorSet
 vkUpdateDescriptorSets
 
+TODO: Spir-V Reflect to automate shader config file creation
+TODO: Read config file and configure descriptor sets based off of information in that.
+
 TODO: Hardcode a starting cube
 TODO: Render the cube
-
-TODO: Spir-V Reflect to automate shader descriptor sets
 
 TODO: Graphics pipelines
 
@@ -104,7 +105,8 @@ TODO: Staging buffer improvment. For loading on the fly
 
 TODO: Make the game code a dynamic plugin.
 
-
+TODO: Serialize a file for each shader that stores the bytes of a struct that I use to store descriptor set information.
+TODO: This is gotten from the config file.
 ======================================================= Past Code I might still need but is in the way =======================================================
     // Clear the screen
     VkClearColorValue clear_value;
