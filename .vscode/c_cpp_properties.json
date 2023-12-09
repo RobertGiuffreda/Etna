@@ -6,7 +6,8 @@
                 "${workspaceFolder}/engine/src",
                 "${VULKAN_SDK}/include",
                 "${workspaceFolder}/extern/glfw/include",
-                "${workspaceFolder}/extern/cglm/include"
+                "${workspaceFolder}/extern/cglm/include",
+                "${workspaceFolder}/extern/SPIRV-Reflect/"
             ],
             "defines": [
                 "UNICODE",

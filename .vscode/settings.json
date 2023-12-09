@@ -103,6 +103,8 @@
         "types-struct.h": "c",
         "application.h": "c",
         "filesystem.h": "c",
-        "vkinit.h": "c"
+        "vkinit.h": "c",
+        "shader.h": "c",
+        "spirv_reflect.h": "c"
     }
 }

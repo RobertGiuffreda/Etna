@@ -27,7 +27,6 @@ foreach(SHADER_FILE ${SHADER_SRC_FILES})
     execute_process(COMMAND ${SHADER_COMPILER} -g ${SHADER_FILE} -o ${SPV_FILE} --target-env vulkan1.3)
 endforeach(SHADER_FILE)
 
-
 #NOTE: External dependencies
 #Add glfw as a dependency to be built alongside the engine
 set(GLFW_BUILD_DOCS False)
@@ -44,6 +43,11 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/extern/glfw)
 # set(CGLM_USE_TEST False)
 # add_subdirectory(${CMAKE_SOURCE_DIR}/extern/cglm/)
 
+set(SPIRV_REFLECT_EXECUTABLE OFF)
+set(SPIRV_REFLECT_STATIC_LIB ON)
+set(SPIRV_REFLECT_BUILD_TESTS OFF)
+add_subdirectory(${CMAKE_SOURCE_DIR}/extern/SPIRV-Reflect)
+
 #HACK: Glob_recurse for now as structure is uncertain.
 #Get library source files:
 file(GLOB_RECURSE ENGINE_SRC_FILES "engine/src/*.c")
@@ -51,6 +55,7 @@ file(GLOB_RECURSE ENGINE_HEADER_FILES "engine/src/*.h")
 
 #Create engine
 add_library(engine ${ENGINE_SRC_FILES} ${ENGINE_HEADER_FILES})
+
 #Compiler defines for engine
 target_compile_definitions(engine PRIVATE _DEBUG)
 
@@ -59,6 +64,7 @@ target_include_directories(engine
     PRIVATE ${CMAKE_SOURCE_DIR}/engine/src
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/glfw/include
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/cglm/include
+    PRIVATE ${CMAKE_SOURCE_DIR}/extern/SPIRV-Reflect/
     PRIVATE $ENV{VULKAN_SDK}/include)
 
 # target_link_libraries(engine
@@ -67,7 +73,8 @@ target_include_directories(engine
 
 # Link libraries to engine
 target_link_libraries(engine
-    PRIVATE glfw)
+    PRIVATE glfw
+    PRIVATE spirv-reflect-static)
 
 #HACK: Glob_recurse for now as structure is uncertain.
 #Get executable source files:

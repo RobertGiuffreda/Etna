@@ -7,6 +7,7 @@
 #include "renderer/swapchain.h"
 #include "renderer/image.h"
 #include "renderer/pipeline.h"
+#include "renderer/shader.h"
 
 #include "window/renderer_window.h"
 
@@ -193,6 +194,11 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     ETINFO("Frame command structures created.");
     create_frame_synchronization_structures(state);
     ETINFO("Frame synchronization structures created.");
+
+    shader test_comp_shader;
+    // load_shader("build/assets/shaders/draw.comp.spv", &test_comp_shader);
+    load_shader("build/assets/shaders/test.vert.spv", &test_comp_shader);
+    // load_shader("build/assets/shaders/test.frag.spv", &test_comp_shader);
 
     test_create_descriptor_pool(state);
     ETINFO("Test descriptor pool created.");

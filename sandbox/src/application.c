@@ -21,8 +21,6 @@ void application_shutdown(struct application_state_t* state) {
 }
 
 b8 application_update(struct application_state_t* state) {
-    ETINFO("Testing glm vec4s: ");
-    ETINFO("v4s.x: %lf | v4s.y: %lf | v4s.z: %lf | v4s.w: %lf.", state->testing.x, state->testing.y, state->testing.z, state->testing.w);
     return true;
 }
 
