@@ -195,10 +195,14 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     create_frame_synchronization_structures(state);
     ETINFO("Frame synchronization structures created.");
 
-    shader test_comp_shader;
+    shader test_vert_shader;
+    shader test_frag_shader;
     // load_shader("build/assets/shaders/draw.comp.spv", &test_comp_shader);
-    load_shader("build/assets/shaders/test.vert.spv", &test_comp_shader);
-    // load_shader("build/assets/shaders/test.frag.spv", &test_comp_shader);
+    load_shader(state, "build/assets/shaders/test.vert.spv", &test_vert_shader);
+    load_shader(state, "build/assets/shaders/test.frag.spv", &test_frag_shader);
+    
+    unload_shader(state, &test_vert_shader);
+    unload_shader(state, &test_frag_shader);
 
     test_create_descriptor_pool(state);
     ETINFO("Test descriptor pool created.");
