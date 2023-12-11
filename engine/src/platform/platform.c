@@ -1,7 +1,7 @@
 #include "platform.h"
 
 #include "core/logger.h"
-#include "renderer/window/renderer_window.h"
+#include "renderer/src/window/renderer_window.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>

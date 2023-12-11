@@ -1,33 +1,31 @@
 --------Immediate--------
-TODO: How does updating and writing VkDescriptorSets work
+TODO: DescriptorAllocator Abstraction
+TODO: VkDescriptorPool give more allocations & make one per frame or something I think
 
-VkDescriptorPoolSize -- One for each VkDescriptorType with amount of allocations from descriptor type
-VkDescriptorPool
-
-VkDescriptorSetLayoutBinding
-VkDescriptorSetLayout
-
-VkDescriptorSet
-
-VkWriteDescriptorSet
-VkCopyDescriptorSet
-vkUpdateDescriptorSets
-
-TODO: Spir-V Reflect to automate shader config file creation
-TODO: Read config file and configure descriptor sets based off of information in that.
-
-TODO: Hardcode a starting cube
-TODO: Render the cube
-
-TODO: Graphics pipelines
-
-TODO: Model loading library
+TODO: Vulkan Buffer
 TODO: Staging buffer implementation
 
+TODO: Model Loading: FastObjLibrary for me
+
+TODO: Hardcoded computepipeline -> compute effect
+TODO: Hardcoded graphicspipeline -> pipeline builder
+
+TODO: Build out materials and renderable framework:
+Obj Format Loading.
+Texture Loading.
+
+Material Creation from shader.
+
+Material system. Prereq for Full implementation of descriptor sets.
+
+TODO: Abstraction between renderer & engine pulling renderer specific implementation details out.
 --------After Immediate--------
 TODO: Result of vulkan commands checking done with VK_CHECK & other result checking when unnecessary
 
 TODO: Recreate swapchain implementation
+
+TODO: (Using material system) Automate descriptor set creation 
+NOTE: How does updating and writing VkDescriptorSets work
 
 TODO: FIFO Struct to place events into
 TODO: Setup event overwritting or adding based on behavior of event. When event is fired,
@@ -124,3 +122,7 @@ TODO: vkCreateDescriptorUpdateTemplate to use update instead of stuff
         &clear_value,
         1,
         &clear_range);
+
+TODO: Manage vulkan buffer & image memory by allocating from GPU in 
+chunks and allocating whats needed from that via views and subsections
+of the buffer/image resource.

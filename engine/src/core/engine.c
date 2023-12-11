@@ -10,7 +10,7 @@
 #include "platform/platform.h"
 #include "platform/etwindow.h"
 
-#include "renderer/renderer.h"
+#include "renderer/src/renderer.h"
 
 #include "application_types.h"
 

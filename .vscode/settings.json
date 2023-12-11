@@ -105,6 +105,7 @@
         "filesystem.h": "c",
         "vkinit.h": "c",
         "shader.h": "c",
-        "spirv_reflect.h": "c"
+        "spirv_reflect.h": "c",
+        "vk_types.h": "c"
     }
 }

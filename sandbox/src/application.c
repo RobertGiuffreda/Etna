@@ -8,7 +8,7 @@
 
 struct application_state_t {
     f32 delta_time;
-    v4s testing;
+    
 };
 
 b8 application_initialize(struct application_state_t* state) {

@@ -1,0 +1,49 @@
+Concepts to organize within engine:
+Shader
+Materials
+Pipelines
+DescriptorSet
+Renderable Object (Mesh + Materials + Other effects)
+
+Brainstorming:
+Create MaterialPipeline from a specific shader.
+Create descriptor set for material.
+
+For now:
+Only one Renderable subtype: OBJ & Mtls Renderable Internals
+
+Features to require and enable (eventual):
+BufferDeviceAddress
+DescriptorIndexing
+
+Shader Descriptor Set Constraints (For now):
+Set 0: Global Shader Variables. Scene specific things
+Set 1: Material Specific Variables
+
+shader(pipeline) + material struct(file) in engine for each kind of material
+
+struct material_pipeline {
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+};
+
+struct material_instance {
+    material_pipeline* pipeline;
+    VkDescriptorSet material_set;
+};
+
+struct etimage {
+    
+};
+
+
+NOTE: SEPARATE PROJECT: To allow for very flexible shader development without extremely convoluted implementation of materials & shaders & pipelines
+Use Application UI extensively to match shader uniforms with textures & data.
+
+NOTE: Serialization for all of this.
+List of loaded obj file's meshes & materials & textures.
+List of created (Materials)pipelines & the descriptor set information for that (material)pipeline.
+
+User matches the pipeline uniforms with corresponding values from the renderable.
+
+FAR LATER: Automatically create a new material file in the engine based on the created 

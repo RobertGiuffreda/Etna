@@ -1,0 +1,102 @@
+# Blender MTL File: 'untitled.blend'
+# Material Count: 9
+
+newmtl None
+Ns 500
+Ka 0.8 0.8 0.8
+Kd 0.8 0.8 0.8
+Ks 0.8 0.8 0.8
+d 1
+illum 2
+
+newmtl mat_consumables.001
+Ns 179.999996
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\consumables_diff.png
+map_d C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\consumables_diff.png
+
+newmtl mat_fire.001
+Ns 179.999996
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\fire_diff.png
+map_d C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\fire_diff.png
+
+newmtl mat_melee.001
+Ns 179.999996
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\melee_diff.png
+map_d C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\melee_diff.png
+
+newmtl mat_misc.001
+Ns 179.999996
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\misc_diff.png
+map_d C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\misc_diff.png
+
+newmtl mat_ranged
+Ns 179.999996
+Ka 1.000000 1.000000 1.000000
+Kd 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\ranged_diff.png
+
+newmtl mat_zelda
+Ns 179.999996
+Ka 1.000000 1.000000 1.000000
+Kd 0.000000 0.000000 0.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\zelda_diff.png
+
+newmtl mat_zeldaEyes
+Ns 179.999996
+Ka 1.000000 1.000000 1.000000
+Kd 0.000000 0.000000 0.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\eyes_diff.png
+
+newmtl mat_zeldaHair
+Ns 179.999996
+Ka 1.000000 1.000000 1.000000
+Kd 0.000000 0.000000 0.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 2
+map_Kd C:\\Users\\Robert\\Desktop\\TestEtna\\assets\\obj\\zda\\Textures\\hair_diff.png
