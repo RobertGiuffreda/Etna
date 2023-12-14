@@ -7,7 +7,35 @@
 
 #include <vulkan/vulkan.h>
 
+
+
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
+
+/* NOTE: Descriptor Set Abstraction structs */
+// TODO: Move these structs back to their respective header files
+// and just #include <vulkan/vulkan.h>.
+
+typedef struct descriptor_set_layout_builder {
+    // Dynarray
+    VkDescriptorSetLayoutBinding* bindings;
+} dsl_builder;
+
+// Descriptor Set writer. Stores descriptor set writes so they can
+// be applied all at once in the command vkUpdateDescriptorSets 
+typedef struct descriptor_set_writer {
+    VkDescriptorImageInfo* image_infos;
+    VkDescriptorBufferInfo* buffer_infos;
+
+    VkWriteDescriptorSet* writes;
+} ds_writer;
+
+typedef struct descriptor_set_allocator {
+    // Dynarray created from hardcoded array(for now)
+    VkDescriptorPoolSize* pool_sizes;
+    VkDescriptorPool pool;
+} ds_allocator;
+/* NOTE: END */
+
 
 typedef struct image {
     VkImage handle;
@@ -18,6 +46,10 @@ typedef struct image {
     VkExtent3D extent;
     VkFormat format;
 } image;
+
+// TODO: Buffer
+
+// TODO: END
 
 /** Information needed for each binding:
  * Requisite information for:
@@ -43,59 +75,78 @@ typedef struct set {
 
 typedef struct shader {
     VkShaderModule module;
+    VkShaderStageFlagBits stage;
+    char* entry_point;
+    u32 set_count;
+    set* _sets;
+
+    // TODO: Get information about push constants
+    u32 push_constant_count;
     struct {
-        VkShaderStageFlagBits stage;
-        char* entry_point;
-        u32 set_count;
-        set* _sets;
+        u32 temp;
+    }*push_constants;
 
-        // TODO: Get information about push constants
-        u32 push_constant_count;
-        struct {
-            u32 temp;
-        }*push_constants;
+    // TODO: Add type information maybe
+    u32 input_count;
+    struct {
+        u32 location;
+        VkFormat format;
+    }*inputs;
 
-        // TODO: Add type information maybe
-        u32 input_count;
-        struct {
-            u32 location;
-            VkFormat format;
-        }*inputs;
-
-        // TODO: Add type information maybe
-        u32 output_count;
-        struct {
-            u32 location;
-            VkFormat format;
-        }*outputs;
-    }reflection;
+    // TODO: Add type information maybe
+    u32 output_count;
+    struct {
+        u32 location;
+        VkFormat format;
+    }*outputs;
 } shader;
 
-// TEMP: Very temporary until materials are properly implemented
+/** TEMP: & TODO:
+ * This section involving compute and graphics pipelines is a bit of a mess and
+ * is temporary. This will be here until a material system is thought out and 
+ * implemented.
+ * 
+ * Compute push constants are TEMP: and will be replaced with more robust system I think:
+ * Compute shader post processing effects for now all share compute push constants to simplify things
+ */
+
+typedef struct compute_push_constants {
+    v4s data1;
+    v4s data2;
+    v4s data3;
+    v4s data4;
+} compute_push_constants;
+
+typedef struct compute_effect {
+    const char* name;
+
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+
+    compute_push_constants data;
+} compute_effect;
+
+// TODO: Old and bad; about to remove
 typedef struct compute_pipeline {
     VkPipeline handle;
     VkPipelineLayout layout;
     VkShaderModule shader;
     
-    // TEMP: Very temporary until materials are properly implemented
     VkDescriptorSetLayout descriptor_layout;
     VkDescriptorSet descriptor_set;
 } compute_pipeline;
-
-typedef struct graphics_pipeline_config {
-    shader vertex_shader;
-    shader fragment_shader;
-} graphics_pipeline_config;
 
 typedef struct graphics_pipeline {
     VkPipeline handle;
     VkPipelineLayout layout;
 
-    // TEMP: Will be replaced by material shader
     VkDescriptorSetLayout descriptor_layout;
     VkDescriptorSet descriptor_set;
 } graphics_pipeline;
-// TEMP: END
+// TODO: END
+
+/* TEMP: & TODO: END */
+
 
 typedef struct device {
     VkDevice handle;
@@ -159,12 +210,20 @@ typedef struct renderer_state {
     VkCommandBuffer* main_graphics_command_buffers;
     // NOTE: Per frame END
 
-    // TEMP: Descriptor set pool. Refactor to make descriptor set creation more automatic
-    VkDescriptorPool descriptor_pool;
+    ds_allocator global_ds_allocator;
+
+    shader test_compute_shader;
+    compute_effect test_compute_effect;
+
+    // TEMP: Shared compute effect descriptor set layout
+    VkDescriptorSetLayout test_compute_descriptor_set_layout;
+    VkDescriptorSet test_compute_descriptor_set;
     // TEMP: END
 
-    compute_pipeline test_comp_pipeline;
+    shader test_graphics_vertex;
+    shader test_graphics_fragment;
 
-    graphics_pipeline_config test_graphics_config;
-    graphics_pipeline test_graphics_pipeline;
+    VkPipeline test_graphics_pipeline;
+    VkPipelineLayout test_graphics_pipeline_layout;
+    //TEMP: END
 } renderer_state;

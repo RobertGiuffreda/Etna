@@ -4,6 +4,8 @@
 
 #define DYNARRAY_DEFAULT_CAPACITY 1
 
+// TODO: Trim function
+
 /*
 This is a dynamic array imlementation that stores the details needed in a
 struct placed before the returned value to the caller. So the caller can call 
@@ -34,6 +36,15 @@ void* dynarray_create(u64 capacity, u64 stride);
  */
 void* dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* data);
 
+/**
+ * @brief Creates a deep copy of a dynarray. This function allocates memory
+ * and the returned dynarray needs to be destroyed
+ * 
+ * @param dynarray Dynarray to copy
+ * @return void* Copy of dynarray
+ */
+void* dynarray_copy(void* src);
+
 void dynarray_destroy(void* array);
 
 void dynarray_resize(void** array_ptr, u64 length);
@@ -59,17 +70,12 @@ b8 dynarray_is_empty(void* array);
 u64 dynarray_length(void* array);
 
 /**
- * @brief Changes the index that functions use to determine the end of the array.
+ * @brief Clear's the dynamic array's contents.
+ * NOTE: Does not change the underlying data struct's capacity
  * 
- * NOTE: This function does not change the size of the data structure housing the array.
- * Setting the index to higher than the underlying struct's capacity does not cause
- * a resize. It is undefined behavoir.
- * 
- * @param array The dynamic array for the function to operate on
- * @param index Value to set the index of array
- * @return void
+ * @param array Dynarray to clear
  */
-void dynarray_set_length(void* array, u64 index);
+void dynarray_clear(void* array);
 
 /**
  * @brief Inserts the value located at element into array_ptr[index] & shifts

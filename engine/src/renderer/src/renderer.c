@@ -8,6 +8,7 @@
 #include "renderer/src/image.h"
 #include "renderer/src/pipeline.h"
 #include "renderer/src/shader.h"
+#include "renderer/src/descriptor.h"
 
 #include "window/renderer_window.h"
 
@@ -23,10 +24,12 @@
 
 static void create_frame_command_structures(renderer_state* state);
 static void destroy_frame_command_structures(renderer_state* state);
+
 static void create_frame_synchronization_structures(renderer_state* state);
 static void destroy_frame_synchronization_structures(renderer_state* state);
-static void test_create_descriptor_pool(renderer_state* state);
-static void test_destroy_descriptor_pool(renderer_state* state);
+
+static void initialize_descriptors(renderer_state* state);
+static void shutdown_descriptors(renderer_state* state);
 
 VkBool32 vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -195,20 +198,70 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     create_frame_synchronization_structures(state);
     ETINFO("Frame synchronization structures created.");
 
-    test_create_descriptor_pool(state);
-    ETINFO("Test descriptor pool created.");
+    // This function initializes:
+    // state->test_compute_descriptor_set_layout
+    // state->test_compute_descriptor_set
+    // state->global_ds_allocator
+    initialize_descriptors(state);
+    ETINFO("Descriptors Initialized.");
 
-    compute_pipeline_config compute_config = { .shader = "build/assets/shaders/draw.comp.spv" };
-    compute_pipeline_create(state, compute_config, &state->test_comp_pipeline);
-    ETINFO("Test compute Pipeline created.");
+    // TEMP: Until post processing effect structure/system is created/becomes more robust. 
+    load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->test_compute_shader);
 
+    VkPipelineLayoutCreateInfo compute_effect_pipeline_layout_info = init_pipeline_layout_create_info();
+    compute_effect_pipeline_layout_info.setLayoutCount = 1;
+    compute_effect_pipeline_layout_info.pSetLayouts = &state->test_compute_descriptor_set_layout;
 
-    load_shader(state, "build/assets/shaders/test1.vert.spv", &state->test_graphics_config.vertex_shader);
-    load_shader(state, "build/assets/shaders/test1.frag.spv", &state->test_graphics_config.fragment_shader);
-    if (!graphics_pipeline_create(state, state->test_graphics_config, &state->test_graphics_pipeline)) {
-        ETFATAL("Error creating graphics pipeline.");
-        return false;
-    }
+    // Push constant structure for compute effect pipelines
+    VkPushConstantRange push_constant = {0};
+    push_constant.offset = 0;
+    push_constant.size = sizeof(compute_push_constants);
+    push_constant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    
+    compute_effect_pipeline_layout_info.pushConstantRangeCount = 1;
+    compute_effect_pipeline_layout_info.pPushConstantRanges = &push_constant;
+    
+    VK_CHECK(vkCreatePipelineLayout(state->device.handle, &compute_effect_pipeline_layout_info, state->allocator, &state->test_compute_effect.layout));
+
+    VkPipelineShaderStageCreateInfo compute_effect_pipeline_shader_stage_info = init_pipeline_shader_stage_create_info();
+    compute_effect_pipeline_shader_stage_info.stage = state->test_compute_shader.stage;
+    compute_effect_pipeline_shader_stage_info.module = state->test_compute_shader.module;
+    compute_effect_pipeline_shader_stage_info.pName = state->test_compute_shader.entry_point;
+
+    VkComputePipelineCreateInfo compute_effect_info = init_compute_pipeline_create_info();
+    compute_effect_info.layout = state->test_compute_effect.layout;
+    compute_effect_info.stage = compute_effect_pipeline_shader_stage_info;
+
+    VK_CHECK(vkCreateComputePipelines(state->device.handle, VK_NULL_HANDLE, 1, &compute_effect_info, state->allocator, &state->test_compute_effect.pipeline));
+    ETINFO("Test compute effect created.");
+    // TEMP: END
+
+    // TEMP: Until material framework is stood up
+    load_shader(state, "build/assets/shaders/test1.vert.spv", &state->test_graphics_vertex);
+    load_shader(state, "build/assets/shaders/test1.frag.spv", &state->test_graphics_fragment);
+
+    pipeline_builder graphics_builder = pipeline_builder_create();
+    pipeline_builder_set_shaders(&graphics_builder,
+        state->test_graphics_vertex,
+        state->test_graphics_fragment);
+    pipeline_builder_set_input_topology(&graphics_builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipeline_builder_set_polygon_mode(&graphics_builder, VK_POLYGON_MODE_FILL);
+    pipeline_builder_set_cull_mode(&graphics_builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipeline_builder_set_multisampling_none(&graphics_builder);
+    pipeline_builder_disable_blending(&graphics_builder);
+    pipeline_builder_disable_depthtest(&graphics_builder);
+    pipeline_builder_set_color_attachment_format(&graphics_builder, state->render_image.format);
+    pipeline_builder_set_depth_format(&graphics_builder, VK_FORMAT_UNDEFINED);
+
+    VkPipelineLayoutCreateInfo layout_info = init_pipeline_layout_create_info();
+    VK_CHECK(vkCreatePipelineLayout(state->device.handle, &layout_info, state->allocator, &state->test_graphics_pipeline_layout));
+
+    graphics_builder.layout = state->test_graphics_pipeline_layout;
+
+    state->test_graphics_pipeline = pipeline_builder_build(&graphics_builder, state);
+
+    pipeline_builder_destroy(&graphics_builder);
+    // TEMP: END
 
     *out_state = state;
     return true;
@@ -218,18 +271,27 @@ void renderer_shutdown(renderer_state* state) {
     vkDeviceWaitIdle(state->device.handle);
     // Destroy reverse order of creation
 
-    graphics_pipeline_destroy(state, &state->test_graphics_pipeline);
-    ETINFO("Test graphics pipeline destroyed.");
+    // TEMP: Until material framework is stood up
+    vkDestroyPipeline(state->device.handle, state->test_graphics_pipeline, state->allocator);
+    vkDestroyPipelineLayout(state->device.handle, state->test_graphics_pipeline_layout, state->allocator);
+    ETINFO("Test graphics pipeline & test graphics pipeline layout destroyed.");
 
-    unload_shader(state, &state->test_graphics_config.fragment_shader);
-    unload_shader(state, &state->test_graphics_config.vertex_shader);
-    ETINFO("Test graphics pipeline shaders unloaded.");
+    unload_shader(state, &state->test_graphics_vertex);
+    unload_shader(state, &state->test_graphics_fragment);
+    ETINFO("Test graphics vertex and fragment shaders unloaded.");
+    // TEMP: Until material framework is stood up
 
-    compute_pipeline_destroy(state, &state->test_comp_pipeline);
-    ETINFO("Test compute Pipeline destroyed.");
+    // TEMP: Until post processing effect structure/system is created/becomes more robust. 
+    vkDestroyPipeline(state->device.handle, state->test_compute_effect.pipeline, state->allocator);
+    vkDestroyPipelineLayout(state->device.handle, state->test_compute_effect.layout, state->allocator);
+    ETINFO("Test compute effect pipeline & test compute effect pipeline layout destroyed.");
 
-    test_destroy_descriptor_pool(state);
-    ETINFO("Test descriptor pool destroyed.");
+    unload_shader(state, &state->test_compute_shader);
+    ETINFO("Test compute shader unloaded.");
+    // TEMP: Until post processing effect structure/system is created/becomes more robust. 
+
+    shutdown_descriptors(state);
+    ETINFO("Descriptors shutdown.");
 
     destroy_frame_synchronization_structures(state);
     ETINFO("Frame synchronization structures destroyed.");
@@ -305,12 +367,19 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT , VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
     // TEMP: Hardcode test compute
-    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->test_comp_pipeline.handle);
+    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->test_compute_effect.pipeline);
 
-    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->test_comp_pipeline.layout, 0, 1, &state->test_comp_pipeline.descriptor_set, 0, 0);
+    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->test_compute_effect.layout, 0, 1, &state->test_compute_descriptor_set, 0, 0);
+
+    compute_push_constants pc = {
+        .data1 = (v4s){1.0f, 0.0f, 0.0f, 1.0f},
+        .data2 = (v4s){0.0f, 0.0f, 1.0f, 1.0f},
+    };
+
+    vkCmdPushConstants(frame_cmd, state->test_compute_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compute_push_constants), &pc);
 
     vkCmdDispatch(frame_cmd, ceil(state->width / 16.0f), ceil(state->height / 16.0f), 1);
-    // TEMP: Hardcode test compute end
+    // TEMP: END
 
     image_barrier(frame_cmd, state->render_image.handle,
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -325,7 +394,7 @@ b8 renderer_draw_frame(renderer_state* state) {
 
     vkCmdBeginRendering(frame_cmd, &render_info);
 
-    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->test_graphics_pipeline.handle);
+    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->test_graphics_pipeline);
 
     VkViewport viewport = {0};
     viewport.x = 0;
@@ -348,7 +417,7 @@ b8 renderer_draw_frame(renderer_state* state) {
     vkCmdDraw(frame_cmd, 3, 1, 0, 0);
 
     vkCmdEndRendering(frame_cmd);
-    // TEMP: Hardcode test graphics end
+    // TEMP: END
 
     // Image barrier to transition render image to transfer source optimal layout
     image_barrier(frame_cmd, state->render_image.handle,
@@ -520,23 +589,38 @@ static void destroy_frame_synchronization_structures(renderer_state* state) {
            MEMORY_TAG_RENDERER);
 }
 
-// TODO: Change from test code to descriptor allocator implementation.
-static void test_create_descriptor_pool(renderer_state* state) {
-    VkDescriptorPoolSize storage_image_pool_size;
-    storage_image_pool_size.descriptorCount = 1;
-    storage_image_pool_size.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    
-    VkDescriptorPoolCreateInfo pool_info = init_descriptor_pool_create_info();
-    pool_info.maxSets = state->image_count;
-    pool_info.poolSizeCount = 1;
-    pool_info.pPoolSizes = &storage_image_pool_size;
+static void initialize_descriptors(renderer_state* state) {
+    // Define pool sizes for descriptor allocator
+    VkDescriptorPoolSize pool_sizes[] = {
+        { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1},
+    };
+    VkDescriptorPoolSize* dynarray_pools = dynarray_create_data(1, sizeof(VkDescriptorPoolSize), 1, pool_sizes);
+    descriptor_set_allocator_initialize(&state->global_ds_allocator, 10, dynarray_pools, state);
+    dynarray_destroy(dynarray_pools);
+    ETINFO("Descriptor set allocator initialized.");
 
-    VK_CHECK(vkCreateDescriptorPool(state->device.handle, &pool_info, state->allocator, &state->descriptor_pool));
+    dsl_builder dsl_builder = descriptor_set_layout_builder_create();
+    descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
+    state->test_compute_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
+    ETINFO("Test Compute Descriptor Set Layout created.");
+
+    state->test_compute_descriptor_set = descriptor_set_allocator_allocate(&state->global_ds_allocator, state->test_compute_descriptor_set_layout, state);
+    descriptor_set_layout_builder_destroy(&dsl_builder);
+    ETINFO("Test Compute Descriptor Set allocated");
+
+    ds_writer writer = descriptor_set_writer_create_initialize();
+    descriptor_set_writer_write_image(&writer, 0, state->render_image.view, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+    descriptor_set_writer_update_set(&writer, state->test_compute_descriptor_set, state);
+    descriptor_set_writer_shutdown(&writer);
+    ETINFO("Test Compute Descriptor Set updated.");
 }
 
-// TODO: Change from test code to descriptor allocator implementation.
-static void test_destroy_descriptor_pool(renderer_state* state) {
-    vkDestroyDescriptorPool(state->device.handle, state->descriptor_pool, state->allocator);
+static void shutdown_descriptors(renderer_state* state) {
+    descriptor_set_allocator_shutdown(&state->global_ds_allocator, state);
+    ETINFO("Descriptor Set Allocator destroyed.");
+
+    vkDestroyDescriptorSetLayout(state->device.handle, state->test_compute_descriptor_set_layout, state->allocator);
+    ETINFO("Test compute descriptor set layout destroyed.");
 }
 
 void renderer_on_resize(renderer_state* state, i32 width, i32 height) {

@@ -1,128 +1,104 @@
 --------Immediate--------
-TODO: DescriptorAllocator Abstraction
 TODO: VkDescriptorPool give more allocations & make one per frame or something I think
 
-TODO: Vulkan Buffer
+TODO: Compute Effect improvement
+
+TODO: Vulkan Buffer naive memory management implementation for now.
 TODO: Staging buffer implementation
 
-TODO: Model Loading: FastObjLibrary for me
+TODO: Texture loading & management system
+TODO: Materials & management system
 
-TODO: Hardcoded computepipeline -> compute effect
-TODO: Hardcoded graphicspipeline -> pipeline builder
+TODO: Renderable interface struct
+TODO: Model loading & management system
 
 TODO: Build out materials and renderable framework:
-Obj Format Loading.
-Texture Loading.
 
-Material Creation from shader.
+TODO: Implement scene graph rendering
 
-Material system. Prereq for Full implementation of descriptor sets.
+TODO: RendererAPI:
+    TODO: Create default scene & load that by default in engine settings.
+    TODO: Functions to expose loading & models & scenes.
+    TODO: Functions to expose loading shaders & making materials from them
+GOAL: Nothing hardcoded in renderer. Systems supply renderables, Application code supplies what to load into systems.
 
-TODO: Abstraction between renderer & engine pulling renderer specific implementation details out.
---------After Immediate--------
-TODO: Result of vulkan commands checking done with VK_CHECK & other result checking when unnecessary
+--------Improvements for after rendering architecture framework is down but not optimized at all--------
+NOTE: Renderer specific:
+    TODO: Recreate swapchain implementation
+    TODO: Manage vulkan buffer & image memory by allocating from GPU in 
+    chunks and allocating whats needed from that via views and subsections
+    of the buffer/image resource.
 
-TODO: Recreate swapchain implementation
+    TODO: Result of vulkan commands checking done with VK_CHECK & other result checking when unnecessary:
+    TODO: Vulkan string library or something like that
 
-TODO: (Using material system) Automate descriptor set creation 
-NOTE: How does updating and writing VkDescriptorSets work
+    TODO: Use multiple queue families instead of just the one. For other stuff
 
-TODO: FIFO Struct to place events into
-TODO: Setup event overwritting or adding based on behavior of event. When event is fired,
-it would be able to overwrite the event waiting in the event queue or
-it would be able to combine its parameters in a predefined way(func pointer??)
-TODO: Events: Data struct to support insertions with ordering(priority) value
+    TODO: SPIR-V optimizer commands in cmake
+    TODO: Runtime compilation of shader for realtime updating & loading
 
-TODO: Logger outputs to log file.
+    TODO: Check if image format has VkFormatFeatureFlagBits set for what I want to use it for
+    TODO: VkImageViewUsageCreateInfo structure to the pNext chain, but the view usage must be a subset of the image usage.
 
-TODO: Use multiple queue families instead of just the one
+    TODO: Make Render image format configurable from engine editor.
 
-NOTE: Recreate swapchain:
-// TEMP: Checking for old_swapchain seems kinda scuffed.
-if (old_swapchain != VK_NULL_HANDLE) {
-    for (u32 i = 0; i < state->image_count; ++i) {
-        vkDestroyImageView(
-            state->device.handle,
-            state->swapchain_image_views[i],
-            state->allocator);
-    }
-    vkDestroySwapchainKHR(
-        state->device.handle,
-        old_swapchain,
-        state->allocator);
-}
---------Refactor & Structure Decisions--------
-NOTE: Actual coding
-TODO: Different formats for swapchain image and render target image
-TODO: Explicitly Reset command buffers in draw function
-TODO: Use the transfer queue to copy the data from rendering image to the swapchain image
-TODO: Validate that the device is able to create the descriptor set layouts gotten from the shaders
-^^vkGetDescriptorSetLayoutSupport & (VkPhysicalDeviceMaintenance3Properties + vkGetPhysicalDeviceProperties2) 
+    TODO: Use the TRANSFER QUEUE to copy the data from rendering image to the swapchain image
+    TODO: Validate that the device is able to create the descriptor set layouts gotten from the shaders
+    ^^vkGetDescriptorSetLayoutSupport & (VkPhysicalDeviceMaintenance3Properties + vkGetPhysicalDeviceProperties2) 
 
-NOTE: Really boring stuff
+
+    TODO: Make the renderer a dynamically loaded plugin.
+
+NOTE: Not Renderer specific:
+    TODO: Logger outputs to log file.
+
+    TODO: FIFO Struct to place events into
+    TODO: Setup event overwritting or adding based on behavior of event. When event is fired,
+          it would be able to overwrite the event waiting in the event queue or
+          it would be able to combine its parameters in a predefined way(func pointer??)
+    TODO: Events: Data struct to support insertions with ordering(priority) value
+
+    TODO: Use multiple queue families instead of just the one. For other stuff
+
+    TODO: Staging buffer improvment. For loading on the fly
+    TODO: vkCreateDescriptorUpdateTemplate to use update instead of stuff
+
+    TODO: Make functions not all return booleans when unnecessary
+    TODO: Change from passing by pointer unless value is changing
+    TODO: Filesystem typedef FILE etfile instead of struct nonsense
+    TODO: Better way of doing the filesystem.
+
+    TODO: When systems fail they should be able to call shutdown procedures if the failure is recoverable
+
+    TODO: Make the game code a dynamically loaded plugin.
+
 TODO: Unit tests
 TODO: Setup Debug & Release configurations
+GOAL: De-spaghettification of code & unit tests to make sure optimizations and features break nothing. 
+--------When rendering is at an acceptable level & RenderingAPI has been created to expose functionality--------
+TODO: Serialization
+    TODO: Config file for engine to load settings
+    TODO: Config file for renderer to load settings
 
-NOTE: Code Structure and spec reading
-TODO: Dynamic vs static library. ??
-TODO: If static: Instead of passing function pointers, just say the functions are external and get them from the sandbox file??.
-TODO: If dynamic: Use volk included with the vulkan sdk to dynamically load vulkan functions.
+TODO: Command Line/Terminal/Bash for the system until UI is created. As well as for temporary setting selection
+TODO: UI Layer & functionality 
 
-TODO: When systems fail they should be able to call shutdown procedures if the failure is recoverable
+GOAL: Ability to edit, save, load the scene from "editor" using a scene configuration file.
+      This makes it so that application code does not need to hardcode the scene data and shaders.
+      No need to set shader uniform binding points or anything like that from the application's & the editor's C code.
 
-TODO: Rework Queue's and Queue Families & Command buffers.
-I haven't event finished writing the code & it already needs a rewrite.
+TODO: Material Experimentaion editor feature.
+      User would make materials by loading shaders & linking loaded textures to binding slots.
+      Ability to link this material to existing objects
 
-TODO: VkImageViewUsageCreateInfo structure to the pNext chain, but the view usage must be a subset of the image usage.
-
-TODO: SPIR-V optimizer commands in cmake
-TODO: Runtime compilation of shader for realtime updating & loading
-
-TODO: Deletion queue / shutdown queue implementation??
-
-TODO: Check if image format has VkFormatFeatureFlagBits set for what I want to use it for
-
-TODO: Renderer to be made configurable:
--Render image format
-
-Refactoring 
-Make functions not all return booleans when unnecessary
-Change from passing by pointer unless value is changing
-Filesystem typedef FILE etfile instead of struct nonsense
-Better way of doing the filesystem.
-
--- When finally rendering --
+--------Finally can do some graphics programming--------
 NOTE: Sample 2D slice of 3D texture for wierd patterns.
 Like mod world position with texture limits to index into tiling 3D texture.
 
 NOTE: Use a procedural fragment shader output (from shader toy or something) & map a mesh as a viewport to it.
 NOTE: 3D texture coords to warp the viewport for neat effects
 NOTE: Use post processing texture group code to styilize procedurally generated textures
-
-TODO: Staging buffer improvment. For loading on the fly
-
-TODO: Make the game code a dynamic plugin.
-
-TODO: Serialize a file for each shader that stores the bytes of a struct that I use to store descriptor set information.
-TODO: vkCreateDescriptorUpdateTemplate to use update instead of stuff
-======================================================= Past Code I might still need but is in the way =======================================================
-    // Clear the screen
-    VkClearColorValue clear_value;
-    f32 flash = (f32)fabs(sin(state->frame_number / 120.0f));
-    clear_value.float32[0] = 0.0f;
-    clear_value.float32[1] = 0.0f;
-    clear_value.float32[2] = flash;
-    clear_value.float32[3] = 1.0f;
-
-    VkImageSubresourceRange clear_range = init_image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-
-    vkCmdClearColorImage(frame_cmd,
-        state->render_image.handle,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        &clear_value,
-        1,
-        &clear_range);
-
-TODO: Manage vulkan buffer & image memory by allocating from GPU in 
-chunks and allocating whats needed from that via views and subsections
-of the buffer/image resource.
+--------Future Optimizations or Refactoring--------
+Create a different dynamic array data structure where the array data is not hidden
+from the user but does not need to be initialized. This would be for data structures to use so a create or 
+initialize function is not needed when before said structure is used;

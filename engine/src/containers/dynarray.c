@@ -10,7 +10,7 @@
 // Debug asserts?? Fatal Errors?? Regular Errors??
 
 #define DYNARRAY_RESIZE_FACTOR 2
-#define RESIZE_CAPACITY(curr_capacity) (curr_capacity + 1) * DYNARRAY_RESIZE_FACTOR
+#define RESIZE_CAPACITY(curr_capacity) ((curr_capacity + 1) * DYNARRAY_RESIZE_FACTOR)
 
 // TODO: Change index & length names to reflect role better.
 // length --> capacity
@@ -50,6 +50,13 @@ void* dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* dat
     header->length = new_length;
     header->stride = stride;
     return (void*)(header + 1);
+}
+
+void* dynarray_copy(void* src) {
+    dynarray* source = (dynarray*)src - 1;
+    dynarray* dest = _dynarray_create(source->capacity, source->stride);
+    etcopy_memory(dest, source, (source->length * source->stride) + header_size);
+    return (void*)(dest + 1);
 }
 
 void dynarray_destroy(void* array)
@@ -103,9 +110,12 @@ b8 dynarray_is_empty(void* array)
     return header->length == 0;
 }
 
-u64 dynarray_length(void* array)
-{
+u64 dynarray_length(void* array) {
     return ((dynarray*)array - 1)->length;
+}
+
+void dynarray_clear(void* array) {
+    ((dynarray*)array - 1)->length = 0;
 }
 
 //TODO: Decide behavoir when index == header->index
@@ -160,20 +170,17 @@ void dynarray_remove(void* array, void* dest, u64 index)
     header->length--;
 }
 
-// static inline here????
-dynarray* _dynarray_create(u64 capacity, u64 stride)
-{
+static inline dynarray* _dynarray_create(u64 capacity, u64 stride) {
    return (dynarray*)etallocate(header_size + (capacity * stride), MEMORY_TAG_DYNARRAY);
 }
 
-dynarray* _dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* data) {
+static inline dynarray* _dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* data) {
     dynarray* new_dynarray = (dynarray*)etallocate(header_size + (capacity * stride), MEMORY_TAG_DYNARRAY);
     etcopy_memory((new_dynarray + 1), data, stride * length);
     return new_dynarray;
 }
 
-// static inline here????
-dynarray* _dynarray_resize(dynarray* header, u64 capacity)
+static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity)
 {
     dynarray* resized_array = _dynarray_create(capacity, header->stride);
 
@@ -196,7 +203,7 @@ dynarray* _dynarray_resize(dynarray* header, u64 capacity)
 
 // As resize is occuring we do not have to check if shifting data to the right
 // one block is going to access memory not in the array.
-dynarray* _dynarray_resize_index(dynarray* header, u64 capacity, u64 index)
+static inline dynarray* _dynarray_resize_index(dynarray* header, u64 capacity, u64 index)
 {
     dynarray* resized_array = _dynarray_create(capacity, header->stride);
 
@@ -222,7 +229,7 @@ dynarray* _dynarray_resize_index(dynarray* header, u64 capacity, u64 index)
 
 // Shifts array entries to the right
 // Assumes header->index != index
-void _dynarray_shift_index(dynarray* header, u64 index)
+static inline void _dynarray_shift_index(dynarray* header, u64 index)
 {
     u8* index_address = (u8*)(header + 1) + header->stride * index;
     etmove_memory(

@@ -33,6 +33,11 @@
             "text": "TEMP:",
             "color": "#ADD8E6",
             "backgroundColor": "rgba(0,0,0,0)"
+        },
+        {
+            "text": "GOAL:",
+            "color": "#FFD700",
+            "backgroundColor": "rgba(0,0,0,0)"
         }
     ],
     "todohighlight.isCaseSensitive": true,
@@ -106,6 +111,8 @@
         "vkinit.h": "c",
         "shader.h": "c",
         "spirv_reflect.h": "c",
-        "vk_types.h": "c"
+        "vk_types.h": "c",
+        "descriptor.h": "c",
+        "pipeline.h": "c"
     }
 }
