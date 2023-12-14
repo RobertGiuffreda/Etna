@@ -1,10 +1,12 @@
 --------Immediate--------
-TODO: VkDescriptorPool give more allocations & make one per frame or something I think
-
 TODO: Compute Effect improvement
+
+TODO: VkDescriptorPool give more allocations & make one per frame or something I think
 
 TODO: Vulkan Buffer naive memory management implementation for now.
 TODO: Staging buffer implementation
+
+TODO: Recreate swapchain implementation
 
 TODO: Texture loading & management system
 TODO: Materials & management system
@@ -17,14 +19,13 @@ TODO: Build out materials and renderable framework:
 TODO: Implement scene graph rendering
 
 TODO: RendererAPI:
-    TODO: Create default scene & load that by default in engine settings.
-    TODO: Functions to expose loading & models & scenes.
+    TODO: Create default scene & load that by default in engine settings
+    TODO: Functions to expose loading & models & scenes
     TODO: Functions to expose loading shaders & making materials from them
 GOAL: Nothing hardcoded in renderer. Systems supply renderables, Application code supplies what to load into systems.
 
 --------Improvements for after rendering architecture framework is down but not optimized at all--------
 NOTE: Renderer specific:
-    TODO: Recreate swapchain implementation
     TODO: Manage vulkan buffer & image memory by allocating from GPU in 
     chunks and allocating whats needed from that via views and subsections
     of the buffer/image resource.
@@ -44,8 +45,7 @@ NOTE: Renderer specific:
 
     TODO: Use the TRANSFER QUEUE to copy the data from rendering image to the swapchain image
     TODO: Validate that the device is able to create the descriptor set layouts gotten from the shaders
-    ^^vkGetDescriptorSetLayoutSupport & (VkPhysicalDeviceMaintenance3Properties + vkGetPhysicalDeviceProperties2) 
-
+    ^^vkGetDescriptorSetLayoutSupport & (VkPhysicalDeviceMaintenance3Properties + vkGetPhysicalDeviceProperties2)
 
     TODO: Make the renderer a dynamically loaded plugin.
 
@@ -74,7 +74,8 @@ NOTE: Not Renderer specific:
 
 TODO: Unit tests
 TODO: Setup Debug & Release configurations
-GOAL: De-spaghettification of code & unit tests to make sure optimizations and features break nothing. 
+GOAL: De-spaghettification of code & unit tests to make sure optimizations and features break nothing.
+
 --------When rendering is at an acceptable level & RenderingAPI has been created to expose functionality--------
 TODO: Serialization
     TODO: Config file for engine to load settings
