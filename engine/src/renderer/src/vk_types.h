@@ -36,7 +36,8 @@ typedef struct descriptor_set_allocator {
 } ds_allocator;
 /* NOTE: END */
 
-
+// TEMP: Until my vulkan memory management is implemented
+// TODO: Store memory information for when implementing memory management
 typedef struct image {
     VkImage handle;
     VkImageView view;
@@ -47,9 +48,32 @@ typedef struct image {
     VkFormat format;
 } image;
 
-// TODO: Buffer
+typedef struct buffer {
+    VkBuffer handle;
+    VkDeviceMemory memory;
+} buffer;
+// TEMP: END
 
-// TODO: END
+// NOTE: vkGuide.dev tutorial structs
+typedef struct vertex {
+    v3s position;
+    f32 uv_x;
+    v3s normal;
+    f32 uv_y;
+    v4s color;
+} vertex;
+
+typedef struct gpu_mesh_buffers {
+    buffer index_buffer;
+    buffer vertex_buffer;
+    VkDeviceAddress vertex_buffer_address;
+} gpu_mesh_buffers;
+
+typedef struct gpu_draw_push_constants {
+    m4s world_matrix;
+    VkDeviceAddress vertex_buffer;
+} gpu_draw_push_constants;
+// NOTE: END
 
 /** Information needed for each binding:
  * Requisite information for:
@@ -109,7 +133,7 @@ typedef struct shader {
  * Compute push constants are TEMP: and will be replaced with more robust system I think:
  * Compute shader post processing effects for now all share compute push constants to simplify things
  */
-
+// NOTE: vkGuide.dev tutorial structs
 typedef struct compute_push_constants {
     v4s data1;
     v4s data2;
@@ -127,14 +151,14 @@ typedef struct compute_effect {
 } compute_effect;
 
 // TODO: Old and bad; about to remove
-typedef struct compute_pipeline {
-    VkPipeline handle;
-    VkPipelineLayout layout;
-    VkShaderModule shader;
+// typedef struct compute_pipeline {
+//     VkPipeline handle;
+//     VkPipelineLayout layout;
+//     VkShaderModule shader;
     
-    VkDescriptorSetLayout descriptor_layout;
-    VkDescriptorSet descriptor_set;
-} compute_pipeline;
+//     VkDescriptorSetLayout descriptor_layout;
+//     VkDescriptorSet descriptor_set;
+// } compute_pipeline;
 
 typedef struct graphics_pipeline {
     VkPipeline handle;
@@ -210,20 +234,36 @@ typedef struct renderer_state {
     VkCommandBuffer* main_graphics_command_buffers;
     // NOTE: Per frame END
 
+    // Immediate command pool & buffer
+    // TODO: How does this fit into place with with queues 
+    // and multiple queue families 
+    VkCommandPool imm_pool;
+    VkCommandBuffer imm_buffer;
+    VkFence imm_fence;
+
+    // Global descriptor set allocator
     ds_allocator global_ds_allocator;
 
-    shader test_compute_shader;
-    compute_effect test_compute_effect;
+    shader gradient_shader;
+    compute_effect gradient_effect;
 
     // TEMP: Shared compute effect descriptor set layout
-    VkDescriptorSetLayout test_compute_descriptor_set_layout;
-    VkDescriptorSet test_compute_descriptor_set;
-    // TEMP: END
+    VkDescriptorSetLayout gradient_descriptor_set_layout;
+    VkDescriptorSet gradient_descriptor_set;
+    // TEMP: END; Called gradient for now
 
+    // NOTE: This is test_ as graphics pipelines will be eventually
+    // be encapsulated via materials and that via meshes. 
     shader test_graphics_vertex;
     shader test_graphics_fragment;
 
     VkPipeline test_graphics_pipeline;
     VkPipelineLayout test_graphics_pipeline_layout;
-    //TEMP: END
+
+    // Testing loading data to vertex & index buffer as well as buffer references
+    shader mesh_vertex;
+    shader mesh_fragment;
+
+    VkPipeline mesh_pipeline;
+    VkPipelineLayout mesh_pipeline_layout;
 } renderer_state;

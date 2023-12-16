@@ -145,6 +145,17 @@ VkImageViewCreateInfo init_image_view2D_create_info(
     return info;
 }
 
+VkBufferCreateInfo init_buffer_create_info(VkBufferUsageFlags usage_flags, u64 size) {
+    VkBufferCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .pNext = 0,
+        .flags = 0,
+        .usage = usage_flags,
+        .size = size,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+    return info;
+}
+
 VkMemoryRequirements2 init_memory_requirements2(void) {
     VkMemoryRequirements2 requirements = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
@@ -158,6 +169,14 @@ VkImageMemoryRequirementsInfo2 init_image_memory_requirements_info2(VkImage imag
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2,
         .pNext = 0,
         .image = image};
+    return info;
+}
+
+VkBufferMemoryRequirementsInfo2 init_buffer_memory_requirements_info2(VkBuffer buffer) {
+    VkBufferMemoryRequirementsInfo2 info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2,
+        .pNext = 0,
+        .buffer = buffer};
     return info;
 }
 
@@ -177,6 +196,18 @@ VkBindImageMemoryInfo init_bind_image_memory_info(
         .sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO,
         .pNext = 0,
         .image = image,
+        .memory = memory,
+        .memoryOffset = memory_offset};
+    return info;
+}
+
+VkBindBufferMemoryInfo init_bind_buffer_memory_info(
+    VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize memory_offset)
+{
+    VkBindBufferMemoryInfo info = {
+        .sType = VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO,
+        .pNext = 0,
+        .buffer = buffer,
         .memory = memory,
         .memoryOffset = memory_offset};
     return info;
@@ -292,6 +323,11 @@ VkRenderingInfo init_rendering_info(VkExtent2D render_extent, VkRenderingAttachm
 }
 
 // TODO: Move this to a utilities file
+/** TODO:
+ * Documentation explaining what this does and how it works
+ * NOTE: Improvement??: Cache/store the indices of known memory usage bit indices and 
+ * start traversing from that index
+ */
 i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
     u32 memory_type_bits_requirement, VkMemoryPropertyFlags required_properties)
 {

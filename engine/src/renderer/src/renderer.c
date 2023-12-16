@@ -6,6 +6,7 @@
 #include "renderer/src/device.h"
 #include "renderer/src/swapchain.h"
 #include "renderer/src/image.h"
+#include "renderer/src/buffer.h"
 #include "renderer/src/pipeline.h"
 #include "renderer/src/shader.h"
 #include "renderer/src/descriptor.h"
@@ -30,6 +31,11 @@ static void destroy_frame_synchronization_structures(renderer_state* state);
 
 static void initialize_descriptors(renderer_state* state);
 static void shutdown_descriptors(renderer_state* state);
+
+static gpu_mesh_buffers upload_mesh(
+    renderer_state* state,
+    u32 index_count, u32* indices, 
+    u32 vertex_count, vertex* vertices);
 
 VkBool32 vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -199,18 +205,18 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     ETINFO("Frame synchronization structures created.");
 
     // This function initializes:
-    // state->test_compute_descriptor_set_layout
-    // state->test_compute_descriptor_set
+    // state->gradient_descriptor_set_layout
+    // state->gradient_descriptor_set
     // state->global_ds_allocator
     initialize_descriptors(state);
     ETINFO("Descriptors Initialized.");
 
     // TEMP: Until post processing effect structure/system is created/becomes more robust. 
-    load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->test_compute_shader);
+    load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader);
 
     VkPipelineLayoutCreateInfo compute_effect_pipeline_layout_info = init_pipeline_layout_create_info();
     compute_effect_pipeline_layout_info.setLayoutCount = 1;
-    compute_effect_pipeline_layout_info.pSetLayouts = &state->test_compute_descriptor_set_layout;
+    compute_effect_pipeline_layout_info.pSetLayouts = &state->gradient_descriptor_set_layout;
 
     // Push constant structure for compute effect pipelines
     VkPushConstantRange push_constant = {0};
@@ -221,19 +227,19 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     compute_effect_pipeline_layout_info.pushConstantRangeCount = 1;
     compute_effect_pipeline_layout_info.pPushConstantRanges = &push_constant;
     
-    VK_CHECK(vkCreatePipelineLayout(state->device.handle, &compute_effect_pipeline_layout_info, state->allocator, &state->test_compute_effect.layout));
+    VK_CHECK(vkCreatePipelineLayout(state->device.handle, &compute_effect_pipeline_layout_info, state->allocator, &state->gradient_effect.layout));
 
     VkPipelineShaderStageCreateInfo compute_effect_pipeline_shader_stage_info = init_pipeline_shader_stage_create_info();
-    compute_effect_pipeline_shader_stage_info.stage = state->test_compute_shader.stage;
-    compute_effect_pipeline_shader_stage_info.module = state->test_compute_shader.module;
-    compute_effect_pipeline_shader_stage_info.pName = state->test_compute_shader.entry_point;
+    compute_effect_pipeline_shader_stage_info.stage = state->gradient_shader.stage;
+    compute_effect_pipeline_shader_stage_info.module = state->gradient_shader.module;
+    compute_effect_pipeline_shader_stage_info.pName = state->gradient_shader.entry_point;
 
     VkComputePipelineCreateInfo compute_effect_info = init_compute_pipeline_create_info();
-    compute_effect_info.layout = state->test_compute_effect.layout;
+    compute_effect_info.layout = state->gradient_effect.layout;
     compute_effect_info.stage = compute_effect_pipeline_shader_stage_info;
 
-    VK_CHECK(vkCreateComputePipelines(state->device.handle, VK_NULL_HANDLE, 1, &compute_effect_info, state->allocator, &state->test_compute_effect.pipeline));
-    ETINFO("Test compute effect created.");
+    VK_CHECK(vkCreateComputePipelines(state->device.handle, VK_NULL_HANDLE, 1, &compute_effect_info, state->allocator, &state->gradient_effect.pipeline));
+    ETINFO("Gradient compute effect created.");
     // TEMP: END
 
     // TEMP: Until material framework is stood up
@@ -282,12 +288,12 @@ void renderer_shutdown(renderer_state* state) {
     // TEMP: Until material framework is stood up
 
     // TEMP: Until post processing effect structure/system is created/becomes more robust. 
-    vkDestroyPipeline(state->device.handle, state->test_compute_effect.pipeline, state->allocator);
-    vkDestroyPipelineLayout(state->device.handle, state->test_compute_effect.layout, state->allocator);
-    ETINFO("Test compute effect pipeline & test compute effect pipeline layout destroyed.");
+    vkDestroyPipeline(state->device.handle, state->gradient_effect.pipeline, state->allocator);
+    vkDestroyPipelineLayout(state->device.handle, state->gradient_effect.layout, state->allocator);
+    ETINFO("Gradient compute effect pipeline & Gradient compute effect pipeline layout destroyed.");
 
-    unload_shader(state, &state->test_compute_shader);
-    ETINFO("Test compute shader unloaded.");
+    unload_shader(state, &state->gradient_shader);
+    ETINFO("Gradient compute shader unloaded.");
     // TEMP: Until post processing effect structure/system is created/becomes more robust. 
 
     shutdown_descriptors(state);
@@ -366,17 +372,17 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_SHADER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT , VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
-    // TEMP: Hardcode test compute
-    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->test_compute_effect.pipeline);
+    // TEMP: Hardcode Gradient compute
+    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.pipeline);
 
-    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->test_compute_effect.layout, 0, 1, &state->test_compute_descriptor_set, 0, 0);
+    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.layout, 0, 1, &state->gradient_descriptor_set, 0, 0);
 
     compute_push_constants pc = {
         .data1 = (v4s){1.0f, 0.0f, 0.0f, 1.0f},
         .data2 = (v4s){0.0f, 0.0f, 1.0f, 1.0f},
     };
 
-    vkCmdPushConstants(frame_cmd, state->test_compute_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compute_push_constants), &pc);
+    vkCmdPushConstants(frame_cmd, state->gradient_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compute_push_constants), &pc);
 
     vkCmdDispatch(frame_cmd, ceil(state->width / 16.0f), ceil(state->height / 16.0f), 1);
     // TEMP: END
@@ -511,6 +517,22 @@ static void create_frame_command_structures(renderer_state* state) {
             &command_buffer_alloc_info,
             &state->main_graphics_command_buffers[i]));
     }
+    // Immediate command pool & buffer
+    VkCommandPoolCreateInfo imm_pool_info = init_command_pool_create_info(
+        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        state->device.graphics_queue_index);
+    VK_CHECK(vkCreateCommandPool(
+        state->device.handle,
+        &imm_pool_info,
+        state->allocator,
+        &state->imm_pool));
+
+    VkCommandBufferAllocateInfo imm_buffer_alloc_info = init_command_buffer_allocate_info(
+        state->imm_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+    VK_CHECK(vkAllocateCommandBuffers(
+        state->device.handle,
+        &imm_buffer_alloc_info,
+        &state->imm_buffer));
 }
 
 static void destroy_frame_command_structures(renderer_state* state) {
@@ -523,11 +545,14 @@ static void destroy_frame_command_structures(renderer_state* state) {
             state->allocator);
     }
     etfree(state->main_graphics_command_buffers,
-           sizeof(VkCommandBuffer) * state->image_count,
-           MEMORY_TAG_RENDERER);
+        sizeof(VkCommandBuffer) * state->image_count,
+        MEMORY_TAG_RENDERER);
     etfree(state->graphics_pools,
-           sizeof(VkCommandPool) * state->image_count,
-           MEMORY_TAG_RENDERER);
+        sizeof(VkCommandPool) * state->image_count,
+        MEMORY_TAG_RENDERER);
+
+    // Destroy immediate command pool
+    vkDestroyCommandPool(state->device.handle, state->imm_pool, state->allocator);
 }
 
 static void create_frame_synchronization_structures(renderer_state* state) {
@@ -561,6 +586,9 @@ static void create_frame_synchronization_structures(renderer_state* state) {
             state->allocator,
             &state->render_fences[i]));
     }
+
+    // Create fence for synchronizing immediate command buffer submissions
+    VK_CHECK(vkCreateFence(state->device.handle, &fence_info, state->allocator, &state->imm_fence));
 }
 
 static void destroy_frame_synchronization_structures(renderer_state* state) {
@@ -579,14 +607,17 @@ static void destroy_frame_synchronization_structures(renderer_state* state) {
             state->allocator);
     }
     etfree(state->swapchain_semaphores,
-          sizeof(VkSemaphore) * state->image_count,
-          MEMORY_TAG_RENDERER);
+        sizeof(VkSemaphore) * state->image_count,
+        MEMORY_TAG_RENDERER);
     etfree(state->render_semaphores,
-          sizeof(VkSemaphore) * state->image_count,
-          MEMORY_TAG_RENDERER);
+        sizeof(VkSemaphore) * state->image_count,
+        MEMORY_TAG_RENDERER);
     etfree(state->render_fences,
-           sizeof(VkFence) * state->image_count,
-           MEMORY_TAG_RENDERER);
+        sizeof(VkFence) * state->image_count,
+        MEMORY_TAG_RENDERER);
+
+    // Destory fence for synchronizing the immediate command buffer
+    vkDestroyFence(state->device.handle, state->imm_fence, state->allocator); 
 }
 
 static void initialize_descriptors(renderer_state* state) {
@@ -601,26 +632,120 @@ static void initialize_descriptors(renderer_state* state) {
 
     dsl_builder dsl_builder = descriptor_set_layout_builder_create();
     descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-    state->test_compute_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
-    ETINFO("Test Compute Descriptor Set Layout created.");
+    state->gradient_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
+    ETINFO("Gradient Compute Descriptor Set Layout created.");
 
-    state->test_compute_descriptor_set = descriptor_set_allocator_allocate(&state->global_ds_allocator, state->test_compute_descriptor_set_layout, state);
+    state->gradient_descriptor_set = descriptor_set_allocator_allocate(&state->global_ds_allocator, state->gradient_descriptor_set_layout, state);
     descriptor_set_layout_builder_destroy(&dsl_builder);
-    ETINFO("Test Compute Descriptor Set allocated");
+    ETINFO("Gradient Compute Descriptor Set allocated");
 
     ds_writer writer = descriptor_set_writer_create_initialize();
     descriptor_set_writer_write_image(&writer, 0, state->render_image.view, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    descriptor_set_writer_update_set(&writer, state->test_compute_descriptor_set, state);
+    descriptor_set_writer_update_set(&writer, state->gradient_descriptor_set, state);
     descriptor_set_writer_shutdown(&writer);
-    ETINFO("Test Compute Descriptor Set updated.");
+    ETINFO("Gradient Compute Descriptor Set updated.");
 }
 
 static void shutdown_descriptors(renderer_state* state) {
     descriptor_set_allocator_shutdown(&state->global_ds_allocator, state);
     ETINFO("Descriptor Set Allocator destroyed.");
 
-    vkDestroyDescriptorSetLayout(state->device.handle, state->test_compute_descriptor_set_layout, state->allocator);
-    ETINFO("Test compute descriptor set layout destroyed.");
+    vkDestroyDescriptorSetLayout(state->device.handle, state->gradient_descriptor_set_layout, state->allocator);
+    ETINFO("Gradient compute descriptor set layout destroyed.");
+}
+
+// TODO: Move to another separate file for handling utility functions
+// TODO: Remove the VK_MEMORY_PROPERTY_HOST_COHERENT_BIT bit from the staging buffer and flush manually
+// TODO:GOAL: Use queue from dedicated transfer queue family(state->device.transfer_queue) to do the transfer
+static gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
+    const u64 vertex_buffer_size = vertex_count * sizeof(vertex);
+    const u64 index_buffer_size = index_count * sizeof(u32);
+
+    gpu_mesh_buffers new_surface;
+
+    // Create Vertex Buffer
+    buffer_create(
+        state,
+        vertex_buffer_size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+        | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+        | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &new_surface.vertex_buffer);
+    
+    VkBufferDeviceAddressInfo device_address_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+        .pNext = 0,
+        .buffer = new_surface.vertex_buffer.handle};
+    // Get Vertex buffer address
+    new_surface.vertex_buffer_address = vkGetBufferDeviceAddress(state->device.handle, &device_address_info);
+
+    // Create Index Buffer
+    buffer_create(
+        state,
+        index_buffer_size,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+        | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &new_surface.index_buffer);
+    
+    // Create staging buffer toi transfer memory from VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT to VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    buffer staging;
+    buffer_create(
+        state,
+        vertex_buffer_size + index_buffer_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &staging);
+
+    void* mapped_memory;
+    vkMapMemory(state->device.handle, staging.memory, 0, vertex_buffer_size + index_buffer_size, 0, &mapped_memory);
+
+    etcopy_memory(mapped_memory, vertices, vertex_buffer_size);
+    etcopy_memory((u8*)mapped_memory + vertex_buffer_size, indices, index_buffer_size);
+
+    vkUnmapMemory(state->device.handle, staging.memory);
+
+    // Immediate Command Buffer use start
+    VK_CHECK(vkResetFences(state->device.handle, 1, &state->imm_fence));
+    VK_CHECK(vkResetCommandBuffer(state->imm_buffer, 0));
+
+    VkCommandBuffer cmd = state->imm_buffer;
+
+    VkCommandBufferBeginInfo cmd_begin =
+        init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    
+    VK_CHECK(vkBeginCommandBuffer(cmd, &cmd_begin));
+
+    /* TODO: Use VkCopyBufferInfo2 to perform this copy */
+    VkBufferCopy vertex_copy = {
+        .dstOffset = 0,
+        .srcOffset = 0,
+        .size = vertex_buffer_size};
+
+    vkCmdCopyBuffer(cmd, staging.handle, new_surface.vertex_buffer.handle, 1, &vertex_copy);
+
+    VkBufferCopy index_copy = {
+        .dstOffset = 0,
+        .srcOffset = vertex_buffer_size,
+        .size = index_buffer_size};
+
+    vkCmdCopyBuffer(cmd, staging.handle, new_surface.index_buffer.handle, 1, &index_copy);
+
+    VK_CHECK(vkEndCommandBuffer(cmd));
+
+    VkCommandBufferSubmitInfo cmd_info = init_command_buffer_submit_info(cmd);
+    VkSubmitInfo2 submit = init_submit_info2(0, 0, 1, &cmd_info, 0, 0);
+
+    // submit command buffer to the queue and execute it.
+    VK_CHECK(vkQueueSubmit2(state->device.graphics_queue, 1, &submit, state->imm_fence));
+
+    VK_CHECK(vkWaitForFences(state->device.handle, 1, &state->imm_fence, VK_TRUE, 9999999999));
+    // Immediate Command Buffer use end
+
+    buffer_destroy(state, &staging);
+
+    return new_surface;
 }
 
 void renderer_on_resize(renderer_state* state, i32 width, i32 height) {

@@ -2,6 +2,8 @@
 
 #include "renderer/src/vk_types.h"
 
+// TODO: Move find_memory_index to another file
+
 VkCommandPoolCreateInfo init_command_pool_create_info(
     VkCommandPoolCreateFlags flags,
     u32 queue_family_index);
@@ -43,6 +45,8 @@ VkImageViewCreateInfo init_image_view2D_create_info(
     VkImage image,
     VkImageAspectFlags aspect_flags);
 
+VkBufferCreateInfo init_buffer_create_info(VkBufferUsageFlags usage_flags, u64 size);
+
 /* Initializers TODO:
 VkBufferMemoryBarrier2
 VkImageMemoryBarrier2
@@ -55,11 +59,16 @@ VkMemoryRequirements2 init_memory_requirements2(void);
 
 VkImageMemoryRequirementsInfo2 init_image_memory_requirements_info2(VkImage image);
 
+VkBufferMemoryRequirementsInfo2 init_buffer_memory_requirements_info2(VkBuffer buffer);
+
 VkMemoryAllocateInfo init_memory_allocate_info(VkDeviceSize allocationSize,
     u32 memoryTypeIndex);
 
 VkBindImageMemoryInfo init_bind_image_memory_info(
     VkImage image, VkDeviceMemory memory, VkDeviceSize memory_offset);
+
+VkBindBufferMemoryInfo init_bind_buffer_memory_info(
+    VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize memory_offset);
 
 VkDeviceImageMemoryRequirements init_device_image_memory_requirements(
     const VkImageCreateInfo* image_create_info);

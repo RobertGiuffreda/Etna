@@ -28,7 +28,7 @@ void image2D_create(
         memory_requirements.memoryTypeBits,
         memory_flags);
     if (memory_index == -1) {
-        ETERROR("Memory type with required memory type bits not found in physical memory properties.");
+        ETERROR("Memory type with required memory type bits for image not found in physical memory properties.");
     }
 
     VkMemoryAllocateInfo alloc_info = init_memory_allocate_info(memory_requirements.size, memory_index);

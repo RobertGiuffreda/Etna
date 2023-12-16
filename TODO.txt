@@ -1,18 +1,21 @@
 --------Immediate--------
-TODO: Compute Effect improvement
+TODO: Load index buffer and vertex buffer & render that data
 
-TODO: VkDescriptorPool give more allocations & make one per frame or something I think
 
-TODO: Vulkan Buffer naive memory management implementation for now.
 TODO: Staging buffer implementation
 
 TODO: Recreate swapchain implementation
+TODO: VkDescriptorPool give more allocations & make one per frame or something I think
 
-TODO: Texture loading & management system
-TODO: Materials & management system
+TODO: Model Geometry Loading
+TODO: Texture loading
+TODO: Material 
+
+TODO: Texture loading management system
+TODO: Materials & Material management system
+TODO: Model loading management system
 
 TODO: Renderable interface struct
-TODO: Model loading & management system
 
 TODO: Build out materials and renderable framework:
 
@@ -91,6 +94,8 @@ GOAL: Ability to edit, save, load the scene from "editor" using a scene configur
 TODO: Material Experimentaion editor feature.
       User would make materials by loading shaders & linking loaded textures to binding slots.
       Ability to link this material to existing objects
+
+TODO: Runtime check for GLSL extension support
 
 --------Finally can do some graphics programming--------
 NOTE: Sample 2D slice of 3D texture for wierd patterns.
