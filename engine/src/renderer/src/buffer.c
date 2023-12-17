@@ -29,7 +29,12 @@ void buffer_create(
         ETERROR("Memory type with required memory type bits for buffer not found in physical memory properties");
     }
 
-    VkMemoryAllocateInfo alloc_info = init_memory_allocate_info(size, memory_index); 
+    VkMemoryAllocateInfo alloc_info = init_memory_allocate_info(size, memory_index);
+    // TODO: Just include the VkMemoryAllocateFlagsInfo by default and pass the flags in??
+    if (usage_flags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+        VkMemoryAllocateFlagsInfo alloc_flags_info = init_memory_allocate_flags_info(VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT);
+        alloc_info.pNext = &alloc_flags_info;
+    }
     VK_CHECK(vkAllocateMemory(
         state->device.handle,
         &alloc_info,

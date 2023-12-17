@@ -19,6 +19,8 @@
 #include "core/logger.h"
 #include "core/etstring.h"
 
+#include "loaders/gltfloader.h"
+
 // TEMP: Until a math library is situated
 #include <math.h>
 // TEMP: END
@@ -32,10 +34,15 @@ static void destroy_frame_synchronization_structures(renderer_state* state);
 static void initialize_descriptors(renderer_state* state);
 static void shutdown_descriptors(renderer_state* state);
 
-static gpu_mesh_buffers upload_mesh(
-    renderer_state* state,
-    u32 index_count, u32* indices, 
-    u32 vertex_count, vertex* vertices);
+// TEMP: Until material framework is stood up
+static void initialize_triangle_pipeline(renderer_state* state);
+static void shutdown_triangle_pipeline(renderer_state* state);
+static void initialize_mesh_pipeline(renderer_state* state);
+static void shutdown_mesh_pipeline(renderer_state* state);
+static void intialize_default_data(renderer_state* state);
+static void shutdown_default_data(renderer_state* state);
+static void draw_geometry(renderer_state* state, VkCommandBuffer cmd);
+// TEMP: END
 
 VkBool32 vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -242,32 +249,11 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     ETINFO("Gradient compute effect created.");
     // TEMP: END
 
-    // TEMP: Until material framework is stood up
-    load_shader(state, "build/assets/shaders/test1.vert.spv", &state->test_graphics_vertex);
-    load_shader(state, "build/assets/shaders/test1.frag.spv", &state->test_graphics_fragment);
+    initialize_triangle_pipeline(state);
 
-    pipeline_builder graphics_builder = pipeline_builder_create();
-    pipeline_builder_set_shaders(&graphics_builder,
-        state->test_graphics_vertex,
-        state->test_graphics_fragment);
-    pipeline_builder_set_input_topology(&graphics_builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    pipeline_builder_set_polygon_mode(&graphics_builder, VK_POLYGON_MODE_FILL);
-    pipeline_builder_set_cull_mode(&graphics_builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-    pipeline_builder_set_multisampling_none(&graphics_builder);
-    pipeline_builder_disable_blending(&graphics_builder);
-    pipeline_builder_disable_depthtest(&graphics_builder);
-    pipeline_builder_set_color_attachment_format(&graphics_builder, state->render_image.format);
-    pipeline_builder_set_depth_format(&graphics_builder, VK_FORMAT_UNDEFINED);
+    initialize_mesh_pipeline(state);
 
-    VkPipelineLayoutCreateInfo layout_info = init_pipeline_layout_create_info();
-    VK_CHECK(vkCreatePipelineLayout(state->device.handle, &layout_info, state->allocator, &state->test_graphics_pipeline_layout));
-
-    graphics_builder.layout = state->test_graphics_pipeline_layout;
-
-    state->test_graphics_pipeline = pipeline_builder_build(&graphics_builder, state);
-
-    pipeline_builder_destroy(&graphics_builder);
-    // TEMP: END
+    intialize_default_data(state);
 
     *out_state = state;
     return true;
@@ -277,15 +263,11 @@ void renderer_shutdown(renderer_state* state) {
     vkDeviceWaitIdle(state->device.handle);
     // Destroy reverse order of creation
 
-    // TEMP: Until material framework is stood up
-    vkDestroyPipeline(state->device.handle, state->test_graphics_pipeline, state->allocator);
-    vkDestroyPipelineLayout(state->device.handle, state->test_graphics_pipeline_layout, state->allocator);
-    ETINFO("Test graphics pipeline & test graphics pipeline layout destroyed.");
+    shutdown_default_data(state);
 
-    unload_shader(state, &state->test_graphics_vertex);
-    unload_shader(state, &state->test_graphics_fragment);
-    ETINFO("Test graphics vertex and fragment shaders unloaded.");
-    // TEMP: Until material framework is stood up
+    shutdown_mesh_pipeline(state);
+
+    shutdown_triangle_pipeline(state);
 
     // TEMP: Until post processing effect structure/system is created/becomes more robust. 
     vkDestroyPipeline(state->device.handle, state->gradient_effect.pipeline, state->allocator);
@@ -379,8 +361,7 @@ b8 renderer_draw_frame(renderer_state* state) {
 
     compute_push_constants pc = {
         .data1 = (v4s){1.0f, 0.0f, 0.0f, 1.0f},
-        .data2 = (v4s){0.0f, 0.0f, 1.0f, 1.0f},
-    };
+        .data2 = (v4s){0.0f, 0.0f, 1.0f, 1.0f}};
 
     vkCmdPushConstants(frame_cmd, state->gradient_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compute_push_constants), &pc);
 
@@ -392,38 +373,8 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-    // TEMP: Hardcode test graphics
-    VkRenderingAttachmentInfo color_attachment = init_rendering_attachment_info(state->render_image.view, 0, VK_IMAGE_LAYOUT_GENERAL);
-
-    VkExtent2D window_extent = {.width = state->width, .height = state->height};
-    VkRenderingInfo render_info = init_rendering_info(window_extent, &color_attachment, 0);
-
-    vkCmdBeginRendering(frame_cmd, &render_info);
-
-    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->test_graphics_pipeline);
-
-    VkViewport viewport = {0};
-    viewport.x = 0;
-    viewport.y = 0;
-    viewport.width = state->width;
-    viewport.height = state->height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    vkCmdSetViewport(frame_cmd, 0, 1, &viewport);
-
-    VkRect2D scissor = {0};
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    scissor.extent.width = state->width;
-    scissor.extent.height = state->height;
-
-    vkCmdSetScissor(frame_cmd, 0, 1, &scissor);
-
-    vkCmdDraw(frame_cmd, 3, 1, 0, 0);
-
-    vkCmdEndRendering(frame_cmd);
-    // TEMP: END
+    // Draw the geometry
+    draw_geometry(state, frame_cmd);
 
     // Image barrier to transition render image to transfer source optimal layout
     image_barrier(frame_cmd, state->render_image.handle,
@@ -654,10 +605,194 @@ static void shutdown_descriptors(renderer_state* state) {
     ETINFO("Gradient compute descriptor set layout destroyed.");
 }
 
+static void initialize_triangle_pipeline(renderer_state* state) {
+    load_shader(state, "build/assets/shaders/triangle.vert.spv", &state->triangle_vertex);
+    load_shader(state, "build/assets/shaders/triangle.frag.spv", &state->triangle_fragment);
+    ETINFO("Triangle pipeline shaders loaded.");
+
+    VkPipelineLayoutCreateInfo layout_info = init_pipeline_layout_create_info();
+    VK_CHECK(vkCreatePipelineLayout(state->device.handle, &layout_info, state->allocator, &state->triangle_pipeline_layout));
+
+    pipeline_builder graphics_builder = pipeline_builder_create();
+    graphics_builder.layout = state->triangle_pipeline_layout;
+    pipeline_builder_set_shaders(&graphics_builder,
+        state->triangle_vertex,
+        state->triangle_fragment);
+    pipeline_builder_set_input_topology(&graphics_builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipeline_builder_set_polygon_mode(&graphics_builder, VK_POLYGON_MODE_FILL);
+    pipeline_builder_set_cull_mode(&graphics_builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipeline_builder_set_multisampling_none(&graphics_builder);
+    pipeline_builder_disable_blending(&graphics_builder);
+    pipeline_builder_disable_depthtest(&graphics_builder);
+    pipeline_builder_set_color_attachment_format(&graphics_builder, state->render_image.format);
+    pipeline_builder_set_depth_format(&graphics_builder, VK_FORMAT_UNDEFINED);
+    state->triangle_pipeline = pipeline_builder_build(&graphics_builder, state);
+
+    pipeline_builder_destroy(&graphics_builder);
+
+    ETINFO("Triangle pipeline & pipeline layout created");
+}
+
+static void shutdown_triangle_pipeline(renderer_state* state) {
+    vkDestroyPipeline(state->device.handle, state->triangle_pipeline, state->allocator);
+    vkDestroyPipelineLayout(state->device.handle, state->triangle_pipeline_layout, state->allocator);
+    ETINFO("Triangle pipeline & Triangle pipeline layout destroyed.");
+
+    unload_shader(state, &state->triangle_vertex);
+    unload_shader(state, &state->triangle_fragment);
+    ETINFO("Triangle pipeline shaders unloaded.");
+}
+
+static void initialize_mesh_pipeline(renderer_state* state) {
+    load_shader(state, "build/assets/shaders/mesh.vert.spv", &state->mesh_vertex);
+    load_shader(state, "build/assets/shaders/triangle.frag.spv", &state->mesh_fragment);
+    ETINFO("Mesh pipeline shaders loaded.");
+
+    VkPushConstantRange buffer_range = {
+        .offset = 0,
+        .size = sizeof(gpu_draw_push_constants),
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT};
+    
+    VkPipelineLayoutCreateInfo pipeline_layout_info = init_pipeline_layout_create_info();
+    pipeline_layout_info.pushConstantRangeCount = 1;
+    pipeline_layout_info.pPushConstantRanges = &buffer_range;
+
+    VK_CHECK(vkCreatePipelineLayout(
+        state->device.handle,
+        &pipeline_layout_info,
+        state->allocator,
+        &state->mesh_pipeline_layout));
+    pipeline_builder builder = pipeline_builder_create();
+    builder.layout = state->mesh_pipeline_layout;
+    pipeline_builder_set_shaders(&builder, state->mesh_vertex, state->mesh_fragment);
+    pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipeline_builder_set_multisampling_none(&builder);
+    pipeline_builder_disable_blending(&builder);
+    pipeline_builder_enable_depthtest(&builder, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+    state->mesh_pipeline = pipeline_builder_build(&builder, state);
+    
+    pipeline_builder_destroy(&builder);
+
+    ETINFO("Mesh pipeline & pipeline layout created");
+}
+
+static void shutdown_mesh_pipeline(renderer_state* state) {
+    vkDestroyPipeline(state->device.handle, state->mesh_pipeline, state->allocator);
+    vkDestroyPipelineLayout(state->device.handle, state->mesh_pipeline_layout, state->allocator);
+    ETINFO("Mesh pipeline & pipeline layout destroyed");
+
+    unload_shader(state, &state->mesh_fragment);
+    unload_shader(state, &state->mesh_vertex);
+    ETINFO("Mesh pipeline shaders unloaded.");
+}
+
+static void intialize_default_data(renderer_state* state) {
+    vertex* vertices = etallocate(sizeof(vertex) * 4, MEMORY_TAG_RENDERER);
+
+    vertices[0].position = (v3s){.raw = { 0.5f, -0.5f, 0.0f}};
+    vertices[1].position = (v3s){.raw = { 0.5f,  0.5f, 0.0f}};
+    vertices[2].position = (v3s){.raw = {-0.5f, -0.5f, 0.0f}};
+    vertices[3].position = (v3s){.raw = {-0.5f,  0.5f, 0.0f}};
+
+    vertices[0].color = (v4s){.raw = {0.0f, 0.0f, 0.0f, 1.0f}};
+    vertices[1].color = (v4s){.raw = {0.5f, 0.5f, 0.5f, 1.0f}};
+    vertices[2].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
+    vertices[3].color = (v4s){.raw = {0.0f, 1.0f, 0.0f, 1.0f}};
+
+    u32* indices = etallocate(sizeof(u32) * 6, MEMORY_TAG_RENDERER);
+    indices[0] = 0;
+    indices[1] = 1;
+    indices[2] = 2;
+    
+    indices[3] = 2;
+    indices[4] = 1;
+    indices[5] = 3;
+
+    state->rectangle = upload_mesh(state, 6, indices, 4, vertices);
+    
+    etfree(vertices, sizeof(vertex) * 4, MEMORY_TAG_RENDERER);
+    etfree(indices, sizeof(u32) * 6, MEMORY_TAG_RENDERER);
+
+    const char* path = "build/assets/gltf/zda.glb";
+    state->meshes = load_gltf_meshes(path, state);
+    if (!state->meshes) {
+        ETERROR("Error loading file %s", path);
+    }
+}
+
+static void shutdown_default_data(renderer_state* state) {
+    for (u32 i = 0; i < dynarray_length(state->meshes); ++i) {
+        buffer_destroy(state, &state->meshes[i].mesh_buffers.vertex_buffer);
+        buffer_destroy(state, &state->meshes[i].mesh_buffers.index_buffer);
+        state->meshes[i].mesh_buffers.vertex_buffer_address = 0;
+        dynarray_destroy(state->meshes[i].surfaces);
+    }
+    dynarray_destroy(state->meshes);
+    ETINFO("Test GLTF file unloaded");
+
+    buffer_destroy(state, &state->rectangle.vertex_buffer);
+    buffer_destroy(state, &state->rectangle.index_buffer);
+    state->rectangle.vertex_buffer_address = 0;
+}
+
+static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
+    VkRenderingAttachmentInfo color_attachment = init_rendering_attachment_info(
+        state->render_image.view, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    VkExtent2D window_extent = {.width = state->width, .height = state->height};
+    VkRenderingInfo render_info = init_rendering_info(window_extent, &color_attachment, 0);
+
+    vkCmdBeginRendering(cmd, &render_info);
+
+    // Triangle pipeline draw
+
+    VkViewport viewport = {0};
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width = state->width;
+    viewport.height = state->height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor = {0};
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent.width = state->width;
+    scissor.extent.height = state->height;
+
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->triangle_pipeline);
+    // vkCmdDraw(cmd, 3, 1, 0, 0);
+
+    // Mesh pipeline draw
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline);
+
+    gpu_draw_push_constants push_constants = {
+        .world_matrix = glms_mat4_identity(),
+        .vertex_buffer = state->rectangle.vertex_buffer_address};
+    vkCmdPushConstants(cmd, state->mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants);
+    vkCmdBindIndexBuffer(cmd, state->rectangle.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+
+    vkCmdEndRendering(cmd);
+}
+
+void renderer_on_resize(renderer_state* state, i32 width, i32 height) {
+    state->width = width;
+    state->height = height;
+    state->swapchain_dirty = true;
+}
+
 // TODO: Move to another separate file for handling utility functions
 // TODO: Remove the VK_MEMORY_PROPERTY_HOST_COHERENT_BIT bit from the staging buffer and flush manually
 // TODO:GOAL: Use queue from dedicated transfer queue family(state->device.transfer_queue) to do the transfer
-static gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
+gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
     const u64 vertex_buffer_size = vertex_count * sizeof(vertex);
     const u64 index_buffer_size = index_count * sizeof(u32);
 
@@ -741,17 +876,10 @@ static gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32*
     VK_CHECK(vkQueueSubmit2(state->device.graphics_queue, 1, &submit, state->imm_fence));
 
     VK_CHECK(vkWaitForFences(state->device.handle, 1, &state->imm_fence, VK_TRUE, 9999999999));
-    // Immediate Command Buffer use end
 
     buffer_destroy(state, &staging);
 
     return new_surface;
-}
-
-void renderer_on_resize(renderer_state* state, i32 width, i32 height) {
-    state->width = width;
-    state->height = height;
-    state->swapchain_dirty = true;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

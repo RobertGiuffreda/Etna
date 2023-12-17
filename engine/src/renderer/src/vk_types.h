@@ -5,9 +5,9 @@
 
 #include "math/math_types.h"
 
+#include "loaders/loader_types.h"
+
 #include <vulkan/vulkan.h>
-
-
 
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
 
@@ -54,15 +54,7 @@ typedef struct buffer {
 } buffer;
 // TEMP: END
 
-// NOTE: vkGuide.dev tutorial structs
-typedef struct vertex {
-    v3s position;
-    f32 uv_x;
-    v3s normal;
-    f32 uv_y;
-    v4s color;
-} vertex;
-
+// NOTE: vkguide.dev structs
 typedef struct gpu_mesh_buffers {
     buffer index_buffer;
     buffer vertex_buffer;
@@ -74,6 +66,18 @@ typedef struct gpu_draw_push_constants {
     VkDeviceAddress vertex_buffer;
 } gpu_draw_push_constants;
 // NOTE: END
+
+typedef struct geo_surface {
+    u32 start_index;
+    u32 count;
+} geo_surface;
+
+typedef struct mesh_asset {
+    const char* name;
+
+    geo_surface* surfaces;
+    gpu_mesh_buffers mesh_buffers;
+} mesh_asset;
 
 /** Information needed for each binding:
  * Requisite information for:
@@ -133,7 +137,7 @@ typedef struct shader {
  * Compute push constants are TEMP: and will be replaced with more robust system I think:
  * Compute shader post processing effects for now all share compute push constants to simplify things
  */
-// NOTE: vkGuide.dev tutorial structs
+// NOTE: vkguide.dev structs
 typedef struct compute_push_constants {
     v4s data1;
     v4s data2;
@@ -149,6 +153,7 @@ typedef struct compute_effect {
 
     compute_push_constants data;
 } compute_effect;
+// NOTE: END
 
 // TODO: Old and bad; about to remove
 // typedef struct compute_pipeline {
@@ -254,11 +259,11 @@ typedef struct renderer_state {
 
     // NOTE: This is test_ as graphics pipelines will be eventually
     // be encapsulated via materials and that via meshes. 
-    shader test_graphics_vertex;
-    shader test_graphics_fragment;
+    shader triangle_vertex;
+    shader triangle_fragment;
 
-    VkPipeline test_graphics_pipeline;
-    VkPipelineLayout test_graphics_pipeline_layout;
+    VkPipeline triangle_pipeline;
+    VkPipelineLayout triangle_pipeline_layout;
 
     // Testing loading data to vertex & index buffer as well as buffer references
     shader mesh_vertex;
@@ -266,4 +271,8 @@ typedef struct renderer_state {
 
     VkPipeline mesh_pipeline;
     VkPipelineLayout mesh_pipeline_layout;
+
+    gpu_mesh_buffers rectangle;
+
+    mesh_asset* meshes;
 } renderer_state;

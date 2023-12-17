@@ -113,6 +113,11 @@
         "spirv_reflect.h": "c",
         "vk_types.h": "c",
         "descriptor.h": "c",
-        "pipeline.h": "c"
+        "pipeline.h": "c",
+        "fast_obj.h": "c",
+        "cgltf.h": "c",
+        "loader_types.h": "c",
+        "gltfloader.h": "c",
+        "buffer.h": "c"
     }
 }

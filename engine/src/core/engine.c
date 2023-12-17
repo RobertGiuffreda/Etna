@@ -7,6 +7,8 @@
 #include "core/input.h"
 #include "core/clock.h"
 
+#include "loaders/gltfloader.h"
+
 #include "platform/platform.h"
 #include "platform/etwindow.h"
 
@@ -129,7 +131,6 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     return true;
 }
 
-// TODO: Handle minimizing
 b8 engine_run(void) {
     state->is_running = true;
 

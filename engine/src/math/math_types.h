@@ -11,7 +11,12 @@ typedef vec4s v4s;
 typedef mat3s m3s;
 typedef mat4s m4s;
 
-typedef struct vertex3d {
+// NOTE: vkguide.dev structs
+typedef struct vertex {
     v3s position;
-    v2s texture;
-} vertex3d;
+    f32 uv_x;
+    v3s normal;
+    f32 uv_y;
+    v4s color;
+} vertex;
+// NOTE: END

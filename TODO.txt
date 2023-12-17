@@ -1,19 +1,17 @@
 --------Immediate--------
-TODO: Load index buffer and vertex buffer & render that data
+TODO: Depth buffer. Depth image
 
-
-TODO: Staging buffer implementation
-
-TODO: Recreate swapchain implementation
 TODO: VkDescriptorPool give more allocations & make one per frame or something I think
 
 TODO: Model Geometry Loading
 TODO: Texture loading
-TODO: Material 
+TODO: Material
 
 TODO: Texture loading management system
 TODO: Materials & Material management system
 TODO: Model loading management system
+
+TODO: Recreate swapchain implementation
 
 TODO: Renderable interface struct
 
@@ -53,6 +51,8 @@ NOTE: Renderer specific:
     TODO: Make the renderer a dynamically loaded plugin.
 
 NOTE: Not Renderer specific:
+    TODO: Handle minimizing
+    
     TODO: Logger outputs to log file.
 
     TODO: FIFO Struct to place events into
@@ -63,7 +63,7 @@ NOTE: Not Renderer specific:
 
     TODO: Use multiple queue families instead of just the one. For other stuff
 
-    TODO: Staging buffer improvment. For loading on the fly
+    TODO: Staging buffer improvment: For loading on the fly | Use transfer queue | Eventual multithreaded
     TODO: vkCreateDescriptorUpdateTemplate to use update instead of stuff
 
     TODO: Make functions not all return booleans when unnecessary

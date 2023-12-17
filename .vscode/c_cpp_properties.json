@@ -8,7 +8,8 @@
                 "${workspaceFolder}/extern/glfw/include/",
                 "${workspaceFolder}/extern/cglm/include/",
                 "${workspaceFolder}/extern/SPIRV-Reflect/",
-                "${workspaceFolder}/extern/stb_image/"
+                "${workspaceFolder}/extern/stb_image/",
+                "${workspaceFolder}/extern/cgltf"
             ],
             "defines": [
                 "UNICODE",

@@ -189,6 +189,14 @@ VkMemoryAllocateInfo init_memory_allocate_info(VkDeviceSize allocation_size, u32
     return info;
 }
 
+VkMemoryAllocateFlagsInfo init_memory_allocate_flags_info(VkMemoryAllocateFlags flags) {
+    VkMemoryAllocateFlagsInfo info = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
+        .pNext = 0,
+        .flags = flags};
+    return info;
+}
+
 VkBindImageMemoryInfo init_bind_image_memory_info(
     VkImage image, VkDeviceMemory memory, VkDeviceSize memory_offset)
 {
@@ -341,3 +349,4 @@ i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
     
     return -1;
 }
+

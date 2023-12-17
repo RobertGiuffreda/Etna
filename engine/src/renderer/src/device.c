@@ -64,6 +64,9 @@ b8 device_create(renderer_state* state, device* out_device) {
         .device_extension_count = 1,
         .device_extensions = &required_extensions,
         .sampler_anisotropy = true,
+
+        .buffer_device_address = true,
+
         .dynamic_rendering = true,
         .synchronization2 = true,
         .maintenance4 = true,

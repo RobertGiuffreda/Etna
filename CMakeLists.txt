@@ -27,12 +27,19 @@ foreach(SHADER_FILE ${SHADER_SRC_FILES})
     execute_process(COMMAND ${SHADER_COMPILER} -g ${SHADER_FILE} -o ${SPV_FILE} --target-env vulkan1.3)
 endforeach(SHADER_FILE)
 
+# Create obj folder in build folder
+set(GLTF_DIRECTORY ${PROJECT_BINARY_DIR}/assets/gltf)
+file(MAKE_DIRECTORY ${GLTF_DIRECTORY})
+
+#zda folder in build/obj/
+configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/zda.glb ${GLTF_DIRECTORY}/zda.glb COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/zda_static.glb ${GLTF_DIRECTORY}/zda_static.glb COPYONLY)
+
 #NOTE: External dependencies
 #Add glfw as a dependency to be built alongside the engine
 set(GLFW_BUILD_DOCS False)
 set(GLFW_BUILD_EXAMPLES False)
 set(GLFW_BUILD_TESTS False)
-set(GLFW_VULKAN_STATIC True)
 add_subdirectory(${CMAKE_SOURCE_DIR}/extern/glfw)
 
 #Add cglm as a dependency to be built alongside the engine
@@ -65,14 +72,20 @@ target_include_directories(engine
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/glfw/include
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/cglm/include
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/SPIRV-Reflect/
+    PRIVATE ${CMAKE_SOURCE_DIR}/extern/stb_image/
+    PRIVATE ${CMAKE_SOURCE_DIR}/extern/cgltf/
     PRIVATE $ENV{VULKAN_SDK}/include)
 
 # target_link_libraries(engine
 #     PRIVATE glfw
-#     PRIVATE cglm)
+#     PRIVATE cglm
+#     PRIVATE spirv-reflect-static)
+
+target_link_directories(engine PRIVATE $ENV{VULKAN_SDK}/Lib)
 
 # Link libraries to engine
 target_link_libraries(engine
+    PRIVATE vulkan-1
     PRIVATE glfw
     PRIVATE spirv-reflect-static)
 
@@ -104,4 +117,8 @@ file(GLOB_RECURSE TEST_HEADER_FILES "tests/src/*.h")
 add_executable(tests ${TEST_SRC_FILES} ${TEST_HEADER_FILES})
 
 target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
-target_link_libraries(tests PRIVATE engine)
+
+target_link_directories(tests PRIVATE $ENV{VULKAN_SDK}/Lib)
+target_link_libraries(tests
+    PRIVATE engine
+    PRIVATE vulkan-1)
