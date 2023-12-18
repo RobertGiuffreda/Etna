@@ -94,7 +94,9 @@ VkPipelineShaderStageCreateInfo init_pipeline_shader_stage_create_info(void);
 
 VkComputePipelineCreateInfo init_compute_pipeline_create_info(void);
 
-VkRenderingAttachmentInfo init_rendering_attachment_info(VkImageView view, VkClearValue* clear, VkImageLayout layout);
+VkRenderingAttachmentInfo init_color_attachment_info(VkImageView view, VkClearValue* clear, VkImageLayout layout);
+
+VkRenderingAttachmentInfo init_depth_attachment_info(VkImageView view, VkImageLayout layout);
 
 VkRenderingInfo init_rendering_info(VkExtent2D render_extent, VkRenderingAttachmentInfo* color_attachment, VkRenderingAttachmentInfo* depthAttachment);
 

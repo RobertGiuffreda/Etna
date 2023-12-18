@@ -34,6 +34,7 @@ file(MAKE_DIRECTORY ${GLTF_DIRECTORY})
 #zda folder in build/obj/
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/zda.glb ${GLTF_DIRECTORY}/zda.glb COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/zda_static.glb ${GLTF_DIRECTORY}/zda_static.glb COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/basicmesh.glb ${GLTF_DIRECTORY}/basicmesh.glb COPYONLY)
 
 #NOTE: External dependencies
 #Add glfw as a dependency to be built alongside the engine

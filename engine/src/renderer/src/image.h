@@ -23,6 +23,7 @@ void blit_image2D_to_image2D(
 void image_barrier(
     VkCommandBuffer cmd,
     VkImage image,
+    VkImageAspectFlags aspects,
     VkImageLayout old_layout,
     VkImageLayout new_layout,
     VkAccessFlags2 src_access_mask,

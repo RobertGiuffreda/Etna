@@ -295,7 +295,7 @@ VkComputePipelineCreateInfo init_compute_pipeline_create_info(void) {
     return info;
 }
 
-VkRenderingAttachmentInfo init_rendering_attachment_info(VkImageView view, VkClearValue* clear, VkImageLayout layout) {
+VkRenderingAttachmentInfo init_color_attachment_info(VkImageView view, VkClearValue* clear, VkImageLayout layout) {
     VkRenderingAttachmentInfo color_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .pNext = 0,
@@ -307,6 +307,18 @@ VkRenderingAttachmentInfo init_rendering_attachment_info(VkImageView view, VkCle
     };
     if (clear) color_attachment.clearValue = *clear;
     return color_attachment;
+}
+
+VkRenderingAttachmentInfo init_depth_attachment_info(VkImageView view, VkImageLayout layout) {
+    VkRenderingAttachmentInfo info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .pNext = 0,
+        .imageView = view,
+        .imageLayout = layout,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+        .clearValue.depthStencil.depth = 0.0f};
+    return info;
 }
 
 VkRenderingInfo init_rendering_info(VkExtent2D render_extent, VkRenderingAttachmentInfo* color_attachment, VkRenderingAttachmentInfo* depthAttachment) {

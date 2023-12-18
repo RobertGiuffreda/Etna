@@ -37,10 +37,13 @@ static void shutdown_descriptors(renderer_state* state);
 // TEMP: Until material framework is stood up
 static void initialize_triangle_pipeline(renderer_state* state);
 static void shutdown_triangle_pipeline(renderer_state* state);
+
 static void initialize_mesh_pipeline(renderer_state* state);
 static void shutdown_mesh_pipeline(renderer_state* state);
-static void intialize_default_data(renderer_state* state);
+
+static b8 intialize_default_data(renderer_state* state);
 static void shutdown_default_data(renderer_state* state);
+
 static void draw_geometry(renderer_state* state, VkCommandBuffer cmd);
 // TEMP: END
 
@@ -62,10 +65,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     state->swapchain_dirty = false;
     state->swapchain = VK_NULL_HANDLE;
     state->current_frame = 0;
-
-    // TEMP:
-    state->frame_number = 0;
-    // TEMP: END
 
     VkApplicationInfo app_cinfo = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -192,19 +191,41 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
 
     initialize_swapchain(state);
 
-    // Render image initialization
+    // Rendering attachment images initialization
+
+    VkImageUsageFlags draw_image_usages = {0};
+    draw_image_usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    draw_image_usages |= VK_IMAGE_USAGE_STORAGE_BIT;
+    draw_image_usages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    // Color attachment
     VkExtent3D render_image_extent = {
         .width = state->width,
         .height = state->height,
         .depth = 1};
-    image2D_create(state, 
+    image2D_create(state,
         render_image_extent,
         VK_FORMAT_R16G16B16A16_SFLOAT,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        draw_image_usages,
         VK_IMAGE_ASPECT_COLOR_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &state->render_image);
     ETINFO("Render image created");
+
+    VkImageUsageFlags depth_image_usages = {0};
+    depth_image_usages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    VkExtent3D depth_image_extent = {
+        .width = state->width,
+        .height = state->height,
+        .depth = 1};
+    image2D_create(state, 
+        depth_image_extent,
+        VK_FORMAT_D32_SFLOAT,
+        depth_image_usages,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &state->depth_image);
+    ETINFO("Depth image created");
 
     create_frame_command_structures(state);
     ETINFO("Frame command structures created.");
@@ -253,7 +274,10 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
 
     initialize_mesh_pipeline(state);
 
-    intialize_default_data(state);
+    if (!intialize_default_data(state)) {
+        ETFATAL("Error intializing data.");
+        return false;
+    }
 
     *out_state = state;
     return true;
@@ -287,8 +311,9 @@ void renderer_shutdown(renderer_state* state) {
     destroy_frame_command_structures(state);
     ETINFO("Frame command structures destroyed.");
 
+    image2D_destroy(state, &state->depth_image);
     image2D_destroy(state, &state->render_image);
-    ETINFO("Render image destroyed.");
+    ETINFO("Rendering attachments (color, depth) destroyed.");
 
     shutdown_swapchain(state);
     ETINFO("Swapchain shutdown.");
@@ -349,7 +374,7 @@ b8 renderer_draw_frame(renderer_state* state) {
     VK_CHECK(vkBeginCommandBuffer(frame_cmd, &begin_info));
 
     // Image barrier to transition render_image from undefined to general layout for clear value command
-    image_barrier(frame_cmd, state->render_image.handle,
+    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
         VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_SHADER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT , VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
@@ -368,22 +393,28 @@ b8 renderer_draw_frame(renderer_state* state) {
     vkCmdDispatch(frame_cmd, ceil(state->width / 16.0f), ceil(state->height / 16.0f), 1);
     // TEMP: END
 
-    image_barrier(frame_cmd, state->render_image.handle,
+    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
         VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+    image_barrier(frame_cmd, state->depth_image.handle, state->depth_image.aspects,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
+
 
     // Draw the geometry
     draw_geometry(state, frame_cmd);
 
     // Image barrier to transition render image to transfer source optimal layout
-    image_barrier(frame_cmd, state->render_image.handle,
+    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
     // Image barrier to transition swapchain image to transfer destination optimal
-    image_barrier(frame_cmd, state->swapchain_images[swapchain_index],
+    image_barrier(frame_cmd, state->swapchain_images[swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_ACCESS_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
@@ -401,7 +432,7 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_IMAGE_ASPECT_COLOR_BIT);
 
     // Image barrier to transition the swapchian image from transfer destination optimal to present khr
-    image_barrier(frame_cmd, state->swapchain_images[swapchain_index],
+    image_barrier(frame_cmd, state->swapchain_images[swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_NONE,
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
@@ -436,8 +467,6 @@ b8 renderer_draw_frame(renderer_state* state) {
         .pWaitSemaphores = &state->render_semaphores[state->current_frame],
         .pImageIndices = &swapchain_index};
     VK_CHECK(vkQueuePresentKHR(state->device.present_queue, &present_info));
-
-    state->frame_number++;
 
     // Move to the next frame
     state->current_frame = (state->current_frame + 1) % state->image_count;
@@ -613,22 +642,22 @@ static void initialize_triangle_pipeline(renderer_state* state) {
     VkPipelineLayoutCreateInfo layout_info = init_pipeline_layout_create_info();
     VK_CHECK(vkCreatePipelineLayout(state->device.handle, &layout_info, state->allocator, &state->triangle_pipeline_layout));
 
-    pipeline_builder graphics_builder = pipeline_builder_create();
-    graphics_builder.layout = state->triangle_pipeline_layout;
-    pipeline_builder_set_shaders(&graphics_builder,
+    pipeline_builder builder = pipeline_builder_create();
+    builder.layout = state->triangle_pipeline_layout;
+    pipeline_builder_set_shaders(&builder,
         state->triangle_vertex,
         state->triangle_fragment);
-    pipeline_builder_set_input_topology(&graphics_builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    pipeline_builder_set_polygon_mode(&graphics_builder, VK_POLYGON_MODE_FILL);
-    pipeline_builder_set_cull_mode(&graphics_builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-    pipeline_builder_set_multisampling_none(&graphics_builder);
-    pipeline_builder_disable_blending(&graphics_builder);
-    pipeline_builder_disable_depthtest(&graphics_builder);
-    pipeline_builder_set_color_attachment_format(&graphics_builder, state->render_image.format);
-    pipeline_builder_set_depth_format(&graphics_builder, VK_FORMAT_UNDEFINED);
-    state->triangle_pipeline = pipeline_builder_build(&graphics_builder, state);
+    pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipeline_builder_set_multisampling_none(&builder);
+    pipeline_builder_disable_blending(&builder);
+    pipeline_builder_disable_depthtest(&builder);
+    pipeline_builder_set_color_attachment_format(&builder, state->render_image.format);
+    pipeline_builder_set_depth_attachment_format(&builder, state->depth_image.format);
+    state->triangle_pipeline = pipeline_builder_build(&builder, state);
 
-    pipeline_builder_destroy(&graphics_builder);
+    pipeline_builder_destroy(&builder);
 
     ETINFO("Triangle pipeline & pipeline layout created");
 }
@@ -669,8 +698,12 @@ static void initialize_mesh_pipeline(renderer_state* state) {
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
     pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
     pipeline_builder_set_multisampling_none(&builder);
-    pipeline_builder_disable_blending(&builder);
+    // pipeline_builder_disable_blending(&builder);
+    pipeline_builder_enable_blending_additive(&builder);
+    // pipeline_builder_enable_blending_alphablend(&builder);
     pipeline_builder_enable_depthtest(&builder, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+    pipeline_builder_set_color_attachment_format(&builder, state->render_image.format);
+    pipeline_builder_set_depth_attachment_format(&builder, state->depth_image.format);
     state->mesh_pipeline = pipeline_builder_build(&builder, state);
     
     pipeline_builder_destroy(&builder);
@@ -688,7 +721,7 @@ static void shutdown_mesh_pipeline(renderer_state* state) {
     ETINFO("Mesh pipeline shaders unloaded.");
 }
 
-static void intialize_default_data(renderer_state* state) {
+static b8 intialize_default_data(renderer_state* state) {
     vertex* vertices = etallocate(sizeof(vertex) * 4, MEMORY_TAG_RENDERER);
 
     vertices[0].position = (v3s){.raw = { 0.5f, -0.5f, 0.0f}};
@@ -697,9 +730,14 @@ static void intialize_default_data(renderer_state* state) {
     vertices[3].position = (v3s){.raw = {-0.5f,  0.5f, 0.0f}};
 
     vertices[0].color = (v4s){.raw = {0.0f, 0.0f, 0.0f, 1.0f}};
-    vertices[1].color = (v4s){.raw = {0.5f, 0.5f, 0.5f, 1.0f}};
+    vertices[1].color = (v4s){.raw = {0.9f, 0.9f, 0.9f, 1.0f}};
     vertices[2].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
     vertices[3].color = (v4s){.raw = {0.0f, 1.0f, 0.0f, 1.0f}};
+
+    // vertices[0].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
+    // vertices[1].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
+    // vertices[2].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
+    // vertices[3].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
 
     u32* indices = etallocate(sizeof(u32) * 6, MEMORY_TAG_RENDERER);
     indices[0] = 0;
@@ -715,11 +753,14 @@ static void intialize_default_data(renderer_state* state) {
     etfree(vertices, sizeof(vertex) * 4, MEMORY_TAG_RENDERER);
     etfree(indices, sizeof(u32) * 6, MEMORY_TAG_RENDERER);
 
-    const char* path = "build/assets/gltf/zda.glb";
+    const char* path = "build/assets/gltf/basicmesh.glb";
     state->meshes = load_gltf_meshes(path, state);
     if (!state->meshes) {
         ETERROR("Error loading file %s", path);
+        return false;
     }
+
+    return true;
 }
 
 static void shutdown_default_data(renderer_state* state) {
@@ -738,11 +779,13 @@ static void shutdown_default_data(renderer_state* state) {
 }
 
 static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
-    VkRenderingAttachmentInfo color_attachment = init_rendering_attachment_info(
+    VkRenderingAttachmentInfo color_attachment = init_color_attachment_info(
         state->render_image.view, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depth_attachment = init_depth_attachment_info(
+        state->depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     VkExtent2D window_extent = {.width = state->width, .height = state->height};
-    VkRenderingInfo render_info = init_rendering_info(window_extent, &color_attachment, 0);
+    VkRenderingInfo render_info = init_rendering_info(window_extent, &color_attachment, &depth_attachment);
 
     vkCmdBeginRendering(cmd, &render_info);
 
@@ -766,8 +809,8 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->triangle_pipeline);
-    // vkCmdDraw(cmd, 3, 1, 0, 0);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->triangle_pipeline);
+    vkCmdDraw(cmd, 3, 1, 0, 0);
 
     // Mesh pipeline draw
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline);
@@ -779,6 +822,23 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     vkCmdBindIndexBuffer(cmd, state->rectangle.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
 
     vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+
+    // MVP calculation: 
+    m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
+
+    // TODO: Figure out projection matrix mess ups & confusion
+    m4s project = glms_perspective(glm_rad(70.f), ((f32)state->width/(f32)state->height), 10000.f, 0.1f);
+    project.raw[1][1] *= -1;
+
+    m4s vp = glms_mat4_mul(project, view);
+
+    gpu_draw_push_constants push_constants1 = {
+        .world_matrix = vp,
+        .vertex_buffer = state->meshes[2].mesh_buffers.vertex_buffer_address};
+    vkCmdPushConstants(cmd, state->mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants1);
+    vkCmdBindIndexBuffer(cmd, state->meshes[2].mesh_buffers.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdDrawIndexed(cmd, state->meshes[2].surfaces[0].count, 1, state->meshes[2].surfaces[0].start_index, 0, 0);
 
     vkCmdEndRendering(cmd);
 }
@@ -905,4 +965,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
             break;
     }
     return VK_FALSE;
+}
+
+static m4s test_perspective(float vertical_fov, float aspect_ratio, float n, float f, m4s *inverse) {
+
 }

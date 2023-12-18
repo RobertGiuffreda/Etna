@@ -2,6 +2,7 @@
 
 #include "defines.h"
 
+#define CGLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <cglm/struct.h>
 
 typedef vec2s v2s;

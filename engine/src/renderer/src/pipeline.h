@@ -41,18 +41,8 @@ void pipeline_builder_enable_blending_alphablend(pipeline_builder* builder);
 
 void pipeline_builder_set_color_attachment_format(pipeline_builder* builder, VkFormat format);
 
-void pipeline_builder_set_depth_format(pipeline_builder* builder, VkFormat format);
+void pipeline_builder_set_depth_attachment_format(pipeline_builder* builder, VkFormat format);
 
 void pipeline_builder_disable_depthtest(pipeline_builder* builder);
 
 void pipeline_builder_enable_depthtest(pipeline_builder* builder, b8 depth_write_enable, VkCompareOp op);
-
-// // TEMP: This is temporary until material system to encapsulate pipelines
-// typedef struct compute_pipeline_config {
-//     const char* shader;
-// } compute_pipeline_config;
-
-// b8 compute_pipeline_create(renderer_state* state, compute_pipeline_config config, compute_pipeline* out_pipeline);
-
-// void compute_pipeline_destroy(renderer_state* state, compute_pipeline* pipeline);
-// // TEMP: END

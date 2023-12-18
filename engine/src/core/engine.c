@@ -101,8 +101,8 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         .name = "Etna Window",
         .x_start_pos = 100,
         .y_start_pos = 100,
-        .width = 720,
-        .height = 480
+        .width = engine_details.width,
+        .height = engine_details.height
     };
     if (!etwindow_initialize(&window_config, &state->window_state)) {
         ETFATAL("Window failed to initialize.");

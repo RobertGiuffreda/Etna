@@ -118,6 +118,14 @@
         "cgltf.h": "c",
         "loader_types.h": "c",
         "gltfloader.h": "c",
-        "buffer.h": "c"
+        "buffer.h": "c",
+        "affine.h": "c",
+        "affine2d.h": "c",
+        "algorithm": "c",
+        "format": "c",
+        "memory": "c",
+        "xlocbuf": "c",
+        "xmemory": "c",
+        "common.h": "c"
     }
 }

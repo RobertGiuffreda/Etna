@@ -9,6 +9,10 @@
 
 #include <vulkan/vulkan.h>
 
+// TODO: This file should be split into an actual vk_types.h file and a
+// renderer.h file. Where the current renderer.h file is being used as a 
+// rendererAPI.h file. 
+
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
 
 /* NOTE: Descriptor Set Abstraction structs */
@@ -46,6 +50,7 @@ typedef struct image {
     VkImageType type;
     VkExtent3D extent;
     VkFormat format;
+    VkImageAspectFlags aspects;
 } image;
 
 typedef struct buffer {
@@ -130,7 +135,7 @@ typedef struct shader {
 } shader;
 
 /** TEMP: & TODO:
- * This section involving compute and graphics pipelines is a bit of a mess and
+ * This section involving compute effects is a bit of a mess and
  * is temporary. This will be here until a material system is thought out and 
  * implemented.
  * 
@@ -154,25 +159,6 @@ typedef struct compute_effect {
     compute_push_constants data;
 } compute_effect;
 // NOTE: END
-
-// TODO: Old and bad; about to remove
-// typedef struct compute_pipeline {
-//     VkPipeline handle;
-//     VkPipelineLayout layout;
-//     VkShaderModule shader;
-    
-//     VkDescriptorSetLayout descriptor_layout;
-//     VkDescriptorSet descriptor_set;
-// } compute_pipeline;
-
-typedef struct graphics_pipeline {
-    VkPipeline handle;
-    VkPipelineLayout layout;
-
-    VkDescriptorSetLayout descriptor_layout;
-    VkDescriptorSet descriptor_set;
-} graphics_pipeline;
-// TODO: END
 
 /* TEMP: & TODO: END */
 
@@ -220,6 +206,7 @@ typedef struct renderer_state {
 
     // Image to render to that get copied onto the swapchain image
     image render_image;
+    image depth_image;
 
     // Index into per frame arrays: TODO: Rename to frame_index maybe??
     u32 current_frame; 
@@ -274,5 +261,6 @@ typedef struct renderer_state {
 
     gpu_mesh_buffers rectangle;
 
+    // TEMP: Until loading a scene instead of meshes
     mesh_asset* meshes;
 } renderer_state;

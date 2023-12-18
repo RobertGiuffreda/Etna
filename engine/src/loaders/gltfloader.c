@@ -19,6 +19,7 @@ mesh_asset* load_gltf_meshes(const char* path, renderer_state* state) {
     cgltf_result result = cgltf_parse_file(&options, path, &data);
     if (result != cgltf_result_success) {
         ETERROR("Error loading gltf file %s.", path);
+        return 0;
     }
 
     result = cgltf_load_buffers(&options, data, 0);
@@ -26,7 +27,9 @@ mesh_asset* load_gltf_meshes(const char* path, renderer_state* state) {
         ETERROR("Error loading gltf file %s's buffers.", path);
     }
 
-    mesh_asset* meshes = dynarray_create(0, sizeof(mesh_asset));
+    mesh_asset* meshes = dynarray_create(data->meshes_count, sizeof(mesh_asset));
+
+    ETINFO("Mesh count: %lu", data->meshes_count);
 
     // Use the same vectors for all meshes so that the memory doesnt 
     // reallocate as often
@@ -153,6 +156,11 @@ mesh_asset* load_gltf_meshes(const char* path, renderer_state* state) {
             // Push the new surface into the mesh asset dynarray of surfaces
             dynarray_push((void**)&new_mesh.surfaces, &new_surface);
         }
+        for (u32 i = 0; i < dynarray_length(vertices); ++i) {
+            vertices[i].color.r = vertices[i].normal.r;
+            vertices[i].color.g = vertices[i].normal.g;
+            vertices[i].color.b = vertices[i].normal.b;
+        } 
         // Upload mesh data to the GPU
         new_mesh.mesh_buffers = upload_mesh(state,
             dynarray_length(indices), indices,

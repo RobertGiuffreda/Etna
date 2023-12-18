@@ -4,6 +4,8 @@
 
 #include "core/logger.h"
 
+// TODO: Multisampling bits in ImageCreateInfo
+// TODO: Check if tiling and sample settings are supported for the specific image format
 void image2D_create(
     renderer_state* state,
     VkExtent3D extent,
@@ -43,6 +45,7 @@ void image2D_create(
 
     out_image->extent = extent;
     out_image->format = format;
+    out_image->aspects = aspect_flags;
 }
 
 void image2D_destroy(renderer_state* state, image* image) {
@@ -50,6 +53,7 @@ void image2D_destroy(renderer_state* state, image* image) {
     image->extent.width = 0;
     image->extent.height = 0;
     image->extent.depth = 0;
+    image->aspects = VK_IMAGE_ASPECT_NONE;
 
     vkDestroyImageView(state->device.handle, image->view, state->allocator);
     image->view = 0;
@@ -99,6 +103,7 @@ void blit_image2D_to_image2D(VkCommandBuffer cmd, VkImage src, VkImage dst, VkEx
 void image_barrier(
     VkCommandBuffer cmd,
     VkImage image,
+    VkImageAspectFlags aspects,
     VkImageLayout old_layout,
     VkImageLayout new_layout,
     VkAccessFlags2 src_access_mask,
@@ -107,7 +112,7 @@ void image_barrier(
     VkPipelineStageFlags2 dst_stage_mask)
 {
     VkImageSubresourceRange subresource_range = {
-        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .aspectMask = aspects,
         .baseMipLevel = 0,
         .levelCount = 1,
         .baseArrayLayer = 0,
