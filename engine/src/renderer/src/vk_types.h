@@ -189,12 +189,14 @@ typedef struct renderer_state {
 #endif
     VkAllocationCallbacks* allocator;
 
+    // 
     VkSurfaceKHR surface;
     i32 width;
     i32 height;
     b8 swapchain_dirty;
 
     device device;
+
 
     VkSwapchainKHR swapchain;
     VkFormat swapchain_image_format;

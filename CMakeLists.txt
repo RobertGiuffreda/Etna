@@ -69,13 +69,13 @@ target_compile_definitions(engine PRIVATE _DEBUG)
 
 #Include directories for engine library
 target_include_directories(engine
-    PRIVATE ${CMAKE_SOURCE_DIR}/engine/src
-    PRIVATE ${CMAKE_SOURCE_DIR}/extern/glfw/include
-    PRIVATE ${CMAKE_SOURCE_DIR}/extern/cglm/include
+    PRIVATE ${CMAKE_SOURCE_DIR}/engine/src/
+    PRIVATE ${CMAKE_SOURCE_DIR}/extern/glfw/include/
+    PRIVATE ${CMAKE_SOURCE_DIR}/extern/cglm/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/SPIRV-Reflect/
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/stb_image/
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/cgltf/
-    PRIVATE $ENV{VULKAN_SDK}/include)
+    PRIVATE $ENV{VULKAN_SDK}/include/)
 
 # target_link_libraries(engine
 #     PRIVATE glfw

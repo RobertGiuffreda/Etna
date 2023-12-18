@@ -942,6 +942,16 @@ gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indice
     return new_surface;
 }
 
+// TODO: WRITE OUT THIS FUNCTION AND CALL WHEN SWAPCHAIN/WINDOW-SIZE IS DIRTY
+// Name is a bit confusing with recreate_swapchain around as well
+b8 rebuild_swapchain(renderer_state* state) {
+    // Sanitize synchronization structures and command buffers
+
+    // recreate swapchain
+
+    // recreate synchronization structures and command buffers
+}
+
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageTypes,
@@ -965,8 +975,4 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
             break;
     }
     return VK_FALSE;
-}
-
-static m4s test_perspective(float vertical_fov, float aspect_ratio, float n, float f, m4s *inverse) {
-
 }

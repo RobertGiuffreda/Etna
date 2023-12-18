@@ -1,15 +1,17 @@
 --------Immediate--------
 TODO: VkDescriptorPool give more allocations & make one per frame or something I think
+    Growable
 
-TODO: Model Geometry Loading
+TODO: Model Geometry Loading - DONE
 TODO: Texture loading
-TODO: Material
+TODO: Material set up
 
 TODO: Texture loading management system
 TODO: Materials & Material management system
 TODO: Model loading management system
 
 TODO: Recreate swapchain implementation
+TODO: Clamp swapchain extent based on max & min values in create & resize function
 
 TODO: Renderable interface struct
 
@@ -106,7 +108,9 @@ Like mod world position with texture limits to index into tiling 3D texture.
 NOTE: Use a procedural fragment shader output (from shader toy or something) & map a mesh as a viewport to it.
 NOTE: 3D texture coords to warp the viewport for neat effects
 NOTE: Use post processing texture group code to styilize procedurally generated textures
+
 --------Future Optimizations or Refactoring--------
+CPU profiler & GPU profiler to profile performance
 Create a different dynamic array data structure where the array data is not hidden
 from the user but does not need to be initialized. This would be for data structures to use so a create or 
 initialize function is not needed when before said structure is used;
