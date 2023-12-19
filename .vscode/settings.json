@@ -126,6 +126,8 @@
         "memory": "c",
         "xlocbuf": "c",
         "xmemory": "c",
-        "common.h": "c"
+        "common.h": "c",
+        "chrono": "c",
+        "regex": "c"
     }
 }

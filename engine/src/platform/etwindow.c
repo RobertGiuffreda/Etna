@@ -29,7 +29,7 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_stat
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     // TEMP: Temporary until swappchain recreation implemented
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     // TEMP: END
 
     GLFWwindow* window = glfwCreateWindow(config->width, config->height, config->name, 0, 0);
@@ -43,7 +43,7 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_stat
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    // glfwSetWindowSizeCallback(window, resize_callback);
+    glfwSetWindowSizeCallback(window, resize_callback);
 
 
     glfwSetWindowPos(window, config->x_start_pos, config->y_start_pos);

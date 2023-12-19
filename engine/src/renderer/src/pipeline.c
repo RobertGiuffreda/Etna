@@ -89,8 +89,6 @@ VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* sta
         .pDynamicState = &dynamic_info
     };
 
-    ETINFO("builder->color_blend_attachment:");
-
     VkPipeline new_pipeline;
     if (vkCreateGraphicsPipelines(
         state->device.handle,

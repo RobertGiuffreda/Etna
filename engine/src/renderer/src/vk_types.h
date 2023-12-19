@@ -197,7 +197,6 @@ typedef struct renderer_state {
 
     device device;
 
-
     VkSwapchainKHR swapchain;
     VkFormat swapchain_image_format;
 

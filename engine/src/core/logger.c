@@ -25,21 +25,26 @@ b8 logger_initialize(void) {
 void logger_shutdown(void) {}
 
 // TODO: Linear allocator for this
-// TODO: Parse the string & correctly count bytes needed to allocate the string. 
 void log_output(log_level level, const char* format, ...) {
+    const u32 log_str_len = 9;
     const char* log_level_strings[LOG_LEVEL_MAX] = {
         "[FATAL]: ", "[ERROR]: ", "[WARN]:  ", "[INFO]:  ", "[DEBUG]: ", "[TRACE]: ",
     };
-    
-    const u8 log_str_len = 9;
-    const u32 format_len = strlen(format);
-    const u32 total_len = log_str_len + format_len + 1 /* To avoid parsing string to get true length: */ + 1024;
-    // 1 added for null terminator
+
+    // HACK: Use vsnprintf to get the correct amount of bytes needed to store the string,
+    // hacky work arround to avoid parsing the string or adding extraneous bytes
+    i32 vsnprintf_len = 0;
+    va_list list_len;
+    va_start(list_len, format);
+    vsnprintf_len = vsnprintf((void*)0, 0, format, list_len);
+    va_end(list_len);
+
+    const u32 total_len = vsnprintf_len + log_str_len + 1;
     char* output = etallocate(sizeof(char) * total_len, MEMORY_TAG_STRING);
 
     // NOTE: Could be a memcpy
     sprintf(output, "%s", log_level_strings[level]);
-    
+
     va_list list;
     va_start(list, format);
     vsnprintf(output + log_str_len, total_len - log_str_len, format, list);

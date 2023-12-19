@@ -47,6 +47,8 @@ static void shutdown_default_data(renderer_state* state);
 static void draw_geometry(renderer_state* state, VkCommandBuffer cmd);
 // TEMP: END
 
+b8 rebuild_swapchain(renderer_state* state);
+
 VkBool32 vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageTypes,
@@ -353,15 +355,20 @@ b8 renderer_draw_frame(renderer_state* state) {
         1000000000));
     
     u32 swapchain_index;
-    VK_CHECK(vkAcquireNextImageKHR(
+    VkResult result = vkAcquireNextImageKHR(
         state->device.handle,
         state->swapchain,
         0xFFFFFFFFFFFFFFFF,
         state->swapchain_semaphores[state->current_frame],
         VK_NULL_HANDLE,
-        &swapchain_index));
-
-    // TODO: Chnage above to result check and rebuild if necessary
+        &swapchain_index);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        rebuild_swapchain(state);
+        return true;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        ETFATAL("Failed to acquire swapchain image.");
+        return false;
+    }
 
     VK_CHECK(vkResetFences(
         state->device.handle,
@@ -426,6 +433,9 @@ b8 renderer_draw_frame(renderer_state* state) {
         .width = state->width,
         .height = state->height,
         .depth = 1};
+    // TODO: Have this function take two image sizes for the swapchain image and the 
+    // render. This way we can render to whatever size image we want and display the output
+    // on whatever size swapchain image we want
     blit_image2D_to_image2D(
         frame_cmd,
         state->render_image.handle,
@@ -468,8 +478,13 @@ b8 renderer_draw_frame(renderer_state* state) {
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &state->render_semaphores[state->current_frame],
         .pImageIndices = &swapchain_index};
-    VK_CHECK(vkQueuePresentKHR(state->device.present_queue, &present_info));
-
+    result = vkQueuePresentKHR(state->device.present_queue, &present_info);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || state->swapchain_dirty) {
+        rebuild_swapchain(state);
+    } else if (result != VK_SUCCESS) {
+        ETFATAL("Error presenting swapchain image");
+        return false;
+    }
     // Move to the next frame
     state->current_frame = (state->current_frame + 1) % state->image_count;
     return true;
@@ -949,12 +964,14 @@ gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indice
 b8 rebuild_swapchain(renderer_state* state) {
     // TODO: Use less heavy handed synchronization
     vkDeviceWaitIdle(state->device.handle);
+    state->swapchain_dirty = false;
+    if (!recreate_swapchain(state)) {
+        ETERROR("Error recreating swapchain.");
+        return false;
+    }
 
-    // Reset command pool & destroy the fences & semaphores
-
-    // recreate swapchain
-
-    // Allocate command buffers & recreate fences & semaphores
+    // TODO: Recreate state->render_image & state->depth_image
+    // VUID-VkRenderingInfo-pNext-06079 triggered when attachment size is smaller than the rendering info size
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
@@ -966,17 +983,21 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     switch(messageSeverity)
     {
         default:
+        // NOTE: The message is passed with ETXXXX(%s, pCallbackData->pMessage) instead of 
+        // ETXXXX(pCallbackData->pMessage) as the message can have a % character followed by a zero,
+        // which breaks a debug assertion in vsnprintf where it is passed as the format string even with
+        // an empty variadic argument list.
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-            ETERROR(pCallbackData->pMessage);
+            ETERROR("%s", pCallbackData->pMessage);
             break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-            ETWARN(pCallbackData->pMessage);
+            ETWARN("%s", pCallbackData->pMessage);
             break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-            ETINFO(pCallbackData->pMessage);
+            ETINFO("%s", pCallbackData->pMessage);
             break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-            ETTRACE(pCallbackData->pMessage);
+            ETTRACE("%s", pCallbackData->pMessage);
             break;
     }
     return VK_FALSE;

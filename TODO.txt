@@ -1,4 +1,7 @@
 --------Immediate--------
+TODO: Change blit to take swapchian image size & render_image size to render at whatever resolution we want
+TODO: Clamp swapchain extent based on max & min values in create & resize function
+
 TODO: VkDescriptorPool give more allocations & make one per frame or something I think
     Growable
 
@@ -9,9 +12,6 @@ TODO: Material set up
 TODO: Texture loading management system
 TODO: Materials & Material management system
 TODO: Model loading management system
-
-TODO: Recreate swapchain implementation
-TODO: Clamp swapchain extent based on max & min values in create & resize function
 
 TODO: Renderable interface struct
 
@@ -116,12 +116,6 @@ from the user but does not need to be initialized. This would be for data struct
 initialize function is not needed when before said structure is used;
 
 
-
-
-
-
-
-
 ------------------------------------------------------
     f32 fov_rad = glm_rad(70.f);
     f32 aspect_ratio = ((f32)state->width/(f32)state->height);
@@ -155,3 +149,7 @@ initialize function is not needed when before said structure is used;
     // ETINFO("Test: ");
     // glms_mat4_print(test, stderr);
     // ETINFO("test.raw[2][3]: %3.3lf.", test.raw[2][3]);
+
+
+LIFE:
+TODO: Research: Footbath, Juicer
