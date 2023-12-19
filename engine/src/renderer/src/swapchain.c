@@ -199,21 +199,16 @@ void shutdown_swapchain(renderer_state* state) {
 // TODO: This could be moved into a separate function to be called from create and recreate_swapchain
 // TODO: Linear allocator for the swapchain images and views equal to the max number of images
 b8 recreate_swapchain(renderer_state* state) {
-    // Destroy the old swapchains image views and free the memory allocated for the swapchain
+    // Destroy the old swapchains image views
     for (u32 i = 0; i < state->image_count; ++i) {
         vkDestroyImageView(
             state->device.handle,
             state->swapchain_image_views[i],
             state->allocator);
     }
-    etfree(state->swapchain_image_views,
-        sizeof(VkImageView) * state->image_count,
-        MEMORY_TAG_RENDERER);
-    etfree(state->swapchain_images,
-        sizeof(VkImage) * state->image_count,
-        MEMORY_TAG_RENDERER);
-    
+    // Record old swapchain information
     VkSwapchainKHR old_swapchain = state->swapchain;
+    u32 old_image_count = state->image_count;
 
     // Surface format detection & selection
     VkFormat image_format;
@@ -353,12 +348,27 @@ b8 recreate_swapchain(renderer_state* state) {
         state->swapchain,
         &state->image_count,
         0));
-    state->swapchain_images = (VkImage*)etallocate(
-        sizeof(VkImage) * state->image_count,
-        MEMORY_TAG_RENDERER);
-    state->swapchain_image_views = (VkImageView*)etallocate(
-        sizeof(VkImageView) * state->image_count,
-        MEMORY_TAG_RENDERER);
+    // Reallocate memory if the image count is different
+    if (old_image_count != state->image_count) {
+        // Reallocate memory for swapchain images
+        etfree(state->swapchain_images,
+            sizeof(VkImage) * old_image_count,
+            MEMORY_TAG_RENDERER
+        );
+        state->swapchain_images = (VkImage*)etallocate(
+            sizeof(VkImage) * state->image_count,
+            MEMORY_TAG_RENDERER
+        );
+        // Reallocate memory for swapchain image views
+        etfree(state->swapchain_image_views,
+            sizeof(VkImageView) * old_image_count,
+            MEMORY_TAG_RENDERER
+        );
+        state->swapchain_image_views = (VkImageView*)etallocate(
+            sizeof(VkImageView) * state->image_count,
+            MEMORY_TAG_RENDERER
+        );
+    }
     VK_CHECK(vkGetSwapchainImagesKHR(
         state->device.handle,
         state->swapchain,

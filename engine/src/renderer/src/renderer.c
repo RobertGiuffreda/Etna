@@ -361,6 +361,8 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_NULL_HANDLE,
         &swapchain_index));
 
+    // TODO: Chnage above to result check and rebuild if necessary
+
     VK_CHECK(vkResetFences(
         state->device.handle,
         1,
@@ -945,11 +947,14 @@ gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indice
 // TODO: WRITE OUT THIS FUNCTION AND CALL WHEN SWAPCHAIN/WINDOW-SIZE IS DIRTY
 // Name is a bit confusing with recreate_swapchain around as well
 b8 rebuild_swapchain(renderer_state* state) {
-    // Sanitize synchronization structures and command buffers
+    // TODO: Use less heavy handed synchronization
+    vkDeviceWaitIdle(state->device.handle);
+
+    // Reset command pool & destroy the fences & semaphores
 
     // recreate swapchain
 
-    // recreate synchronization structures and command buffers
+    // Allocate command buffers & recreate fences & semaphores
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
