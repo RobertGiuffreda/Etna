@@ -1,9 +1,12 @@
 --------Immediate--------
+TODO: Use the render_image extent for the renderpass renderArea & scissor & viewport when drawing in order to render at whatever resolution we want
 TODO: Change blit to take swapchian image size & render_image size to render at whatever resolution we want
 TODO: Clamp swapchain extent based on max & min values in create & resize function
 
-TODO: VkDescriptorPool give more allocations & make one per frame or something I think
-    Growable
+If we change the resolution of the render_image we need to update the descriptor sets that reference it with the new image view sampler etc...
+TODO: Descriptor sets still reference old render image. So they need to be updated
+
+TODO: VkDescriptorPool give more allocations & make one per frame or something I think: Growable Version of allocator
 
 TODO: Model Geometry Loading - DONE
 TODO: Texture loading

@@ -194,7 +194,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     initialize_swapchain(state);
 
     // Rendering attachment images initialization
-
     VkImageUsageFlags draw_image_usages = {0};
     draw_image_usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     draw_image_usages |= VK_IMAGE_USAGE_STORAGE_BIT;
@@ -801,6 +800,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     VkRenderingAttachmentInfo depth_attachment = init_depth_attachment_info(
         state->depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
+    // TODO: Use the render_image extent for the renderpass renderArea & scissor & viewport
     VkExtent2D window_extent = {.width = state->width, .height = state->height};
     VkRenderingInfo render_info = init_rendering_info(window_extent, &color_attachment, &depth_attachment);
 
@@ -808,6 +808,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 
     // Triangle pipeline draw
 
+    // TODO: Use the render_image extent for the renderpass renderArea & scissor & viewport
     VkViewport viewport = {0};
     viewport.x = 0;
     viewport.y = 0;
@@ -818,6 +819,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 
     vkCmdSetViewport(cmd, 0, 1, &viewport);
 
+    // TODO: Use the render_image extent for the renderpass renderArea & scissor & viewport
     VkRect2D scissor = {0};
     scissor.offset.x = 0;
     scissor.offset.y = 0;
@@ -970,8 +972,52 @@ b8 rebuild_swapchain(renderer_state* state) {
         return false;
     }
 
-    // TODO: Recreate state->render_image & state->depth_image
-    // VUID-VkRenderingInfo-pNext-06079 triggered when attachment size is smaller than the rendering info size
+    // VUID-VkRenderingInfo-pNext-06079 triggered when attachment 
+    // size is smaller than the rendering info size
+    // Recreate state->render_image & state->depth_image: 
+
+    // TODO: Change this when better memory managment is implemented
+    image2D_destroy(state, &state->render_image);
+    image2D_destroy(state, &state->depth_image);
+
+        // Rendering attachment images initialization
+    VkImageUsageFlags draw_image_usages = {0};
+    draw_image_usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    draw_image_usages |= VK_IMAGE_USAGE_STORAGE_BIT;
+    draw_image_usages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    // Color attachment
+    VkExtent3D render_image_extent = {
+        .width = state->width,
+        .height = state->height,
+        .depth = 1};
+    image2D_create(state,
+        render_image_extent,
+        VK_FORMAT_R16G16B16A16_SFLOAT,
+        draw_image_usages,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &state->render_image);
+    ETINFO("Render image recreated");
+
+    VkImageUsageFlags depth_image_usages = {0};
+    depth_image_usages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    VkExtent3D depth_image_extent = {
+        .width = state->width,
+        .height = state->height,
+        .depth = 1};
+    image2D_create(state, 
+        depth_image_extent,
+        VK_FORMAT_D32_SFLOAT,
+        depth_image_usages,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &state->depth_image);
+    ETINFO("Depth image recreated");
+
+    // TODO: Descriptor sets still reference old render image. So they need to be updated
+
+    return true;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
