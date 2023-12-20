@@ -17,7 +17,8 @@ void blit_image2D_to_image2D(
     VkCommandBuffer cmd,
     VkImage src,
     VkImage dst,
-    VkExtent3D image_size,
+    VkExtent3D src_size,
+    VkExtent3D dst_size,
     VkImageAspectFlags aspect_flags);
 
 void image_barrier(

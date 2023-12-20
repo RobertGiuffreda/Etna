@@ -166,6 +166,10 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     PFN_vkDestroyDebugUtilsMessengerEXT pfnDestroyDebugUtilsMessengerEXT =
         (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(state->instance, "vkDestroyDebugUtilsMessengerEXT");
 
+    // Function to set an objects debug name. For debugging
+    state->vkSetDebugUtilsObjectNameEXT = 
+        (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(state->instance, "vkSetDebugUtilsObjectNameEXT");
+
     VkDebugUtilsMessengerCreateInfoEXT callback1 = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .pNext = NULL,
@@ -191,8 +195,17 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
         return false;
     }
 
+    // TODO: state->window_extent should be set before the swapchain in case the 
+    // swapchain current extent is 0xFFFFFFFF. Special value to say the app is in
+    // control of the size 
     initialize_swapchain(state);
 
+    // TEMP: HACK: TODO: Make render image resolution configurable from engine
+    VkExtent3D render_resolution = {
+        .width = state->window_extent.width,
+        .height = state->window_extent.height,
+        .depth = 1};
+    state->render_extent = render_resolution;
     // Rendering attachment images initialization
     VkImageUsageFlags draw_image_usages = {0};
     draw_image_usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -200,12 +213,8 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     draw_image_usages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
     // Color attachment
-    VkExtent3D render_image_extent = {
-        .width = state->width,
-        .height = state->height,
-        .depth = 1};
     image2D_create(state,
-        render_image_extent,
+        state->render_extent,
         VK_FORMAT_R16G16B16A16_SFLOAT,
         draw_image_usages,
         VK_IMAGE_ASPECT_COLOR_BIT,
@@ -215,12 +224,9 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
 
     VkImageUsageFlags depth_image_usages = {0};
     depth_image_usages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    VkExtent3D depth_image_extent = {
-        .width = state->width,
-        .height = state->height,
-        .depth = 1};
+
     image2D_create(state, 
-        depth_image_extent,
+        state->render_extent,
         VK_FORMAT_D32_SFLOAT,
         depth_image_usages,
         VK_IMAGE_ASPECT_DEPTH_BIT,
@@ -398,7 +404,7 @@ b8 renderer_draw_frame(renderer_state* state) {
 
     vkCmdPushConstants(frame_cmd, state->gradient_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compute_push_constants), &pc);
 
-    vkCmdDispatch(frame_cmd, ceil(state->width / 16.0f), ceil(state->height / 16.0f), 1);
+    vkCmdDispatch(frame_cmd, ceil(state->render_extent.width / 16.0f), ceil(state->render_extent.height / 16.0f), 1);
     // TEMP: END
 
     image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
@@ -439,7 +445,8 @@ b8 renderer_draw_frame(renderer_state* state) {
         frame_cmd,
         state->render_image.handle,
         state->swapchain_images[swapchain_index],
-        blit_extent,
+        state->render_extent,
+        state->window_extent,
         VK_IMAGE_ASPECT_COLOR_BIT);
 
     // Image barrier to transition the swapchian image from transfer destination optimal to present khr
@@ -454,7 +461,7 @@ b8 renderer_draw_frame(renderer_state* state) {
     // Begin command buffer submission
     VkCommandBufferSubmitInfo cmd_submit = init_command_buffer_submit_info(frame_cmd);
     VkSemaphoreSubmitInfo wait_submit = init_semaphore_submit_info(
-        state->swapchain_semaphores[swapchain_index],
+        state->swapchain_semaphores[state->current_frame],
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
     VkSemaphoreSubmitInfo signal_submit = init_semaphore_submit_info(
         state->render_semaphores[state->current_frame],
@@ -572,11 +579,15 @@ static void create_frame_synchronization_structures(renderer_state* state) {
             &semaphore_info,
             state->allocator,
             &state->swapchain_semaphores[i]));
+        const char swap_sem_name[] = "Swapchain semaphore";
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_SEMAPHORE, state->swapchain_semaphores[i], swap_sem_name);
         VK_CHECK(vkCreateSemaphore(
             state->device.handle, 
             &semaphore_info, 
             state->allocator, 
             &state->render_semaphores[i]));
+        const char rend_sem_name[] = "Render semaphore";
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_SEMAPHORE, state->render_semaphores[i], rend_sem_name);
         VK_CHECK(vkCreateFence(state->device.handle,
             &fence_info,
             state->allocator,
@@ -801,8 +812,8 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
         state->depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
     // TODO: Use the render_image extent for the renderpass renderArea & scissor & viewport
-    VkExtent2D window_extent = {.width = state->width, .height = state->height};
-    VkRenderingInfo render_info = init_rendering_info(window_extent, &color_attachment, &depth_attachment);
+    VkExtent2D render_extent = {.width = state->render_extent.width, .height = state->render_extent.height};
+    VkRenderingInfo render_info = init_rendering_info(render_extent, &color_attachment, &depth_attachment);
 
     vkCmdBeginRendering(cmd, &render_info);
 
@@ -812,8 +823,8 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     VkViewport viewport = {0};
     viewport.x = 0;
     viewport.y = 0;
-    viewport.width = state->width;
-    viewport.height = state->height;
+    viewport.width = render_extent.width;
+    viewport.height = render_extent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
@@ -823,8 +834,8 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     VkRect2D scissor = {0};
     scissor.offset.x = 0;
     scissor.offset.y = 0;
-    scissor.extent.width = state->width;
-    scissor.extent.height = state->height;
+    scissor.extent.width = render_extent.width;
+    scissor.extent.height = render_extent.height;
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
@@ -846,7 +857,8 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
 
     // TODO: Figure out projection matrix mess ups & confusion
-    m4s project = glms_perspective(glm_rad(70.f), ((f32)state->width/(f32)state->height), 10000.f, 0.1f);
+    m4s project = glms_perspective(glm_rad(70.f), ((f32)state->window_extent.width/(f32)state->window_extent.height), 10000.f, 0.1f);
+    // m4s project = glms_perspective(glm_rad(70.f), ((f32)render_extent.width/(f32)render_extent.height), 10000.f, 0.1f);
     project.raw[1][1] *= -1;
 
     m4s vp = glms_mat4_mul(project, view);
@@ -863,8 +875,8 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 }
 
 void renderer_on_resize(renderer_state* state, i32 width, i32 height) {
-    state->width = width;
-    state->height = height;
+    state->render_extent.width = (u32)width;
+    state->render_extent.height = (u32)height;
     state->swapchain_dirty = true;
 }
 
@@ -965,7 +977,7 @@ gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indice
 // Name is a bit confusing with recreate_swapchain around as well
 b8 rebuild_swapchain(renderer_state* state) {
     // TODO: Use less heavy handed synchronization
-    vkDeviceWaitIdle(state->device.handle);
+    VK_CHECK(vkDeviceWaitIdle(state->device.handle));
     state->swapchain_dirty = false;
     if (!recreate_swapchain(state)) {
         ETERROR("Error recreating swapchain.");
@@ -974,48 +986,6 @@ b8 rebuild_swapchain(renderer_state* state) {
 
     // VUID-VkRenderingInfo-pNext-06079 triggered when attachment 
     // size is smaller than the rendering info size
-    // Recreate state->render_image & state->depth_image: 
-
-    // TODO: Change this when better memory managment is implemented
-    image2D_destroy(state, &state->render_image);
-    image2D_destroy(state, &state->depth_image);
-
-        // Rendering attachment images initialization
-    VkImageUsageFlags draw_image_usages = {0};
-    draw_image_usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    draw_image_usages |= VK_IMAGE_USAGE_STORAGE_BIT;
-    draw_image_usages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    // Color attachment
-    VkExtent3D render_image_extent = {
-        .width = state->width,
-        .height = state->height,
-        .depth = 1};
-    image2D_create(state,
-        render_image_extent,
-        VK_FORMAT_R16G16B16A16_SFLOAT,
-        draw_image_usages,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &state->render_image);
-    ETINFO("Render image recreated");
-
-    VkImageUsageFlags depth_image_usages = {0};
-    depth_image_usages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    VkExtent3D depth_image_extent = {
-        .width = state->width,
-        .height = state->height,
-        .depth = 1};
-    image2D_create(state, 
-        depth_image_extent,
-        VK_FORMAT_D32_SFLOAT,
-        depth_image_usages,
-        VK_IMAGE_ASPECT_DEPTH_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &state->depth_image);
-    ETINFO("Depth image recreated");
-
-    // TODO: Descriptor sets still reference old render image. So they need to be updated
 
     return true;
 }
@@ -1048,3 +1018,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     }
     return VK_FALSE;
 }
+
+#ifdef _DEBUG
+b8 renderer_set_debug_object_name(renderer_state* state, VkObjectType object_type, u64 object_handle, const char* object_name) {
+    const VkDebugUtilsObjectNameInfoEXT name_info = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = 0,
+        .objectType = object_type,
+        .objectHandle = object_handle,
+        .pObjectName = object_name};
+    VK_CHECK(state->vkSetDebugUtilsObjectNameEXT(state->device.handle, &name_info));
+    return true;
+}
+#endif

@@ -63,18 +63,23 @@ void image2D_destroy(renderer_state* state, image* image) {
     image->handle = 0;
 }
 
-void blit_image2D_to_image2D(VkCommandBuffer cmd, VkImage src, VkImage dst, VkExtent3D image_size, VkImageAspectFlags aspect_flags) {
+void blit_image2D_to_image2D(
+    VkCommandBuffer cmd,
+    VkImage src, VkImage dst,
+    VkExtent3D src_size, VkExtent3D dst_size,
+    VkImageAspectFlags aspect_flags)
+{
     VkImageBlit2 blit = {0};
     blit.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
     blit.pNext = 0;
 
-    blit.srcOffsets[1].x = image_size.width;
-    blit.srcOffsets[1].y = image_size.height;
-    blit.srcOffsets[1].z = 1;
+    blit.srcOffsets[1].x = src_size.width;
+    blit.srcOffsets[1].y = src_size.height;
+    blit.srcOffsets[1].z = src_size.depth;
 
-    blit.dstOffsets[1].x = image_size.width;
-    blit.dstOffsets[1].y = image_size.height;
-    blit.dstOffsets[1].z = 1;
+    blit.dstOffsets[1].x = dst_size.width;
+    blit.dstOffsets[1].y = dst_size.height;
+    blit.dstOffsets[1].z = dst_size.depth;
 
     VkImageSubresourceLayers subresource = {0};
     subresource.aspectMask = aspect_flags;

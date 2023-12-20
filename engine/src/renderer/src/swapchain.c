@@ -48,15 +48,23 @@ b8 initialize_swapchain(renderer_state* state) {
         state->surface,
         &surface_capabilities));
 
-    VkExtent2D swapchain_dimensions;
+    VkExtent2D swapchain_extent;
     if (surface_capabilities.currentExtent.width == 0xFFFFFFFF) {
-        swapchain_dimensions.width = state->width;
-        swapchain_dimensions.height = state->height;
+        swapchain_extent.width = state->window_extent.width;
+        swapchain_extent.height = state->window_extent.height;
     } else {
-        swapchain_dimensions = surface_capabilities.currentExtent;
+        swapchain_extent = surface_capabilities.currentExtent;
     }
 
-    // TODO: Clamp extent based on max & min values
+    // Clamp extent based on max & min values
+    VkExtent2D min_extent = surface_capabilities.minImageExtent;
+    VkExtent2D max_extent = surface_capabilities.maxImageExtent;
+    // Minimum dimensions
+    u32 clamp_width = (swapchain_extent.width < min_extent.width) ? min_extent.width : swapchain_extent.width;
+    u32 clamp_height = (swapchain_extent.height < min_extent.height) ? min_extent.height : swapchain_extent.height;
+    // Maximum dimensions
+    swapchain_extent.width = (clamp_width > max_extent.width) ? max_extent.width : clamp_width;
+    swapchain_extent.height = (clamp_height > max_extent.height) ? max_extent.height : clamp_height;
 
     // NOTE: This mode must be supported to adhere to vulkan spec
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
@@ -100,7 +108,7 @@ b8 initialize_swapchain(renderer_state* state) {
         .minImageCount = swapchain_image_count,
         .imageFormat = image_format,
         .imageColorSpace = color_space,
-        .imageExtent = swapchain_dimensions,
+        .imageExtent = swapchain_extent,
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         // Image sharing mode & queue family indices below
@@ -131,8 +139,9 @@ b8 initialize_swapchain(renderer_state* state) {
         &state->swapchain));
     ETINFO("Vulkan Swapchain intialized.");
 
-    state->width = swapchain_dimensions.width;
-    state->height = swapchain_dimensions.height;
+    state->window_extent.width = swapchain_extent.width;
+    state->window_extent.height = swapchain_extent.height;
+    state->window_extent.depth = 1;
     state->swapchain_image_format = image_format;
 
     // Allocate memory for swapchain image handles and swapchain 
@@ -252,15 +261,23 @@ b8 recreate_swapchain(renderer_state* state) {
         state->surface,
         &surface_capabilities));
 
-    VkExtent2D swapchain_dimensions;
+    VkExtent2D swapchain_extent;
     if (surface_capabilities.currentExtent.width == 0xFFFFFFFF) {
-        swapchain_dimensions.width = state->width;
-        swapchain_dimensions.height = state->height;
+        swapchain_extent.width = state->window_extent.width;
+        swapchain_extent.height = state->window_extent.height;
     } else {
-        swapchain_dimensions = surface_capabilities.currentExtent;
+        swapchain_extent = surface_capabilities.currentExtent;
     }
 
-    // TODO: Clamp extent based on max & min values
+    // Clamp extent based on max & min values
+    VkExtent2D min_extent = surface_capabilities.minImageExtent;
+    VkExtent2D max_extent = surface_capabilities.maxImageExtent;
+    // Minimum dimensions
+    u32 clamp_width = (swapchain_extent.width < min_extent.width) ? min_extent.width : swapchain_extent.width;
+    u32 clamp_height = (swapchain_extent.height < min_extent.height) ? min_extent.height : swapchain_extent.height;
+    // Maximum dimensions
+    swapchain_extent.width = (clamp_width > max_extent.width) ? max_extent.width : clamp_width;
+    swapchain_extent.height = (clamp_height > max_extent.height) ? max_extent.height : clamp_height;
 
     // NOTE: This mode must be supported to adhere to vulkan spec
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
@@ -304,7 +321,7 @@ b8 recreate_swapchain(renderer_state* state) {
         .minImageCount = swapchain_image_count,
         .imageFormat = image_format,
         .imageColorSpace = color_space,
-        .imageExtent = swapchain_dimensions,
+        .imageExtent = swapchain_extent,
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         // Image sharing mode & queue family indices below
@@ -334,8 +351,9 @@ b8 recreate_swapchain(renderer_state* state) {
         state->allocator,
         &state->swapchain));
 
-    state->width = swapchain_dimensions.width;
-    state->height = swapchain_dimensions.height;
+    state->window_extent.width = swapchain_extent.width;
+    state->window_extent.height = swapchain_extent.height;
+    state->window_extent.depth = 1;
     state->swapchain_image_format = image_format;
 
     // Destroy the old swapchain

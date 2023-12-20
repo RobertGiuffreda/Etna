@@ -1,9 +1,15 @@
 --------Immediate--------
 TODO: Use the render_image extent for the renderpass renderArea & scissor & viewport when drawing in order to render at whatever resolution we want
 TODO: Change blit to take swapchian image size & render_image size to render at whatever resolution we want
-TODO: Clamp swapchain extent based on max & min values in create & resize function
 
-If we change the resolution of the render_image we need to update the descriptor sets that reference it with the new image view sampler etc...
+TODO: Make max resolution image and render to a swapchain sized portion of it using scissor & viewport & renderArea
+
+TODO: state->window_extent should be set before the swapchain in case the swapchain current extent is 0xFFFFFFFF. 
+Special value to say the app is in control of the size 
+
+TODO: Create utilities vulkan file and add corresponding functions there. Set debug name function for example
+
+TODO: If we change the resolution of the render_image we need to update the descriptor sets that reference it with the new image view sampler etc...
 TODO: Descriptor sets still reference old render image. So they need to be updated
 
 TODO: VkDescriptorPool give more allocations & make one per frame or something I think: Growable Version of allocator
@@ -121,7 +127,7 @@ initialize function is not needed when before said structure is used;
 
 ------------------------------------------------------
     f32 fov_rad = glm_rad(70.f);
-    f32 aspect_ratio = ((f32)state->width/(f32)state->height);
+    f32 aspect_ratio = ((f32)state->render_extent.width/(f32)state->render_extent.height);
     f32 n = 10000.f;
     f32 f = 0.1f;
 
