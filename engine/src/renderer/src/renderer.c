@@ -200,7 +200,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     // control of the size 
     initialize_swapchain(state);
 
-    // TEMP: HACK: TODO: Make render image resolution configurable from engine
+    // TEMP: HACK: TODO: Make render image resolution configurable from engine & not the original swapchain bounds
     VkExtent3D render_resolution = {
         .width = state->window_extent.width,
         .height = state->window_extent.height,

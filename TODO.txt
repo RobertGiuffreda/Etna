@@ -1,7 +1,4 @@
 --------Immediate--------
-TODO: Use the render_image extent for the renderpass renderArea & scissor & viewport when drawing in order to render at whatever resolution we want
-TODO: Change blit to take swapchian image size & render_image size to render at whatever resolution we want
-
 TODO: Make max resolution image and render to a swapchain sized portion of it using scissor & viewport & renderArea
 
 TODO: state->window_extent should be set before the swapchain in case the swapchain current extent is 0xFFFFFFFF. 
@@ -14,7 +11,7 @@ TODO: Descriptor sets still reference old render image. So they need to be updat
 
 TODO: VkDescriptorPool give more allocations & make one per frame or something I think: Growable Version of allocator
 
-TODO: Model Geometry Loading - DONE
+---------------------
 TODO: Texture loading
 TODO: Material set up
 
