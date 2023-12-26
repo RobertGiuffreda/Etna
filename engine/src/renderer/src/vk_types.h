@@ -39,6 +39,12 @@ typedef struct descriptor_set_allocator {
     VkDescriptorPoolSize* pool_sizes;
     VkDescriptorPool pool;
 } ds_allocator;
+
+typedef struct descriptor_set_allocator_growable {
+    VkDescriptorPoolSize* pool_sizes;
+    VkDescriptorPool* ready_pools;
+    VkDescriptorPool* full_pools;
+} ds_allocator_growable;
 /* NOTE: END */
 
 // TEMP: Until my vulkan memory management is implemented

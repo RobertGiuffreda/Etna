@@ -973,7 +973,6 @@ gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indice
     return new_surface;
 }
 
-// TODO: WRITE OUT THIS FUNCTION AND CALL WHEN SWAPCHAIN/WINDOW-SIZE IS DIRTY
 // Name is a bit confusing with recreate_swapchain around as well
 b8 rebuild_swapchain(renderer_state* state) {
     // TODO: Use less heavy handed synchronization
@@ -983,9 +982,6 @@ b8 rebuild_swapchain(renderer_state* state) {
         ETERROR("Error recreating swapchain.");
         return false;
     }
-
-    // VUID-VkRenderingInfo-pNext-06079 triggered when attachment 
-    // size is smaller than the rendering info size
 
     return true;
 }
@@ -1020,6 +1016,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 }
 
 #ifdef _DEBUG
+// TODO: Better naming of all the objects w/ handles
 b8 renderer_set_debug_object_name(renderer_state* state, VkObjectType object_type, u64 object_handle, const char* object_name) {
     const VkDebugUtilsObjectNameInfoEXT name_info = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,

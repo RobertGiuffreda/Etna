@@ -30,3 +30,9 @@ void descriptor_set_allocator_shutdown(ds_allocator* allocator, renderer_state* 
 void descriptor_set_allocator_destroy_pool(ds_allocator* allocator, renderer_state* state);
 VkDescriptorSet descriptor_set_allocator_allocate(ds_allocator* allocator, VkDescriptorSetLayout layout, renderer_state* state);
 /* NOTE: END */
+
+/* NOTE: ds_allocator_growable */
+void descriptor_set_allocator_growable_intialize(ds_allocator_growable* allocator);
+void descriptor_set_allocator_growable_clear_pools(ds_allocator_growable* allocator);
+void descriptor_set_allocator_growable_destroy_pools(ds_allocator_growable* allocator);
+/* NOTE: END */
