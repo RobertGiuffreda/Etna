@@ -40,10 +40,17 @@ typedef struct descriptor_set_allocator {
     VkDescriptorPool pool;
 } ds_allocator;
 
+// Growable descriptor allocator types
+typedef struct pool_size_ratio {
+    VkDescriptorType type;
+    float ratio;
+} pool_size_ratio;
+
 typedef struct descriptor_set_allocator_growable {
-    VkDescriptorPoolSize* pool_sizes;
+    pool_size_ratio* pool_sizes;
     VkDescriptorPool* ready_pools;
     VkDescriptorPool* full_pools;
+    u32 sets_per_pool;
 } ds_allocator_growable;
 /* NOTE: END */
 

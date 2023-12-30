@@ -2,6 +2,8 @@
 
 #include "containers/dynarray.h"
 
+#include "renderer/src/utilities/vkinit.h"
+
 /* NOTE: Functions for: Descriptor Set Layout Builder */
 dsl_builder descriptor_set_layout_builder_create(void) {
     dsl_builder builder;
@@ -179,4 +181,121 @@ VkDescriptorSet descriptor_set_allocator_allocate(ds_allocator* allocator, VkDes
     VK_CHECK(vkAllocateDescriptorSets(state->device.handle, &info, &ds));
 
     return ds;
+}
+
+/* NOTE: Function for growable descriptor set allocator */
+void descriptor_set_allocator_growable_intialize(
+    ds_allocator_growable* allocator,
+    u32 initial_sets,
+    pool_size_ratio* pool_sizes)
+{
+    allocator->pool_sizes = dynarray_copy(pool_sizes);
+    allocator->ready_pools = dynarray_create(0, sizeof(VkDescriptorPool));
+    allocator->full_pools = dynarray_create(0, sizeof(VkDescriptorPool));
+    allocator->sets_per_pool = initial_sets;
+}
+
+void descriptor_set_allocator_growable_shutdown(
+    ds_allocator_growable* allocator,
+    renderer_state* state)
+{
+    descriptor_set_allocator_growable_destroy_pools(allocator, state);
+    dynarray_destroy(allocator->pool_sizes);
+    dynarray_destroy(allocator->ready_pools);
+    dynarray_destroy(allocator->full_pools);
+    allocator->sets_per_pool = 0;
+}
+
+void descriptor_set_allocator_growable_clear_pools(
+    ds_allocator_growable* allocator,
+    renderer_state* state)
+{
+    u32 rpool_len = dynarray_length(allocator->ready_pools);
+    for (u32 i = 0; i < rpool_len; ++i) {
+        VkDescriptorPool pool = allocator->ready_pools[i];
+        vkResetDescriptorPool(state->device.handle, pool, 0);
+    }
+
+    u32 fpool_len = dynarray_length(allocator->full_pools);
+    for (u32 i = 0; i < fpool_len; ++i) {
+        VkDescriptorPool pool = allocator->full_pools[i];
+        vkResetDescriptorPool(state->device.handle, pool, 0);
+        dynarray_push((void**)&allocator->ready_pools, &pool);
+    }
+    dynarray_clear(allocator->full_pools);
+}
+
+void descriptor_set_allocator_growable_destroy_pools(
+    ds_allocator_growable* allocator,
+    renderer_state* state)
+{
+    u32 rpool_len = dynarray_length(allocator->ready_pools);
+    for (u32 i = 0; i < rpool_len; ++i) {
+        VkDescriptorPool pool = allocator->ready_pools[i];
+        vkDestroyDescriptorPool(state->device.handle, pool, state->allocator);
+    }
+    dynarray_clear(allocator->ready_pools);
+
+    u32 fpool_len = dynarray_length(allocator->full_pools);
+    for (u32 i = 0; i < fpool_len; ++i) {
+        VkDescriptorPool pool = allocator->full_pools[i];
+        vkDestroyDescriptorPool(state->device.handle, pool, state->allocator);
+    }
+    dynarray_clear(allocator->full_pools);
+}
+
+VkDescriptorSet descriptor_set_allocator_growable_allocate(
+    ds_allocator_growable* allocator,
+    VkDescriptorSetLayout layout,
+    renderer_state* state)
+{
+    
+}
+
+VkDescriptorPool descriptor_set_allocator_growable_get_pool(
+    ds_allocator_growable* allocator,
+    renderer_state* state)
+{
+    VkDescriptorPool new_pool;
+    if (dynarray_length(allocator->ready_pools) != 0) {
+        dynarray_pop(allocator->ready_pools, &new_pool);
+    } else {
+        new_pool = descriptor_set_allocator_growable_create_pool(allocator, state);
+        allocator->sets_per_pool *= 1.5;
+        if (allocator->sets_per_pool > 4092) {
+            allocator->sets_per_pool = 4092;
+        }
+    }
+    return new_pool;
+}
+VkDescriptorPool descriptor_set_allocator_growable_create_pool(
+    ds_allocator_growable* allocator,
+    renderer_state* state)
+{
+    VkDescriptorPoolSize* sizes = dynarray_create(1, sizeof(VkDescriptorPoolSize));
+    for (u32 i = 0; i < dynarray_length(allocator->pool_sizes); ++i) {
+        VkDescriptorPoolSize new_size = {
+            .type = allocator->pool_sizes[i].type,
+            .descriptorCount = allocator->pool_sizes[i].ratio * allocator->sets_per_pool
+        };
+        dynarray_push((void**)&allocator->pool_sizes, &new_size);
+    }
+    
+    VkDescriptorPoolCreateInfo pool_info = init_descriptor_pool_create_info();
+    pool_info.flags = 0;
+    pool_info.maxSets = allocator->sets_per_pool;
+    pool_info.poolSizeCount = dynarray_length(sizes);
+    pool_info.pPoolSizes = sizes;
+
+    VkDescriptorPool new_pool;
+    VK_CHECK(vkCreateDescriptorPool(
+        state->device.handle,
+        &pool_info,
+        state->allocator,
+        &new_pool));
+
+    // Clean up memory
+    dynarray_destroy(sizes);
+
+    return new_pool;
 }

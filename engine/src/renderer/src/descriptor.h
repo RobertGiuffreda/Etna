@@ -26,13 +26,18 @@ void descriptor_set_writer_update_set(ds_writer* writer, VkDescriptorSet set, re
 void descriptor_set_allocator_initialize(ds_allocator* allocator, u32 max_sets, VkDescriptorPoolSize* pool_sizes, renderer_state* state);
 void descriptor_set_allocator_create_pool(ds_allocator* allocator, u32 max_sets, renderer_state* state);
 void descriptor_set_allocator_clear_descriptor_sets(ds_allocator* allocator, renderer_state* state);
-void descriptor_set_allocator_shutdown(ds_allocator* allocator, renderer_state* state);
 void descriptor_set_allocator_destroy_pool(ds_allocator* allocator, renderer_state* state);
+void descriptor_set_allocator_shutdown(ds_allocator* allocator, renderer_state* state);
 VkDescriptorSet descriptor_set_allocator_allocate(ds_allocator* allocator, VkDescriptorSetLayout layout, renderer_state* state);
 /* NOTE: END */
 
 /* NOTE: ds_allocator_growable */
-void descriptor_set_allocator_growable_intialize(ds_allocator_growable* allocator);
-void descriptor_set_allocator_growable_clear_pools(ds_allocator_growable* allocator);
-void descriptor_set_allocator_growable_destroy_pools(ds_allocator_growable* allocator);
+void descriptor_set_allocator_growable_intialize(ds_allocator_growable* allocator, u32 initial_sets, pool_size_ratio* pool_sizes);
+void descriptor_set_allocator_growable_shutdown(ds_allocator_growable* allocator, renderer_state* state);
+void descriptor_set_allocator_growable_clear_pools(ds_allocator_growable* allocator, renderer_state* state);
+void descriptor_set_allocator_growable_destroy_pools(ds_allocator_growable* allocator, renderer_state* state);
+VkDescriptorSet descriptor_set_allocator_growable_allocate(ds_allocator_growable* allocator, VkDescriptorSetLayout layout, renderer_state* state);
+
+VkDescriptorPool descriptor_set_allocator_growable_get_pool(ds_allocator_growable* allocator, renderer_state* state);
+VkDescriptorPool descriptor_set_allocator_growable_create_pool(ds_allocator_growable* allocator, renderer_state* state);
 /* NOTE: END */

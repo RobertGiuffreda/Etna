@@ -9,16 +9,11 @@ TODO: Create utilities vulkan file and add corresponding functions there. Set de
 TODO: If we change the resolution of the render_image we need to update the descriptor sets that reference it with the new image view sampler etc...
 TODO: Descriptor sets still reference old render image. So they need to be updated
 
-TODO: VkDescriptorPool give more allocations & make one per frame or something I think: Growable Version of allocator
+---------------------More Immediate---------------------
+TODO: Growable Version of allocator
+TODO: A growable descriptor allocator for descriptor allocations per frame.
 
----------------------
-TODO: Texture loading
-TODO: Material set up
-
-TODO: Texture loading management system
-TODO: Materials & Material management system
-TODO: Model loading management system
-
+TODO: Follow vkguide.dev until rendering structure is in place then change to suit c specific code 
 TODO: Renderable interface struct
 
 TODO: Build out materials and renderable framework:
