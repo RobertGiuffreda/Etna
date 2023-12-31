@@ -249,7 +249,27 @@ VkDescriptorSet descriptor_set_allocator_growable_allocate(
     VkDescriptorSetLayout layout,
     renderer_state* state)
 {
-    
+    VkDescriptorPool to_use = 
+        descriptor_set_allocator_growable_get_pool(allocator, state);
+    VkDescriptorSetAllocateInfo alloc_info = init_descriptor_set_allocate_info();
+    alloc_info.descriptorPool = to_use;
+    alloc_info.descriptorSetCount = 1;
+    alloc_info.pSetLayouts = &layout;
+
+    VkDescriptorSet ds;
+    VkResult result = vkAllocateDescriptorSets(state->device.handle, &alloc_info, &ds);
+
+    if (result == VK_ERROR_OUT_OF_POOL_MEMORY || result == VK_ERROR_FRAGMENTED_POOL) {
+        dynarray_push((void**)&allocator->full_pools, &to_use);
+
+        to_use = descriptor_set_allocator_growable_get_pool(allocator, state);
+        alloc_info.descriptorPool = to_use;
+
+        VK_CHECK(vkAllocateDescriptorSets(state->device.handle, &alloc_info, &ds));
+    }
+
+    dynarray_push((void**)&allocator->ready_pools, &to_use);
+    return ds;
 }
 
 VkDescriptorPool descriptor_set_allocator_growable_get_pool(
