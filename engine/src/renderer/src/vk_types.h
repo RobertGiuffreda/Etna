@@ -230,9 +230,6 @@ typedef struct renderer_state {
     // Index into per frame arrays: TODO: Rename to frame_index maybe??
     u32 current_frame; 
     
-    // TEMP: THIS LINE
-    i32 frame_number;
-
     // NOTE: Per frame structures/data. Add to separate struct??
     VkSemaphore* swapchain_semaphores;
     VkSemaphore* render_semaphores;
@@ -243,6 +240,8 @@ typedef struct renderer_state {
     // better handle on things. 
     VkCommandPool* graphics_pools;
     VkCommandBuffer* main_graphics_command_buffers;
+
+    ds_allocator_growable* set_allocators;
     // NOTE: Per frame END
 
     // Immediate command pool & buffer

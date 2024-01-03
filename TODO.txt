@@ -10,7 +10,6 @@ TODO: If we change the resolution of the render_image we need to update the desc
 TODO: Descriptor sets still reference old render image. So they need to be updated
 
 ---------------------More Immediate---------------------
-TODO: Growable Version of allocator
 TODO: A growable descriptor allocator for descriptor allocations per frame.
 
 TODO: Follow vkguide.dev until rendering structure is in place then change to suit c specific code 
