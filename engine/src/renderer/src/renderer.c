@@ -10,6 +10,7 @@
 #include "renderer/src/pipeline.h"
 #include "renderer/src/shader.h"
 #include "renderer/src/descriptor.h"
+#include "renderer/src/GLTFMetallic_Roughness.h"
 
 #include "window/renderer_window.h"
 
@@ -25,6 +26,7 @@
 #include <math.h>
 // TEMP: END
 
+// Initialize frame structure functions
 static void create_frame_command_structures(renderer_state* state);
 static void destroy_frame_command_structures(renderer_state* state);
 
@@ -34,18 +36,24 @@ static void destroy_frame_synchronization_structures(renderer_state* state);
 static void initialize_descriptors(renderer_state* state);
 static void shutdown_descriptors(renderer_state* state);
 
-// TEMP: Until material framework is stood up
-static void initialize_triangle_pipeline(renderer_state* state);
-static void shutdown_triangle_pipeline(renderer_state* state);
+static void create_scene_data_buffers(renderer_state* state);
+static void destroy_scene_data_buffers(renderer_state* state);
 
+// TEMP: Until material framework is stood up
 static void initialize_mesh_pipeline(renderer_state* state);
 static void shutdown_mesh_pipeline(renderer_state* state);
+
+static void initialize_mesh_mat_pipeline(renderer_state* state);
+static void shutdown_mesh_mat_pipeline(renderer_state* state);
 
 static b8 intialize_default_data(renderer_state* state);
 static void shutdown_default_data(renderer_state* state);
 
 static void draw_geometry(renderer_state* state, VkCommandBuffer cmd);
 // TEMP: END
+
+static void immediate_begin(struct renderer_state* state);
+static void immediate_end(struct renderer_state* state);
 
 b8 rebuild_swapchain(renderer_state* state);
 
@@ -239,19 +247,22 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     create_frame_synchronization_structures(state);
     ETINFO("Frame synchronization structures created.");
 
-    // This function initializes:
-    // state->gradient_descriptor_set_layout
-    // state->gradient_descriptor_set
-    // state->global_ds_allocator
+    // Set immediate command buffer start and end functions
+    state->immediate_begin = immediate_begin;
+    state->immediate_end = immediate_end;
+
     initialize_descriptors(state);
     ETINFO("Descriptors Initialized.");
+
+    create_scene_data_buffers(state);
+    ETINFO("Scene data buffers created");
 
     // TEMP: Until post processing effect structure/system is created/becomes more robust. 
     load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader);
 
     VkPipelineLayoutCreateInfo compute_effect_pipeline_layout_info = init_pipeline_layout_create_info();
     compute_effect_pipeline_layout_info.setLayoutCount = 1;
-    compute_effect_pipeline_layout_info.pSetLayouts = &state->gradient_descriptor_set_layout;
+    compute_effect_pipeline_layout_info.pSetLayouts = &state->draw_image_descriptor_set_layout;
 
     // Push constant structure for compute effect pipelines
     VkPushConstantRange push_constant = {0};
@@ -277,9 +288,9 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     ETINFO("Gradient compute effect created.");
     // TEMP: END
 
-    initialize_triangle_pipeline(state);
-
     initialize_mesh_pipeline(state);
+
+    initialize_mesh_mat_pipeline(state);
 
     if (!intialize_default_data(state)) {
         ETFATAL("Error intializing data.");
@@ -298,8 +309,6 @@ void renderer_shutdown(renderer_state* state) {
 
     shutdown_mesh_pipeline(state);
 
-    shutdown_triangle_pipeline(state);
-
     // TEMP: Until post processing effect structure/system is created/becomes more robust. 
     vkDestroyPipeline(state->device.handle, state->gradient_effect.pipeline, state->allocator);
     vkDestroyPipelineLayout(state->device.handle, state->gradient_effect.layout, state->allocator);
@@ -307,7 +316,10 @@ void renderer_shutdown(renderer_state* state) {
 
     unload_shader(state, &state->gradient_shader);
     ETINFO("Gradient compute shader unloaded.");
-    // TEMP: Until post processing effect structure/system is created/becomes more robust. 
+    // TEMP: END
+
+    destroy_scene_data_buffers(state);
+    ETINFO("Scene data buffers destroyed.");
 
     shutdown_descriptors(state);
     ETINFO("Descriptors shutdown.");
@@ -345,8 +357,8 @@ void renderer_shutdown(renderer_state* state) {
     etfree(state, sizeof(renderer_state), MEMORY_TAG_RENDERER);
 }
 
-b8 renderer_prepare_frame(renderer_state* state) {
-    return true;
+void renderer_update_scene(renderer_state* state) {
+
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
@@ -359,6 +371,10 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_TRUE,
         1000000000));
     
+    // TODO: Determine if this is the proper place among my code for
+    // clearing the pools
+    descriptor_set_allocator_growable_clear_pools(&state->frame_allocators[state->current_frame], state);
+
     u32 swapchain_index;
     VkResult result = vkAcquireNextImageKHR(
         state->device.handle,
@@ -396,7 +412,7 @@ b8 renderer_draw_frame(renderer_state* state) {
     // TEMP: Hardcode Gradient compute
     vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.pipeline);
 
-    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.layout, 0, 1, &state->gradient_descriptor_set, 0, 0);
+    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.layout, 0, 1, &state->draw_image_descriptor_set, 0, 0);
 
     compute_push_constants pc = {
         .data1 = (v4s){1.0f, 0.0f, 0.0f, 1.0f},
@@ -628,80 +644,108 @@ static void destroy_frame_synchronization_structures(renderer_state* state) {
 }
 
 static void initialize_descriptors(renderer_state* state) {
-    // Define pool sizes for descriptor allocator
-    VkDescriptorPoolSize pool_sizes[] = {
-        { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1},
-    };
-    VkDescriptorPoolSize* dynarray_pools = dynarray_create_data(1, sizeof(VkDescriptorPoolSize), 1, pool_sizes);
-    descriptor_set_allocator_initialize(&state->global_ds_allocator, 10, dynarray_pools, state);
-    dynarray_destroy(dynarray_pools);
-    ETINFO("Descriptor set allocator initialized.");
+    // Update global allocator to growable version
+    pool_size_ratio global_ratios[] = {
+        { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 1},
+        { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 1}};
+    // pool_size_ratio* global_ratios_dynarray = dynarray_create_data(2, sizeof(pool_size_ratio), 2, global_ratios);
+    pool_size_ratio* global_ratios_dynarray = dynarray_create_data_tagged(2, sizeof(pool_size_ratio), 2, MEMORY_TAG_DESCRIPTOR_DYN, global_ratios);
+    descriptor_set_allocator_growable_initialize(&state->global_ds_allocator, 10, global_ratios_dynarray, state);
+    dynarray_destroy(global_ratios_dynarray);
+    ETINFO("Global descriptor set allocator initialized.");
 
     dsl_builder dsl_builder = descriptor_set_layout_builder_create();
     descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-    state->gradient_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
-    ETINFO("Gradient Compute Descriptor Set Layout created.");
-
-    state->gradient_descriptor_set = descriptor_set_allocator_allocate(&state->global_ds_allocator, state->gradient_descriptor_set_layout, state);
+    state->draw_image_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
     descriptor_set_layout_builder_destroy(&dsl_builder);
-    ETINFO("Gradient Compute Descriptor Set allocated");
+    ETINFO("Draw Image Descriptor Set Layout created.");
+
+    dsl_builder = descriptor_set_layout_builder_create();
+    descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+    state->single_image_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
+    descriptor_set_layout_builder_destroy(&dsl_builder);
+    ETINFO("Single image descriptor set layout created.");
+
+    dsl_builder = descriptor_set_layout_builder_create();
+    descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    state->scene_data_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
+    descriptor_set_layout_builder_destroy(&dsl_builder);
+    ETINFO("Scene data descriptor set layout created.");
+
+    state->draw_image_descriptor_set = descriptor_set_allocator_growable_allocate(&state->global_ds_allocator, state->draw_image_descriptor_set_layout, state);
+    ETINFO("Draw Image Descriptor Set allocated");
 
     ds_writer writer = descriptor_set_writer_create_initialize();
     descriptor_set_writer_write_image(&writer, 0, state->render_image.view, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    descriptor_set_writer_update_set(&writer, state->gradient_descriptor_set, state);
+    descriptor_set_writer_update_set(&writer, state->draw_image_descriptor_set, state);
     descriptor_set_writer_shutdown(&writer);
-    ETINFO("Gradient Compute Descriptor Set updated.");
+    ETINFO("Draw Image Descriptor Set updated.");
+
+    // Create pool size ratios to be used for the frames
+    pool_size_ratio ratios[] = {
+        { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 3},
+        { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 3},
+        { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
+        { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3}};
+    // pool_size_ratio* frame_ratios = dynarray_create_data(4, sizeof(pool_size_ratio), 4, ratios);
+    pool_size_ratio* frame_ratios = dynarray_create_data_tagged(4, sizeof(pool_size_ratio), 4, MEMORY_TAG_DESCRIPTOR_DYN, ratios);
+    state->frame_allocators = etallocate(sizeof(ds_allocator_growable) * state->image_count, MEMORY_TAG_RENDERER);
+    for (u32 i = 0; i < state->image_count; ++i) {
+        // Initialize growable allocator for the frames
+        descriptor_set_allocator_growable_initialize(&state->frame_allocators[i], 1000, frame_ratios, state);
+    }
+    ETINFO("Frame Descriptors created");
+
+    // Clean up allocated memory
+    dynarray_destroy(frame_ratios);
 }
 
+// TODO: Should be reverse order of creation just for uniformity
 static void shutdown_descriptors(renderer_state* state) {
-    descriptor_set_allocator_shutdown(&state->global_ds_allocator, state);
+    descriptor_set_allocator_growable_shutdown(&state->global_ds_allocator, state);
     ETINFO("Descriptor Set Allocator destroyed.");
 
-    vkDestroyDescriptorSetLayout(state->device.handle, state->gradient_descriptor_set_layout, state->allocator);
-    ETINFO("Gradient compute descriptor set layout destroyed.");
+    vkDestroyDescriptorSetLayout(state->device.handle, state->scene_data_descriptor_set_layout, state->allocator);
+    ETINFO("Scene data descriptor set layout destroyed.");
+
+    vkDestroyDescriptorSetLayout(state->device.handle, state->draw_image_descriptor_set_layout, state->allocator);
+    ETINFO("Draw Image descriptor set layout destroyed.");
+
+    vkDestroyDescriptorSetLayout(state->device.handle, state->single_image_descriptor_set_layout, state->allocator);
+    ETINFO("Single Image descriptor set layout destroyed.");
+
+    // Shutdown growable descriptor set allocators
+    for (u32 i = 0; i < state->image_count; ++i) {
+        descriptor_set_allocator_growable_destroy_pools(&state->frame_allocators[i], state);
+        descriptor_set_allocator_growable_shutdown(&state->frame_allocators[i], state);
+    }
+    etfree(state->frame_allocators, sizeof(ds_allocator_growable) * state->image_count, MEMORY_TAG_RENDERER);
+    ETINFO("Destroyed frame descriptors");
 }
 
-static void initialize_triangle_pipeline(renderer_state* state) {
-    load_shader(state, "build/assets/shaders/triangle.vert.spv", &state->triangle_vertex);
-    load_shader(state, "build/assets/shaders/triangle.frag.spv", &state->triangle_fragment);
-    ETINFO("Triangle pipeline shaders loaded.");
-
-    VkPipelineLayoutCreateInfo layout_info = init_pipeline_layout_create_info();
-    VK_CHECK(vkCreatePipelineLayout(state->device.handle, &layout_info, state->allocator, &state->triangle_pipeline_layout));
-
-    pipeline_builder builder = pipeline_builder_create();
-    builder.layout = state->triangle_pipeline_layout;
-    pipeline_builder_set_shaders(&builder,
-        state->triangle_vertex,
-        state->triangle_fragment);
-    pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
-    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-    pipeline_builder_set_multisampling_none(&builder);
-    pipeline_builder_disable_blending(&builder);
-    pipeline_builder_disable_depthtest(&builder);
-    pipeline_builder_set_color_attachment_format(&builder, state->render_image.format);
-    pipeline_builder_set_depth_attachment_format(&builder, state->depth_image.format);
-    state->triangle_pipeline = pipeline_builder_build(&builder, state);
-
-    pipeline_builder_destroy(&builder);
-
-    ETINFO("Triangle pipeline & pipeline layout created");
+static void create_scene_data_buffers(renderer_state* state) {
+    state->scene_data_buffers = etallocate(sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
+    for (u32 i = 0; i < state->image_count; ++i) {
+        buffer_create(
+            state,
+            sizeof(GPU_scene_data),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &state->scene_data_buffers[i]
+        );
+    }
 }
 
-static void shutdown_triangle_pipeline(renderer_state* state) {
-    vkDestroyPipeline(state->device.handle, state->triangle_pipeline, state->allocator);
-    vkDestroyPipelineLayout(state->device.handle, state->triangle_pipeline_layout, state->allocator);
-    ETINFO("Triangle pipeline & Triangle pipeline layout destroyed.");
-
-    unload_shader(state, &state->triangle_vertex);
-    unload_shader(state, &state->triangle_fragment);
-    ETINFO("Triangle pipeline shaders unloaded.");
+static void destroy_scene_data_buffers(renderer_state* state) {
+    for (u32 i = 0; i < state->image_count; ++i) {
+        buffer_destroy(state, &state->scene_data_buffers[i]);
+    }
+    etfree(state->scene_data_buffers, sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
 }
 
 static void initialize_mesh_pipeline(renderer_state* state) {
     load_shader(state, "build/assets/shaders/mesh.vert.spv", &state->mesh_vertex);
-    load_shader(state, "build/assets/shaders/triangle.frag.spv", &state->mesh_fragment);
+    load_shader(state, "build/assets/shaders/tex_image.frag.spv", &state->mesh_fragment);
     ETINFO("Mesh pipeline shaders loaded.");
 
     VkPushConstantRange buffer_range = {
@@ -712,12 +756,14 @@ static void initialize_mesh_pipeline(renderer_state* state) {
     VkPipelineLayoutCreateInfo pipeline_layout_info = init_pipeline_layout_create_info();
     pipeline_layout_info.pushConstantRangeCount = 1;
     pipeline_layout_info.pPushConstantRanges = &buffer_range;
-
+    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = &state->single_image_descriptor_set_layout;
     VK_CHECK(vkCreatePipelineLayout(
         state->device.handle,
         &pipeline_layout_info,
         state->allocator,
         &state->mesh_pipeline_layout));
+    
     pipeline_builder builder = pipeline_builder_create();
     builder.layout = state->mesh_pipeline_layout;
     pipeline_builder_set_shaders(&builder, state->mesh_vertex, state->mesh_fragment);
@@ -725,8 +771,8 @@ static void initialize_mesh_pipeline(renderer_state* state) {
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
     pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
     pipeline_builder_set_multisampling_none(&builder);
-    // pipeline_builder_disable_blending(&builder);
-    pipeline_builder_enable_blending_additive(&builder);
+    pipeline_builder_disable_blending(&builder);
+    // pipeline_builder_enable_blending_additive(&builder);
     // pipeline_builder_enable_blending_alphablend(&builder);
     pipeline_builder_enable_depthtest(&builder, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
     pipeline_builder_set_color_attachment_format(&builder, state->render_image.format);
@@ -748,6 +794,14 @@ static void shutdown_mesh_pipeline(renderer_state* state) {
     ETINFO("Mesh pipeline shaders unloaded.");
 }
 
+static void initialize_mesh_mat_pipeline(renderer_state* state) {
+    GLTF_MR_build_pipelines(&state->metal_rough_material, state);
+}
+
+static void shutdown_mesh_mat_pipeline(renderer_state* state) {
+    return; // Empty for now 
+}
+
 static b8 intialize_default_data(renderer_state* state) {
     vertex* vertices = etallocate(sizeof(vertex) * 4, MEMORY_TAG_RENDERER);
 
@@ -761,10 +815,14 @@ static b8 intialize_default_data(renderer_state* state) {
     vertices[2].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
     vertices[3].color = (v4s){.raw = {0.0f, 1.0f, 0.0f, 1.0f}};
 
-    // vertices[0].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
-    // vertices[1].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
-    // vertices[2].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
-    // vertices[3].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
+    vertices[0].uv_x = 1;
+    vertices[0].uv_y = 0;
+    vertices[1].uv_x = 0;
+    vertices[1].uv_y = 0;
+    vertices[2].uv_x = 1;
+    vertices[2].uv_y = 1;
+    vertices[3].uv_x = 0;
+    vertices[3].uv_y = 1;
 
     u32* indices = etallocate(sizeof(u32) * 6, MEMORY_TAG_RENDERER);
     indices[0] = 0;
@@ -779,6 +837,105 @@ static b8 intialize_default_data(renderer_state* state) {
     
     etfree(vertices, sizeof(vertex) * 4, MEMORY_TAG_RENDERER);
     etfree(indices, sizeof(u32) * 6, MEMORY_TAG_RENDERER);
+
+    // NOTE: For some reason the u32 is being interpreted as 
+    // 0xFFFFFFFF -- aabbggrr. Maybe gpu or computer specific
+    u32 white = 0xFFFFFFFF;
+    image2D_create_data(
+        state,
+        (void*)&white,
+        (VkExtent3D){.width = 1, .height = 1, .depth = 1},
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &state->white_image);
+    ETINFO("White default image created.");
+
+    u32 grey = 0xFFAAAAAA;
+    image2D_create_data(
+        state,
+        (void*)&grey,
+        (VkExtent3D){.width = 1, .height = 1, .depth = 1},
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &state->grey_image);
+    ETINFO("Grey default image created.");
+
+    u32 black = 0xFF000000;
+    image2D_create_data(
+        state,
+        (void*)&black,
+        (VkExtent3D){.width = 1, .height = 1, .depth = 1},
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &state->black_image);
+    ETINFO("Black default image created.");
+
+    u32 magenta = 0xFFFF00FF;
+    u32 pixels[16 * 16] = {0};
+    for (u32 i = 0; i < 16; ++i) {
+        for (u32 j = 0; j < 16; ++j) {
+            pixels[j * 16 + i] = ((i % 2) ^ (j % 2)) ? magenta : black;
+        }
+    }
+    image2D_create_data(
+        state,
+        (void*)&pixels[0],
+        (VkExtent3D){.width = 16, .height = 16, .depth = 1},
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &state->error_checkerboard_image);
+    ETINFO("Checkerboard default image created.");
+
+    VkSamplerCreateInfo sampler_info = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+
+    sampler_info.magFilter = VK_FILTER_NEAREST;
+    sampler_info.minFilter = VK_FILTER_NEAREST;
+    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->default_sampler_nearest);
+
+    sampler_info.magFilter = VK_FILTER_LINEAR;
+    sampler_info.minFilter = VK_FILTER_LINEAR;
+    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->default_sampler_linear);
+
+    struct material_resources mat_resources;
+    mat_resources.color_image = state->white_image;
+    mat_resources.color_sampler = state->default_sampler_linear;
+    mat_resources.metal_rough_image = state->white_image;
+    mat_resources.metal_rough_sampler = state->default_sampler_linear;
+
+    // Initialize state->metal_rough_material
+
+    descriptor_set_writer_initialize(&state->metal_rough_material.writer);
+
+    // Create material_constants uniform buffer
+    buffer_create(
+        state,
+        sizeof(struct material_constants),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &state->material_constants
+    );
+
+    struct material_constants scene_uniform_data = {
+        .color_factors = (v4s){.raw = {1.f, 1.f, 1.f, 1.f}},
+        .metal_rough_factors = (v4s){.raw = {1.f, .5f, 0.f, 0.f}},
+    };
+    struct material_constants* mapped_data;
+    vkMapMemory(state->device.handle, state->material_constants.memory, 0, sizeof(struct material_constants), 0, &mapped_data);
+    *mapped_data = scene_uniform_data;
+    vkUnmapMemory(state->device.handle, state->material_constants.memory);
+
+    mat_resources.data_buffer = state->material_constants.handle;
+    mat_resources.data_buffer_offset = 0;
+
+    state->default_data = GLTF_MR_write_material(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
 
     const char* path = "build/assets/gltf/basicmesh.glb";
     state->meshes = load_gltf_meshes(path, state);
@@ -800,6 +957,18 @@ static void shutdown_default_data(renderer_state* state) {
     dynarray_destroy(state->meshes);
     ETINFO("Test GLTF file unloaded");
 
+    buffer_destroy(state, &state->material_constants);
+
+    descriptor_set_writer_shutdown(&state->metal_rough_material.writer);
+
+    vkDestroySampler(state->device.handle, state->default_sampler_linear, state->allocator);
+    vkDestroySampler(state->device.handle, state->default_sampler_nearest, state->allocator);
+
+    image2D_destroy(state, &state->error_checkerboard_image);
+    image2D_destroy(state, &state->black_image);
+    image2D_destroy(state, &state->grey_image);
+    image2D_destroy(state, &state->white_image);
+
     buffer_destroy(state, &state->rectangle.vertex_buffer);
     buffer_destroy(state, &state->rectangle.index_buffer);
     state->rectangle.vertex_buffer_address = 0;
@@ -816,8 +985,6 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     VkRenderingInfo render_info = init_rendering_info(render_extent, &color_attachment, &depth_attachment);
 
     vkCmdBeginRendering(cmd, &render_info);
-
-    // Triangle pipeline draw
 
     // TODO: Use the render_image extent for the renderpass renderArea & scissor & viewport
     VkViewport viewport = {0};
@@ -839,19 +1006,34 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->triangle_pipeline);
-    vkCmdDraw(cmd, 3, 1, 0, 0);
-
     // Mesh pipeline draw
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline);
 
-    gpu_draw_push_constants push_constants = {
-        .world_matrix = glms_mat4_identity(),
-        .vertex_buffer = state->rectangle.vertex_buffer_address};
-    vkCmdPushConstants(cmd, state->mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants);
-    vkCmdBindIndexBuffer(cmd, state->rectangle.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+    // Descriptor set creation
+    VkDescriptorSet image_set = descriptor_set_allocator_growable_allocate(
+        &state->frame_allocators[state->current_frame],
+        state->single_image_descriptor_set_layout,
+        state);
+    ds_writer writer = descriptor_set_writer_create_initialize();
+    descriptor_set_writer_write_image(
+        &writer,
+        0,
+        state->error_checkerboard_image.view,
+        state->default_sampler_nearest,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    descriptor_set_writer_update_set(&writer, image_set, state);
+    descriptor_set_writer_shutdown(&writer);
 
-    vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline_layout, 0, 1, &image_set, 0, 0);
+
+    // gpu_draw_push_constants push_constants = {
+    //     .world_matrix = glms_mat4_identity(),
+    //     .vertex_buffer = state->rectangle.vertex_buffer_address};
+    // vkCmdPushConstants(cmd, state->mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants);
+
+    // vkCmdBindIndexBuffer(cmd, state->rectangle.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+    // vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
 
     // MVP calculation: 
     m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
@@ -867,9 +1049,46 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
         .world_matrix = vp,
         .vertex_buffer = state->meshes[2].mesh_buffers.vertex_buffer_address};
     vkCmdPushConstants(cmd, state->mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants1);
-    vkCmdBindIndexBuffer(cmd, state->meshes[2].mesh_buffers.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
 
+    vkCmdBindIndexBuffer(cmd, state->meshes[2].mesh_buffers.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
     vkCmdDrawIndexed(cmd, state->meshes[2].surfaces[0].count, 1, state->meshes[2].surfaces[0].start_index, 0, 0);
+
+    // guide 4 scene data
+    state->scene_data.proj = project;
+    state->scene_data.view = view;
+    state->scene_data.viewproj = vp;
+
+    void* mapped_scene_data;
+    vkMapMemory(
+        state->device.handle,
+        state->scene_data_buffers[state->current_frame].memory,
+        0,
+        sizeof(GPU_scene_data),
+        0,
+        &mapped_scene_data);
+
+    // Cast mapped memory to GPU_scene_data pointer to read and modify it
+    GPU_scene_data* frame_scene_data = (GPU_scene_data*)mapped_scene_data;
+    *frame_scene_data = state->scene_data;
+    vkUnmapMemory(
+        state->device.handle,
+        state->scene_data_buffers[state->current_frame].memory);
+
+    VkDescriptorSet scene_descriptor_set = descriptor_set_allocator_growable_allocate(
+        &state->frame_allocators[state->current_frame],
+        state->scene_data_descriptor_set_layout,
+        state);
+    
+    writer = descriptor_set_writer_create_initialize();
+    descriptor_set_writer_write_buffer(
+        &writer,
+        /* Binding: */ 0,
+        state->scene_data_buffers[state->current_frame].handle,
+        sizeof(GPU_scene_data),
+        /* Offset: */ 0,
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    descriptor_set_writer_update_set(&writer, scene_descriptor_set, state);
+    descriptor_set_writer_shutdown(&writer);
 
     vkCmdEndRendering(cmd);
 }
@@ -915,7 +1134,7 @@ gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indice
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &new_surface.index_buffer);
     
-    // Create staging buffer toi transfer memory from VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT to VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+    // Create staging buffer to transfer memory from VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT to VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     buffer staging;
     buffer_create(
         state,
@@ -932,41 +1151,22 @@ gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indice
 
     vkUnmapMemory(state->device.handle, staging.memory);
 
-    // Immediate Command Buffer use start
-    VK_CHECK(vkResetFences(state->device.handle, 1, &state->imm_fence));
-    VK_CHECK(vkResetCommandBuffer(state->imm_buffer, 0));
+    IMMEDIATE_SUBMIT(state, {
+        VkCommandBuffer cmd = state->imm_buffer;
+        VkBufferCopy vertex_copy = {
+            .dstOffset = 0,
+            .srcOffset = 0,
+            .size = vertex_buffer_size};
 
-    VkCommandBuffer cmd = state->imm_buffer;
+        vkCmdCopyBuffer(cmd, staging.handle, new_surface.vertex_buffer.handle, 1, &vertex_copy);
 
-    VkCommandBufferBeginInfo cmd_begin =
-        init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    
-    VK_CHECK(vkBeginCommandBuffer(cmd, &cmd_begin));
+        VkBufferCopy index_copy = {
+            .dstOffset = 0,
+            .srcOffset = vertex_buffer_size,
+            .size = index_buffer_size};
 
-    /* TODO: Use VkCopyBufferInfo2 to perform this copy */
-    VkBufferCopy vertex_copy = {
-        .dstOffset = 0,
-        .srcOffset = 0,
-        .size = vertex_buffer_size};
-
-    vkCmdCopyBuffer(cmd, staging.handle, new_surface.vertex_buffer.handle, 1, &vertex_copy);
-
-    VkBufferCopy index_copy = {
-        .dstOffset = 0,
-        .srcOffset = vertex_buffer_size,
-        .size = index_buffer_size};
-
-    vkCmdCopyBuffer(cmd, staging.handle, new_surface.index_buffer.handle, 1, &index_copy);
-
-    VK_CHECK(vkEndCommandBuffer(cmd));
-
-    VkCommandBufferSubmitInfo cmd_info = init_command_buffer_submit_info(cmd);
-    VkSubmitInfo2 submit = init_submit_info2(0, 0, 1, &cmd_info, 0, 0);
-
-    // submit command buffer to the queue and execute it.
-    VK_CHECK(vkQueueSubmit2(state->device.graphics_queue, 1, &submit, state->imm_fence));
-
-    VK_CHECK(vkWaitForFences(state->device.handle, 1, &state->imm_fence, VK_TRUE, 9999999999));
+        vkCmdCopyBuffer(cmd, staging.handle, new_surface.index_buffer.handle, 1, &index_copy);
+    });
 
     buffer_destroy(state, &staging);
 
@@ -984,6 +1184,28 @@ b8 rebuild_swapchain(renderer_state* state) {
     }
 
     return true;
+}
+
+// TODO: Determine if these should be function pointers or not
+static void immediate_begin(struct renderer_state* state) {
+    VK_CHECK(vkResetFences(state->device.handle, 1, &state->imm_fence));
+    VK_CHECK(vkResetCommandBuffer(state->imm_buffer, 0));
+
+    VkCommandBufferBeginInfo cmd_begin =
+        init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    
+    VK_CHECK(vkBeginCommandBuffer(state->imm_buffer, &cmd_begin));
+}
+
+static void immediate_end(struct renderer_state* state) {
+    VK_CHECK(vkEndCommandBuffer(state->imm_buffer));
+
+    VkCommandBufferSubmitInfo cmd_info = init_command_buffer_submit_info(state->imm_buffer);
+    VkSubmitInfo2 submit = init_submit_info2(0, 0, 1, &cmd_info, 0, 0);
+
+    VK_CHECK(vkQueueSubmit2(state->device.graphics_queue, 1, &submit, state->imm_fence));
+
+    VK_CHECK(vkWaitForFences(state->device.handle, 1, &state->imm_fence, VK_TRUE, 9999999999));
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

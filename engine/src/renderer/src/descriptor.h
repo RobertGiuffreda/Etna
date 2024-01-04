@@ -32,7 +32,7 @@ VkDescriptorSet descriptor_set_allocator_allocate(ds_allocator* allocator, VkDes
 /* NOTE: END */
 
 /* NOTE: ds_allocator_growable */
-void descriptor_set_allocator_growable_intialize(ds_allocator_growable* allocator, u32 initial_sets, pool_size_ratio* pool_sizes);
+void descriptor_set_allocator_growable_initialize(ds_allocator_growable* allocator, u32 initial_sets, pool_size_ratio* pool_sizes, renderer_state* state);
 void descriptor_set_allocator_growable_shutdown(ds_allocator_growable* allocator, renderer_state* state);
 void descriptor_set_allocator_growable_clear_pools(ds_allocator_growable* allocator, renderer_state* state);
 void descriptor_set_allocator_growable_destroy_pools(ds_allocator_growable* allocator, renderer_state* state);

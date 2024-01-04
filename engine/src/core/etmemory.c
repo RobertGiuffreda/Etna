@@ -15,20 +15,23 @@ struct memory_state {
 static struct memory_state state;
 
 static const char* memory_strings[MEMORY_TAG_MAX] = {
-    "Unknown:    ",
-    "Engine:     ",
-    "Application:",
-    "Events:     ",
-    "Input:      ",
-    "Window:     ",
-    "Renderer:   ",
-    "Shader:     ",
-    "Resource:   ",
-    "File System:",
-    "Dynarray:   ",
-    "String:     "
+    "Unknown:       ",
+    "Engine:        ",
+    "Application:   ",
+    "Events:        ",
+    "Input:         ",
+    "Window:        ",
+    "Renderer:      ",
+    "Shader:        ",
+    "Resource:      ",
+    "File System:   ",
+    "Dynarray:      ",
+    "Descriptor Dyn:",
+    "Pipeline Dyn:  ",
+    "Material Dyn:  ",
+    "String:        "
 };
-static const u32 mem_tag_str_len = 13;
+static const u32 mem_tag_str_len = 16;
 
 void print_memory_allocations(void);
 

@@ -11,6 +11,16 @@ void image2D_create(
     VkMemoryPropertyFlags memory_flags,
     image* out_image);
 
+void image2D_create_data(
+    renderer_state* state,
+    void* data,
+    VkExtent3D extent,
+    VkFormat format,
+    VkImageUsageFlagBits usage_flags,
+    VkImageAspectFlags aspect_flags,
+    VkMemoryPropertyFlags memory_flags,
+    image* out_image);
+
 void image2D_destroy(renderer_state* state, image* image);
 
 void blit_image2D_to_image2D(
@@ -20,16 +30,6 @@ void blit_image2D_to_image2D(
     VkExtent3D src_size,
     VkExtent3D dst_size,
     VkImageAspectFlags aspect_flags);
-
-/* TODO: Take data and input into the texture to use */
-// A texture is a 2D Image with some flags preset and predtermined
-void texture_create(
-    renderer_state* state,
-    VkExtent3D extent,
-    VkFormat format,
-    void* data,
-    image* out_image);
-/* TODO: END */
 
 void image_barrier(
     VkCommandBuffer cmd,

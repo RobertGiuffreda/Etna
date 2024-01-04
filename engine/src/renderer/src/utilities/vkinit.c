@@ -246,7 +246,7 @@ VkShaderModuleCreateInfo init_shader_module_create_info(void) {
     return info;
 }
 
-VkPipelineLayoutCreateInfo init_pipline_layout_create_info(void) {
+VkPipelineLayoutCreateInfo init_pipeline_layout_create_info(void) {
     VkPipelineLayoutCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = 0};
@@ -270,13 +270,6 @@ VkDescriptorPoolCreateInfo init_descriptor_pool_create_info(void) {
 VkDescriptorSetAllocateInfo init_descriptor_set_allocate_info(void) {
     VkDescriptorSetAllocateInfo info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = 0};
-    return info;
-}
-
-VkPipelineLayoutCreateInfo init_pipeline_layout_create_info(void) {
-    VkPipelineLayoutCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = 0};
     return info;
 }
@@ -342,6 +335,28 @@ VkRenderingInfo init_rendering_info(VkExtent2D render_extent, VkRenderingAttachm
     return render_info;
 }
 
+VkBufferImageCopy2 init_buffer_image_copy2(void) {
+    VkBufferImageCopy2 copy = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2,
+        .pNext = 0,
+    };
+    return copy;
+}
+
+VkCopyBufferToImageInfo2 init_copy_buffer_to_image_info2(
+    VkBuffer buffer,
+    VkImage image,
+    VkImageLayout layout)
+{
+    VkCopyBufferToImageInfo2 info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
+        .pNext = 0,
+        .srcBuffer = buffer,
+        .dstImage = image,
+        .dstImageLayout = layout,
+    };
+    return info;
+}
 // TODO: Move this to a utilities file
 /** TODO:
  * Documentation explaining what this does and how it works

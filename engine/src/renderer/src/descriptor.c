@@ -2,6 +2,8 @@
 
 #include "containers/dynarray.h"
 
+#include "core/logger.h"
+
 #include "renderer/src/utilities/vkinit.h"
 
 /* NOTE: Functions for: Descriptor Set Layout Builder */
@@ -19,7 +21,6 @@ void descriptor_set_layout_builder_destroy(dsl_builder* builder) {
     dynarray_destroy(builder->bindings);
 }
 
-// TODO: Shader stage flags as a function argument  
 void descriptor_set_layout_builder_add_binding(
     dsl_builder* builder,
     u32 binding,
@@ -127,7 +128,7 @@ void descriptor_set_writer_clear(ds_writer* writer) {
 }
 void descriptor_set_writer_update_set(ds_writer* writer, VkDescriptorSet set, renderer_state* state) {
     for (u32 i = 0; i < dynarray_length(writer->writes); ++i) {
-        writer->writes->dstSet = set;
+        writer->writes[i].dstSet = set;
     }
 
     vkUpdateDescriptorSets(state->device.handle, (u32)dynarray_length(writer->writes), writer->writes, 0, 0);
@@ -184,15 +185,23 @@ VkDescriptorSet descriptor_set_allocator_allocate(ds_allocator* allocator, VkDes
 }
 
 /* NOTE: Function for growable descriptor set allocator */
-void descriptor_set_allocator_growable_intialize(
+void descriptor_set_allocator_growable_initialize(
     ds_allocator_growable* allocator,
     u32 initial_sets,
-    pool_size_ratio* pool_sizes)
+    pool_size_ratio* pool_sizes,
+    renderer_state* state)
 {
+    // Memory init
     allocator->pool_sizes = dynarray_copy(pool_sizes);
     allocator->ready_pools = dynarray_create(0, sizeof(VkDescriptorPool));
     allocator->full_pools = dynarray_create(0, sizeof(VkDescriptorPool));
     allocator->sets_per_pool = initial_sets;
+    // Create first pool
+    VkDescriptorPool new_pool = 
+        descriptor_set_allocator_growable_create_pool(allocator, state);
+    
+    allocator->sets_per_pool *= 1.5f;
+    dynarray_push((void**)&allocator->ready_pools, &new_pool);
 }
 
 void descriptor_set_allocator_growable_shutdown(
@@ -298,7 +307,7 @@ VkDescriptorPool descriptor_set_allocator_growable_create_pool(
             .type = allocator->pool_sizes[i].type,
             .descriptorCount = allocator->pool_sizes[i].ratio * allocator->sets_per_pool
         };
-        dynarray_push((void**)&allocator->pool_sizes, &new_size);
+        dynarray_push((void**)&sizes, &new_size);
     }
     
     VkDescriptorPoolCreateInfo pool_info = init_descriptor_pool_create_info();

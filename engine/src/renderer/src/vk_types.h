@@ -5,8 +5,6 @@
 
 #include "math/math_types.h"
 
-#include "loaders/loader_types.h"
-
 #include <vulkan/vulkan.h>
 
 // TODO: This file should be split into an actual vk_types.h file and a
@@ -14,7 +12,6 @@
 // rendererAPI.h file. 
 
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
-
 
 /* NOTE: Descriptor Set Abstraction structs */
 // TODO: Move these structs back to their respective header files
@@ -70,6 +67,7 @@ typedef struct image {
 typedef struct buffer {
     VkBuffer handle;
     VkDeviceMemory memory;
+    u64 size;
 } buffer;
 // TEMP: END
 
@@ -98,11 +96,82 @@ typedef struct mesh_asset {
     gpu_mesh_buffers mesh_buffers;
 } mesh_asset;
 
-/** Information needed for each binding:
- * Requisite information for:
- * VkPipelineVertexInputStateCreateInfo
- * TODO: VkPipelineTessellationStateCreateInfo
- */
+typedef struct GPU_scene_data {
+    m4s view;
+    m4s proj;
+    m4s viewproj;
+    v4s ambient_color;
+    v4s sunlight_direction; // w for sun power
+    v4s sunlight_color;
+    v4s padding;            // 256 byte minimum on my GPU
+} GPU_scene_data;
+
+// TODO:TEMP: Hacky c code mimicking C++ OOP from vkguide.dev. 
+// This is until something more scalable or better for c is 
+// ironed out. 
+struct draw_context;
+
+typedef enum material_pass {
+    MATERIAL_PASS_MAIN_COLOR,
+    MATERIAL_PASS_TRANSPARENT,
+    MATERIAL_PASS_OTHER
+} material_pass;
+
+typedef struct material_pipeline {
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+} material_pipeline;
+
+typedef struct material_instance {
+    material_pipeline* pipeline;
+    VkDescriptorSet material_set;
+    material_pass pass_type;
+} material_instance;
+
+typedef struct render_object {
+    u32 index_count;
+    u32 first_index;
+    VkBuffer index_buffer;
+
+    material_instance* material;
+
+    m4s transform;
+    VkDeviceAddress vertex_buffer_address;
+} render_object;
+
+typedef struct renderable {
+    void* self;
+    void (*draw)(void* self, m4s* top_matrix, struct draw_context* ctx);
+} renderable;
+
+typedef struct GLTFMetallic_Roughness {
+    material_pipeline opaque_pipeline;
+    material_pipeline transparent_pipeline;
+
+    VkDescriptorSetLayout material_layout;
+
+    struct material_constants {
+        v4s color_factors;
+        v4s metal_rough_factors;
+        v4s padding[14];
+    };
+
+    struct material_resources {
+        image color_image;
+        VkSampler color_sampler;
+
+        image metal_rough_image;
+        VkSampler metal_rough_sampler;
+
+        VkBuffer data_buffer;
+        u32 data_buffer_offset;
+    };
+
+    ds_writer writer;
+} GLTF_MR;
+
+// TODO:TEMP: END
+
 typedef struct binding {
     u32 binding;
     VkDescriptorType descriptor_type;
@@ -241,7 +310,7 @@ typedef struct renderer_state {
     VkCommandPool* graphics_pools;
     VkCommandBuffer* main_graphics_command_buffers;
 
-    ds_allocator_growable* set_allocators;
+    ds_allocator_growable* frame_allocators;
     // NOTE: Per frame END
 
     // Immediate command pool & buffer
@@ -251,24 +320,18 @@ typedef struct renderer_state {
     VkCommandBuffer imm_buffer;
     VkFence imm_fence;
 
+    void (*immediate_begin)(struct renderer_state* state);
+    void (*immediate_end)(struct renderer_state* state);
+
     // Global descriptor set allocator
-    ds_allocator global_ds_allocator;
+    ds_allocator_growable global_ds_allocator;
 
     shader gradient_shader;
     compute_effect gradient_effect;
 
-    // TEMP: Shared compute effect descriptor set layout
-    VkDescriptorSetLayout gradient_descriptor_set_layout;
-    VkDescriptorSet gradient_descriptor_set;
-    // TEMP: END; Called gradient for now
-
-    // NOTE: This is test_ as graphics pipelines will be eventually
-    // be encapsulated via materials and that via meshes. 
-    shader triangle_vertex;
-    shader triangle_fragment;
-
-    VkPipeline triangle_pipeline;
-    VkPipelineLayout triangle_pipeline_layout;
+    VkDescriptorSet draw_image_descriptor_set;
+    VkDescriptorSetLayout draw_image_descriptor_set_layout;
+    VkDescriptorSetLayout single_image_descriptor_set_layout;
 
     // Testing loading data to vertex & index buffer as well as buffer references
     shader mesh_vertex;
@@ -277,12 +340,50 @@ typedef struct renderer_state {
     VkPipeline mesh_pipeline;
     VkPipelineLayout mesh_pipeline_layout;
 
-    gpu_mesh_buffers rectangle;
-
     // TEMP: Until loading a scene instead of meshes
     mesh_asset* meshes;
+    // TEMP: END
+
+    // TEMP: Section 4 of guide
+    // Default images/textures to use
+    image white_image;
+    image black_image;
+    image grey_image;
+    image error_checkerboard_image;
+
+    VkSampler default_sampler_linear;
+    VkSampler default_sampler_nearest;
+    
+    material_instance default_data;
+    GLTF_MR metal_rough_material;
+    buffer material_constants;
+
+    // Scene data
+    GPU_scene_data scene_data;
+    VkDescriptorSetLayout scene_data_descriptor_set_layout;
+    
+    // Buffers for each frame to store scene data
+    buffer* scene_data_buffers;
+    // TEMP: END
+
+    gpu_mesh_buffers rectangle;
 } renderer_state;
 
+#define IMM_CMD_BUFFER(state) state->imm_buffer
+
+/** 
+ * Hacky macro for encapsulating code, ... portion, inside the 
+ * vulkan start and end function for the command buffer designated for 
+ * immediate submissions
+ */
+#define IMMEDIATE_SUBMIT(state, ...)          \
+do {                                            \
+    state->immediate_begin(state);              \
+    do {                                        \
+        __VA_ARGS__;                            \
+    } while (0);                                \
+    state->immediate_end(state);                \
+} while(0);                                     \
 
 #ifdef _DEBUG
 // TODO: Move definition to a utility function file

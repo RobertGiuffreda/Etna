@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "core/etmemory.h"
 
 #define DYNARRAY_DEFAULT_CAPACITY 1
 
@@ -25,6 +26,8 @@ If this becomes an issue: Create implementation of something like a shared point
  */
 void* dynarray_create(u64 capacity, u64 stride);
 
+void* dynarray_create_tagged(u64 capacity, u64 stride, memory_tag tag);
+
 /**
  * @brief Create a new dynamic array from an existing source of data.
  * 
@@ -35,6 +38,8 @@ void* dynarray_create(u64 capacity, u64 stride);
  * @return void* 
  */
 void* dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* data);
+
+void* dynarray_create_data_tagged(u64 capacity, u64 stride, u64 length, memory_tag tag, const void* data);
 
 /**
  * @brief Creates a deep copy of a dynarray. This function allocates memory
@@ -65,7 +70,7 @@ b8 dynarray_is_empty(void* array);
  * Used for dynarray_push & dynarray_pop.
  * 
  * @param array The dynamic array for the function to operate on
- * @return void
+ * @return u64
  */
 u64 dynarray_length(void* array);
 

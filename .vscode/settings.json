@@ -128,6 +128,7 @@
         "xmemory": "c",
         "common.h": "c",
         "chrono": "c",
-        "regex": "c"
+        "regex": "c",
+        "type_traits": "c"
     }
 }

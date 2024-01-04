@@ -100,6 +100,13 @@ VkRenderingAttachmentInfo init_depth_attachment_info(VkImageView view, VkImageLa
 
 VkRenderingInfo init_rendering_info(VkExtent2D render_extent, VkRenderingAttachmentInfo* color_attachment, VkRenderingAttachmentInfo* depthAttachment);
 
+VkBufferImageCopy2 init_buffer_image_copy2(void);
+
+VkCopyBufferToImageInfo2 init_copy_buffer_to_image_info2(
+    VkBuffer buffer,
+    VkImage image,
+    VkImageLayout layout);
+
 i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
     u32 memory_type_bits_requirement, VkMemoryPropertyFlags required_properties);
 
@@ -107,3 +114,5 @@ gpu_mesh_buffers upload_mesh(
     renderer_state* state,
     u32 index_count, u32* indices, 
     u32 vertex_count, vertex* vertices);
+
+// TODO: Add immediate submit and begin into this class as well as macros

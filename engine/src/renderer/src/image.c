@@ -1,6 +1,10 @@
 #include "image.h"
 
+#include "core/etmemory.h"
+
 #include "renderer/src/utilities/vkinit.h"
+
+#include "renderer/src/buffer.h"
 
 #include "core/logger.h"
 
@@ -46,6 +50,89 @@ void image2D_create(
     out_image->extent = extent;
     out_image->format = format;
     out_image->aspects = aspect_flags;
+}
+
+void image2D_create_data(
+    renderer_state* state,
+    void* data,
+    VkExtent3D extent,
+    VkFormat format,
+    VkImageUsageFlagBits usage_flags,
+    VkImageAspectFlags aspect_flags,
+    VkMemoryPropertyFlags memory_flags,
+    image* out_image)
+{
+    // Create staging buffer and upload data to it
+    u64 data_size = extent.width * extent.height * extent.depth * 4;
+    buffer staging = {0};
+    buffer_create(
+        state,
+        data_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &staging);
+    void* mapped_memory;
+    vkMapMemory(
+        state->device.handle,
+        staging.memory,
+        0,
+        data_size,
+        0,
+        &mapped_memory);
+    etcopy_memory(mapped_memory, data, data_size);
+    vkUnmapMemory(state->device.handle, staging.memory);
+
+    // Create image to upload data to
+    image2D_create(
+        state,
+        extent,
+        format,
+        usage_flags | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+        aspect_flags,
+        memory_flags,
+        out_image);
+    
+    IMMEDIATE_SUBMIT(state, {
+        VkCommandBuffer cmd = state->imm_buffer;
+
+        // Transition image to optimal transfer destination layout
+        image_barrier(cmd, out_image->handle, out_image->aspects,
+            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_ACCESS_2_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT
+        );
+
+        VkBufferImageCopy2 cpy = init_buffer_image_copy2();
+        cpy.bufferOffset = 0;
+        cpy.bufferRowLength = 0;
+        cpy.bufferImageHeight = 0;
+
+        cpy.imageSubresource.aspectMask = out_image->aspects;
+        cpy.imageSubresource.mipLevel = 0;
+        cpy.imageSubresource.baseArrayLayer = 0;
+        cpy.imageSubresource.layerCount = 1;
+        cpy.imageOffset.x = 0;
+        cpy.imageOffset.y = 0;
+        cpy.imageOffset.z = 0;
+        cpy.imageExtent = extent;
+
+        VkCopyBufferToImageInfo2 copy_info = init_copy_buffer_to_image_info2(
+            staging.handle,
+            out_image->handle,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        copy_info.regionCount = 1;
+        copy_info.pRegions = &cpy;
+
+        vkCmdCopyBufferToImage2(cmd, &copy_info);
+
+        // Transition image to shader readonly optimal for now
+        image_barrier(cmd, out_image->handle, out_image->aspects,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT
+        );
+    });
+    buffer_destroy(state, &staging);
 }
 
 void image2D_destroy(renderer_state* state, image* image) {
