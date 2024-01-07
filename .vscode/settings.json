@@ -129,6 +129,7 @@
         "common.h": "c",
         "chrono": "c",
         "regex": "c",
-        "type_traits": "c"
+        "type_traits": "c",
+        "renderables.h": "c"
     }
 }

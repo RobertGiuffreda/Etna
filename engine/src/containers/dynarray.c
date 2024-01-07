@@ -101,6 +101,8 @@ void dynarray_resize(void** array_ptr, u64 length)
     if (length > header->capacity)  {
         header = _dynarray_resize(header, length);
         header->length = header->capacity;
+    } else if (length < header->length) {
+        header->length = length;
     }
     *array_ptr = (void*)(header + 1);
 }
@@ -216,7 +218,7 @@ static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity)
         header_size + header->capacity * header->stride
     );
 
-    // Set new array length as the old one was copied from
+    // Set new array capacity as the old one was copied from
     // the previous array header
     resized_array->capacity = capacity;
 

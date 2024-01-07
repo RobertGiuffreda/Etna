@@ -84,18 +84,6 @@ typedef struct gpu_draw_push_constants {
 } gpu_draw_push_constants;
 // NOTE: END
 
-typedef struct geo_surface {
-    u32 start_index;
-    u32 count;
-} geo_surface;
-
-typedef struct mesh_asset {
-    const char* name;
-
-    geo_surface* surfaces;
-    gpu_mesh_buffers mesh_buffers;
-} mesh_asset;
-
 typedef struct GPU_scene_data {
     m4s view;
     m4s proj;
@@ -109,8 +97,6 @@ typedef struct GPU_scene_data {
 // TODO:TEMP: Hacky c code mimicking C++ OOP from vkguide.dev. 
 // This is until something more scalable or better for c is 
 // ironed out. 
-struct draw_context;
-
 typedef enum material_pass {
     MATERIAL_PASS_MAIN_COLOR,
     MATERIAL_PASS_TRANSPARENT,
@@ -128,6 +114,26 @@ typedef struct material_instance {
     material_pass pass_type;
 } material_instance;
 
+typedef struct GLTF_material {
+    material_instance data;
+} GLTF_material;
+
+typedef struct geo_surface {
+    u32 start_index;
+    u32 count;
+
+    // Not responsible for freeing
+    GLTF_material* material;
+} geo_surface;
+
+typedef struct mesh_asset {
+    const char* name;
+
+    // Dynarray
+    geo_surface* surfaces;
+    gpu_mesh_buffers mesh_buffers;
+} mesh_asset;
+
 typedef struct render_object {
     u32 index_count;
     u32 first_index;
@@ -139,10 +145,51 @@ typedef struct render_object {
     VkDeviceAddress vertex_buffer_address;
 } render_object;
 
+typedef struct draw_context {
+    // Dynarray
+    render_object* opaque_surfaces;
+} draw_context;
+
+// TODO: Should not be visible
+typedef struct renderable_virtual_table {
+    void (*draw)(void* self, const m4s top_matrix, draw_context* ctx);
+    void (*destroy)(void* self);
+} renderable_vt;
+
+// TODO: This should be opaque type
 typedef struct renderable {
     void* self;
-    void (*draw)(void* self, m4s* top_matrix, struct draw_context* ctx);
+    renderable_vt* vt;
 } renderable;
+
+// TODO: Should not be visible
+typedef struct node_virtual_table {
+    void (*draw)(void* self, const m4s top_matrix, draw_context* ctx);
+    void (*destroy)(void* self);
+} node_vt;
+
+typedef struct node {
+    // Extends renderable
+    renderable renderable;
+
+    // Polymorphism data
+    void* self;
+    node_vt* vt;
+
+    // Actual struct node data
+    struct node* parent;
+    struct node** children;
+    m4s local_transform;
+    m4s world_transform;
+} node;
+
+typedef struct mesh_node {
+    // Extends node
+    struct node base;
+
+    // Pointer as mesh can be shared between multiple nodes
+    mesh_asset* mesh;
+} mesh_node;
 
 typedef struct GLTFMetallic_Roughness {
     material_pipeline opaque_pipeline;
@@ -354,14 +401,19 @@ typedef struct renderer_state {
     VkSampler default_sampler_linear;
     VkSampler default_sampler_nearest;
     
-    material_instance default_data;
     GLTF_MR metal_rough_material;
     buffer material_constants;
 
     // Scene data
+    draw_context main_draw_context;
     GPU_scene_data scene_data;
+    material_instance default_data;
+
+    // TODO: Make this a hash_map. For now, just an array of pointers
+    node** loaded_nodes;
+
     VkDescriptorSetLayout scene_data_descriptor_set_layout;
-    
+
     // Buffers for each frame to store scene data
     buffer* scene_data_buffers;
     // TEMP: END

@@ -22,6 +22,10 @@
 
 #include "loaders/gltfloader.h"
 
+// TEMP: Testing renderables
+#include "renderer/src/renderables.h"
+// TEMP: END
+
 // TEMP: Until a math library is situated
 #include <math.h>
 // TEMP: END
@@ -358,10 +362,36 @@ void renderer_shutdown(renderer_state* state) {
 }
 
 void renderer_update_scene(renderer_state* state) {
+    dynarray_clear(state->main_draw_context.opaque_surfaces);
 
+    node_draw(state->loaded_nodes[2], glms_mat4_identity(), &state->main_draw_context);
+    // ETINFO("state->meshes[%lu]: name %s", 2, state->meshes[2].name);
+
+    m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
+
+    // TODO: Figure out projection matrix mess ups & confusion
+    m4s project = glms_perspective(glm_rad(70.f), ((f32)state->window_extent.width/(f32)state->window_extent.height), 10000.f, 0.1f);
+    // m4s project = glms_perspective(glm_rad(70.f), ((f32)render_extent.width/(f32)render_extent.height), 10000.f, 0.1f);
+    project.raw[1][1] *= -1;
+
+    m4s vp = glms_mat4_mul(project, view);
+
+    state->scene_data.proj = project;
+    state->scene_data.view = view;
+    state->scene_data.viewproj = vp;
+
+    v4s a_color = { .raw = {.1f, .1f, .1f, .1f}};
+    v4s s_color = { .raw = {1.f, 1.f, 1.f, 1.f}};
+    v4s sl_dir = { .raw = {0, 1.f, .5f, 1.f}};
+    
+    state->scene_data.ambient_color = a_color;
+    state->scene_data.sunlight_color = s_color;
+    state->scene_data.sunlight_direction = sl_dir;
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
+    renderer_update_scene(state);
+
     // Wait for the current frame to end rendering by waiting on its render fence
     // Reset the render fence for reuse
     VK_CHECK(vkWaitForFences(
@@ -910,8 +940,7 @@ static b8 intialize_default_data(renderer_state* state) {
     mat_resources.metal_rough_image = state->white_image;
     mat_resources.metal_rough_sampler = state->default_sampler_linear;
 
-    // Initialize state->metal_rough_material
-
+    // Initialize state->metal_rough_material.writer
     descriptor_set_writer_initialize(&state->metal_rough_material.writer);
 
     // Create material_constants uniform buffer
@@ -944,10 +973,34 @@ static b8 intialize_default_data(renderer_state* state) {
         return false;
     }
 
+    state->main_draw_context.opaque_surfaces = dynarray_create(0, sizeof(render_object));
+    state->loaded_nodes = dynarray_create(0, sizeof(node*));
+    for (u32 i = 0; i < dynarray_length(state->meshes); ++i) {
+        mesh_asset* m = &state->meshes[i];
+
+        mesh_node* new_node = mesh_node_create();
+        new_node->mesh = m;
+        new_node->base.local_transform = glms_mat4_identity();
+        new_node->base.world_transform = glms_mat4_identity();
+
+        for (u32 j = 0; j < dynarray_length(new_node->mesh->surfaces); j++) {
+            geo_surface* s = &new_node->mesh->surfaces[j];
+            s->material = (GLTF_material*)&state->default_data;
+        }
+        node* node = node_from_mesh_node(new_node);
+        dynarray_push((void**)&state->loaded_nodes, &node);
+    }
+
     return true;
 }
 
 static void shutdown_default_data(renderer_state* state) {
+    for (u32 i = 0; i < dynarray_length(state->loaded_nodes); ++i) {
+        node_destroy(state->loaded_nodes[i]);
+    }
+    dynarray_destroy(state->loaded_nodes);
+    dynarray_destroy(state->main_draw_context.opaque_surfaces);
+
     for (u32 i = 0; i < dynarray_length(state->meshes); ++i) {
         buffer_destroy(state, &state->meshes[i].mesh_buffers.vertex_buffer);
         buffer_destroy(state, &state->meshes[i].mesh_buffers.index_buffer);
@@ -1054,10 +1107,6 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     vkCmdDrawIndexed(cmd, state->meshes[2].surfaces[0].count, 1, state->meshes[2].surfaces[0].start_index, 0, 0);
 
     // guide 4 scene data
-    state->scene_data.proj = project;
-    state->scene_data.view = view;
-    state->scene_data.viewproj = vp;
-
     void* mapped_scene_data;
     vkMapMemory(
         state->device.handle,
@@ -1089,6 +1138,8 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     descriptor_set_writer_update_set(&writer, scene_descriptor_set, state);
     descriptor_set_writer_shutdown(&writer);
+
+    // TODO: Record draw commands for render objects here
 
     vkCmdEndRendering(cmd);
 }

@@ -29,8 +29,6 @@ mesh_asset* load_gltf_meshes(const char* path, renderer_state* state) {
 
     mesh_asset* meshes = dynarray_create(data->meshes_count, sizeof(mesh_asset));
 
-    ETINFO("Mesh count: %lu", data->meshes_count);
-
     // Use the same vectors for all meshes so that the memory doesnt 
     // reallocate as often
     vertex* vertices = dynarray_create(1, sizeof(vertex));
@@ -40,6 +38,9 @@ mesh_asset* load_gltf_meshes(const char* path, renderer_state* state) {
         cgltf_mesh* mesh = &data->meshes[i];
         
         mesh_asset new_mesh;
+
+        // TODO: copy the string the cgltf_mesh is destroyed, leaving garbage in place;
+        ETINFO("Mesh name %s", mesh->name);
         new_mesh.name = mesh->name;
         new_mesh.surfaces = dynarray_create(mesh->primitives_count, sizeof(geo_surface));
 
