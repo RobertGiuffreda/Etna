@@ -440,7 +440,7 @@ do {                                            \
 #ifdef _DEBUG
 // TODO: Move definition to a utility function file
 b8 renderer_set_debug_object_name(renderer_state* state, VkObjectType object_type, u64 object_handle, const char* object_name);
-#define SET_DEBUG_NAME(render_state, object_type, object_handle, object_name) renderer_set_debug_object_name(render_state, object_type, (u64)object_handle, object_name)
+#define SET_DEBUG_NAME(render_state, object_type, object_handle, object_name) renderer_set_debug_object_name(render_state, object_type, (u64)(object_handle), object_name)
 #elif 
 #define SET_DEBUG_NAME()
 #endif

@@ -311,6 +311,8 @@ void renderer_shutdown(renderer_state* state) {
 
     shutdown_default_data(state);
 
+    shutdown_mesh_mat_pipeline(state);
+
     shutdown_mesh_pipeline(state);
 
     // TEMP: Until post processing effect structure/system is created/becomes more robust. 
@@ -829,7 +831,7 @@ static void initialize_mesh_mat_pipeline(renderer_state* state) {
 }
 
 static void shutdown_mesh_mat_pipeline(renderer_state* state) {
-    return; // Empty for now 
+    GLTF_MR_destroy_pipelines(&state->metal_rough_material, state);
 }
 
 static b8 intialize_default_data(renderer_state* state) {
@@ -995,12 +997,15 @@ static b8 intialize_default_data(renderer_state* state) {
 }
 
 static void shutdown_default_data(renderer_state* state) {
+    // TODO: Place destruction of created node graph into own file.
+    // node_recurse_destroy function perhaps
     for (u32 i = 0; i < dynarray_length(state->loaded_nodes); ++i) {
         node_destroy(state->loaded_nodes[i]);
     }
     dynarray_destroy(state->loaded_nodes);
     dynarray_destroy(state->main_draw_context.opaque_surfaces);
 
+    // TODO: Place destruction of loaded meshes into a function somewhere
     for (u32 i = 0; i < dynarray_length(state->meshes); ++i) {
         buffer_destroy(state, &state->meshes[i].mesh_buffers.vertex_buffer);
         buffer_destroy(state, &state->meshes[i].mesh_buffers.index_buffer);
@@ -1059,26 +1064,26 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    // Mesh pipeline draw
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline);
+    // // Mesh pipeline draw
+    // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline);
 
-    // Descriptor set creation
-    VkDescriptorSet image_set = descriptor_set_allocator_growable_allocate(
-        &state->frame_allocators[state->current_frame],
-        state->single_image_descriptor_set_layout,
-        state);
-    ds_writer writer = descriptor_set_writer_create_initialize();
-    descriptor_set_writer_write_image(
-        &writer,
-        0,
-        state->error_checkerboard_image.view,
-        state->default_sampler_nearest,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    descriptor_set_writer_update_set(&writer, image_set, state);
-    descriptor_set_writer_shutdown(&writer);
+    // // Descriptor set creation
+    // VkDescriptorSet image_set = descriptor_set_allocator_growable_allocate(
+    //     &state->frame_allocators[state->current_frame],
+    //     state->single_image_descriptor_set_layout,
+    //     state);
+    // ds_writer writer = descriptor_set_writer_create_initialize();
+    // descriptor_set_writer_write_image(
+    //     &writer,
+    //     /* Binding: */ 0,
+    //     state->error_checkerboard_image.view,
+    //     state->default_sampler_nearest,
+    //     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    // descriptor_set_writer_update_set(&writer, image_set, state);
+    // descriptor_set_writer_shutdown(&writer);
 
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline_layout, 0, 1, &image_set, 0, 0);
+    // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline_layout, 0, 1, &image_set, 0, 0);
 
     // gpu_draw_push_constants push_constants = {
     //     .world_matrix = glms_mat4_identity(),
@@ -1089,31 +1094,32 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     // vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
 
     // MVP calculation: 
-    m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
+    // m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
 
-    // TODO: Figure out projection matrix mess ups & confusion
-    m4s project = glms_perspective(glm_rad(70.f), ((f32)state->window_extent.width/(f32)state->window_extent.height), 10000.f, 0.1f);
-    // m4s project = glms_perspective(glm_rad(70.f), ((f32)render_extent.width/(f32)render_extent.height), 10000.f, 0.1f);
-    project.raw[1][1] *= -1;
+    // // TODO: Figure out projection matrix mess ups & confusion
+    // m4s project = glms_perspective(glm_rad(70.f), ((f32)state->window_extent.width/(f32)state->window_extent.height), 10000.f, 0.1f);
+    // // m4s project = glms_perspective(glm_rad(70.f), ((f32)render_extent.width/(f32)render_extent.height), 10000.f, 0.1f);
+    // project.raw[1][1] *= -1;
 
-    m4s vp = glms_mat4_mul(project, view);
+    // m4s vp = glms_mat4_mul(project, view);
 
-    gpu_draw_push_constants push_constants1 = {
-        .world_matrix = vp,
-        .vertex_buffer = state->meshes[2].mesh_buffers.vertex_buffer_address};
-    vkCmdPushConstants(cmd, state->mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants1);
+    // gpu_draw_push_constants push_constants1 = {
+    //     .world_matrix = vp,
+    //     .vertex_buffer = state->meshes[2].mesh_buffers.vertex_buffer_address};
+    // vkCmdPushConstants(cmd, state->mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants1);
 
-    vkCmdBindIndexBuffer(cmd, state->meshes[2].mesh_buffers.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(cmd, state->meshes[2].surfaces[0].count, 1, state->meshes[2].surfaces[0].start_index, 0, 0);
+    // vkCmdBindIndexBuffer(cmd, state->meshes[2].mesh_buffers.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+    // vkCmdDrawIndexed(cmd, state->meshes[2].surfaces[0].count, 1, state->meshes[2].surfaces[0].start_index, 0, 0);
+
 
     // guide 4 scene data
     void* mapped_scene_data;
     vkMapMemory(
         state->device.handle,
         state->scene_data_buffers[state->current_frame].memory,
-        0,
+        /* Offset: */ 0,
         sizeof(GPU_scene_data),
-        0,
+        /* Flags: */ 0,
         &mapped_scene_data);
 
     // Cast mapped memory to GPU_scene_data pointer to read and modify it
@@ -1128,7 +1134,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
         state->scene_data_descriptor_set_layout,
         state);
     
-    writer = descriptor_set_writer_create_initialize();
+    ds_writer writer = descriptor_set_writer_create_initialize();
     descriptor_set_writer_write_buffer(
         &writer,
         /* Binding: */ 0,
@@ -1140,6 +1146,38 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     descriptor_set_writer_shutdown(&writer);
 
     // TODO: Record draw commands for render objects here
+    for (u32 i = 0; i < dynarray_length(state->main_draw_context.opaque_surfaces); ++i) {
+        render_object* draw = &state->main_draw_context.opaque_surfaces[i];
+
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->material->pipeline->pipeline);
+        // Scene data/Global data descriptor set binding
+        vkCmdBindDescriptorSets(cmd,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            draw->material->pipeline->layout, 
+            /* First Set: */ 0,
+            /* Descriptor Set Count: */ 1,
+            &scene_descriptor_set,
+            /* Dynamic offset count: */ 0,
+            /* Dynamic offsets: */ 0);
+        // Material descriptor set binding
+        vkCmdBindDescriptorSets(cmd,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            draw->material->pipeline->layout, 
+            /* First Set: */ 1,
+            /* Descriptor Set Count: */ 1,
+            &draw->material->material_set,
+            /* Dynamic offset count: */ 0,
+            /* Dynamic offsets: */ 0);
+        
+        vkCmdBindIndexBuffer(cmd, draw->index_buffer, 0, VK_INDEX_TYPE_UINT32);
+
+        gpu_draw_push_constants push_constants = {
+            .vertex_buffer = draw->vertex_buffer_address,
+            .world_matrix = draw->transform};
+        vkCmdPushConstants(cmd, draw->material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants);
+
+        vkCmdDrawIndexed(cmd, draw->index_count, 1, draw->first_index, 0, 0);
+    }
 
     vkCmdEndRendering(cmd);
 }

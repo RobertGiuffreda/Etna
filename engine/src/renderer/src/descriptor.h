@@ -2,6 +2,9 @@
 
 #include "renderer/src/vk_types.h"
 
+// Add option to set the name of the allocated descriptor sets
+// and the built descriptor set layouts with debug name extension
+
 /* NOTE: dsl_builder functions */
 dsl_builder descriptor_set_layout_builder_create(void);
 void descriptor_set_layout_builder_clear(dsl_builder* builder);

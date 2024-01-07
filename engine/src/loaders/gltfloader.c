@@ -157,11 +157,14 @@ mesh_asset* load_gltf_meshes(const char* path, renderer_state* state) {
             // Push the new surface into the mesh asset dynarray of surfaces
             dynarray_push((void**)&new_mesh.surfaces, &new_surface);
         }
-        for (u32 i = 0; i < dynarray_length(vertices); ++i) {
-            vertices[i].color.r = vertices[i].normal.r;
-            vertices[i].color.g = vertices[i].normal.g;
-            vertices[i].color.b = vertices[i].normal.b;
-        } 
+        bool override_colors = false;
+        if (override_colors) {
+            for (u32 i = 0; i < dynarray_length(vertices); ++i) {
+                vertices[i].color.r = vertices[i].normal.r;
+                vertices[i].color.g = vertices[i].normal.g;
+                vertices[i].color.b = vertices[i].normal.b;
+            }
+        }
         // Upload mesh data to the GPU
         new_mesh.mesh_buffers = upload_mesh(state,
             dynarray_length(indices), indices,

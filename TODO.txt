@@ -10,19 +10,13 @@ TODO: If we change the resolution of the render_image we need to update the desc
 TODO: Descriptor sets still reference old render image. So they need to be updated
 
 ---------------------More Immediate---------------------
-TODO: Follow vkguide.dev until rendering structure is in place then change to suit c specific code 
-
-TODO: Renderable interface struct
-
-TODO: Build out materials and renderable framework:
-
 TODO: Implement scene graph rendering
 
 TODO: RendererAPI:
-    TODO: Create default scene & load that by default are in engine settings
-    TODO: Refactor TODO:'s listed in vk_types.h and renderer.h
-    TODO: Functions to expose loading & models & scenes
-    TODO: Functions to expose loading shaders & making materials from them
+      TODO: Create default scene & load that by default are in engine settings
+      TODO: Refactor TODO:'s listed in vk_types.h and renderer.h
+      TODO: Functions to expose loading & models & scenes
+      TODO: Functions to expose loading shaders & making materials from them
     
 GOAL: Nothing hardcoded in renderer. Systems supply renderables, Application code supplies what to load into systems.
 
@@ -55,6 +49,8 @@ NOTE: Not Renderer specific:
     TODO: Handle minimizing
     
     TODO: Logger outputs to log file.
+
+    TODO: Logger uses etstring abstractions (just wrappers for now)
 
     TODO: FIFO Struct to place events into
     TODO: Setup event overwritting or adding based on behavior of event. When event is fired,

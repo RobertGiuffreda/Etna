@@ -96,7 +96,14 @@ void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
     unload_shader(state, &mesh_frag_shader);
 }
 
-void GLTF_MR_clear_resources(GLTF_MR* mat, renderer_state* state) {}
+void GLTF_MR_destroy_pipelines(GLTF_MR* mat, renderer_state* state) {
+    // NOTE: GLTF_MR opaque pipeline and transparent pipeline have the 
+    // same layout so only one vkDestroyPipelineLayout call is used
+    vkDestroyPipeline(state->device.handle, mat->transparent_pipeline.pipeline, state->allocator);
+    vkDestroyPipeline(state->device.handle, mat->opaque_pipeline.pipeline, state->allocator);
+    vkDestroyPipelineLayout(state->device.handle, mat->opaque_pipeline.layout, state->allocator);
+    vkDestroyDescriptorSetLayout(state->device.handle, mat->material_layout, state->allocator);
+}
 
 material_instance GLTF_MR_write_material(
     GLTF_MR* mat,
