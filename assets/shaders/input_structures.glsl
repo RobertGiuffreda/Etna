@@ -1,3 +1,5 @@
+// Essentially the current defined Principled BSDF. 
+// Currently shaders must conform to these data names
 layout(set = 0, binding = 0) uniform scene_data_head {
     mat4 view;
 	mat4 proj;

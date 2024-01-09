@@ -38,6 +38,25 @@ void renderable_draw(renderable* renderable, const m4s top_matrix, draw_context*
 }
 
 // Node functions:
+void node_create(node* out_node) {
+    renderable_vt* r_vt = (renderable_vt*)etallocate(sizeof(renderable_vt), MEMORY_TAG_RENDERABLE);
+    r_vt->draw = _node_draw_vt;
+    r_vt->destroy = _node_destroy_vt;
+
+    node_vt* n_vt = (node_vt*)etallocate(sizeof(node_vt), MEMORY_TAG_RENDERABLE);
+    n_vt->draw = _node_draw_vt;
+    n_vt->destroy = _node_destroy_vt;
+
+    node new_node = {
+        .renderable = { .vt = r_vt },
+        .vt = n_vt,
+        .children = dynarray_create(0, sizeof(struct node*))};
+    *out_node = new_node;
+
+    out_node->self = out_node;
+    out_node->renderable.self = out_node;
+}
+
 void node_destroy(node* node) {
     node->vt->destroy(node->self);
 }
@@ -70,10 +89,7 @@ static inline void _node_draw(node* node, const m4s top_matrix, draw_context* ct
 }
 
 // Mesh node functions:
-mesh_node* mesh_node_create(void) {
-    // Allocate memory to be returned
-    mesh_node* node = (mesh_node*)etallocate(sizeof(mesh_node), MEMORY_TAG_RENDERABLE);
-
+void mesh_node_create(mesh_node* out_node) {
     // Set up virtual tables
     renderable_vt* r_vt = (renderable_vt*)etallocate(sizeof(renderable_vt), MEMORY_TAG_RENDERABLE);
     r_vt->draw = _mesh_node_draw_vt;
@@ -92,11 +108,10 @@ mesh_node* mesh_node_create(void) {
             .children = dynarray_create(0, sizeof(struct node*)),
         }
     };
-    *node = new_node;
+    *out_node = new_node;
 
-    node->base.renderable.self = node;
-    node->base.self = node;
-    return node;
+    out_node->base.renderable.self = out_node;
+    out_node->base.self = out_node;
 }
 
 void mesh_node_destroy(mesh_node* node) {
@@ -107,7 +122,6 @@ static inline void _mesh_node_destroy_vt(void* self) {
 }
 static inline void _mesh_node_destroy(mesh_node* node) {
     _node_destroy(&node->base);
-    etfree(node, sizeof(mesh_node), MEMORY_TAG_RENDERABLE);
 }
 
 void mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_context* ctx) {

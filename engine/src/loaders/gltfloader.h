@@ -5,4 +5,4 @@
 
 // TODO: Unexpose the renderer functions from this
 // Dynarray for mesh_asset returned
-mesh_asset* load_gltf_meshes(const char* path, renderer_state* state);
+struct mesh_asset* load_gltf_meshes(const char* path, struct renderer_state* state);

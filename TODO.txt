@@ -10,6 +10,9 @@ TODO: If we change the resolution of the render_image we need to update the desc
 TODO: Descriptor sets still reference old render image. So they need to be updated
 
 ---------------------More Immediate---------------------
+TODO: Have pfn_on_event take the observer as an argument
+Just cast it in the function
+
 TODO: Implement scene graph rendering
 
 TODO: RendererAPI:

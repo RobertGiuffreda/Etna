@@ -5,7 +5,7 @@
 #include "core/events.h"
 #include "core/input.h"
 
-#include "renderer/src/vk_types.h"
+#include "renderer/src/renderer.h"
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_core.h>

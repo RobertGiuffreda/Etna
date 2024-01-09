@@ -12,7 +12,7 @@
 #include "platform/platform.h"
 #include "platform/etwindow.h"
 
-#include "renderer/src/renderer.h"
+#include "renderer/rendererAPI.h"
 
 #include "application_types.h"
 
@@ -51,14 +51,14 @@ typedef struct engine_state {
 
 static engine_state* state;
 
-b8 engine_on_resize(u16 event_code, event_data data);
+b8 engine_on_resize(u16 event_code, void* engine_state, event_data data);
 
 b8 engine_initialize(engine_config engine_details, application_config app_details) {
     // Initialize memory first, so all memory allocations are tracked.
     if (!memory_initialize()) {
         ETFATAL("Unable to initialize memory.");
         return false;
-    };
+    }
 
     // Allocate engine state memory
     state = (engine_state*)etallocate(sizeof(engine_state), MEMORY_TAG_ENGINE);
@@ -115,6 +115,9 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
+    // Func takes renderer_state so register after renderer is initialized
+    event_observer_register(EVENT_CODE_RESIZE, (void*)state, engine_on_resize);
+
     // Transfer app information
     state->app_initialize = app_details.initialize;
     state->app_shutdown = app_details.shutdown;
@@ -137,9 +140,12 @@ b8 engine_run(void) {
     state->app_update(state->app_state);
 
     while (state->is_running) {
+        renderer_update_scene(state->renderer_state);
+
         renderer_draw_frame(state->renderer_state);
 
-        // Belong to platform or window??
+        input_update(state->input_state);
+
         etwindow_pump_messages();
         state->is_running = !etwindow_should_close(state->window_state);
     }
@@ -165,6 +171,7 @@ void engine_shutdown(void) {
     input_shutdown(state->input_state);
 
     // Deregister engine events & Shutdown event system
+    event_observer_deregister(EVENT_CODE_RESIZE, (void*)state, engine_on_resize);
     events_shutdown(state->events_state);
 
     // Shutdown log file
@@ -177,9 +184,9 @@ void engine_shutdown(void) {
     memory_shutdown();
 }
 
-b8 engine_on_resize(u16 event_code, event_data data) {
-    ETDEBUG("X-pos: %d | Y-pos: %d", data.i32[0], data.i32[1]);
-
+b8 engine_on_resize(u16 event_code, void* engine_state, event_data data) {
+    // TODO: Register renderer for resizes in the renderer and not here
+    renderer_on_resize(state->renderer_state, data.i32[0], data.i32[1]);
     // Other events should handle this event code as well
     return false;
 }

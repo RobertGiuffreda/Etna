@@ -2,6 +2,8 @@
 
 #include "core/logger.h"
 
+#include "renderer/src/renderer.h"
+
 void buffer_create(
     renderer_state* state,
     u64 size,

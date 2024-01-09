@@ -2,7 +2,7 @@
 
 #include "renderer/src/vk_types.h"
 
-// TODO: Move find_memory_index to another file
+// TODO: Move non initializers to a vk_utils
 
 VkCommandPoolCreateInfo init_command_pool_create_info(
     VkCommandPoolCreateFlags flags,

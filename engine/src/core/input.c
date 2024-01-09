@@ -24,6 +24,7 @@ static struct input_state* state;
 
 b8 input_initialize(input_state** input_system_state) {
     *input_system_state = etallocate(sizeof(struct input_state), MEMORY_TAG_INPUT);
+    etzero_memory(*input_system_state, sizeof(struct input_state));
     state = *input_system_state;
     return true;
 }

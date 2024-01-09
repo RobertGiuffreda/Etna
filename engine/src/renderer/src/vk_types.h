@@ -7,15 +7,24 @@
 
 #include <vulkan/vulkan.h>
 
-// TODO: This file should be split into an actual vk_types.h file and a
-// renderer.h file. Where the current renderer.h file is being used as a 
-// rendererAPI.h file. 
+/**
+ * TODO: These should have renderer agnostic represenations for the engine:
+ * struct image
+ * struct buffer
+ * struct GPU_scene_data
+ * struct material_instance
+ * struct geo_surface
+ * struct mesh_asset
+ * 
+ * Not renderer specific:
+ * struct renderable
+ * struct node
+ * struct mesh_node
+ */
 
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
 
-/* NOTE: Descriptor Set Abstraction structs */
-// TODO: Move these structs back to their respective header files
-// and just #include <vulkan/vulkan.h>.
+typedef struct renderer_state renderer_state;
 
 typedef struct descriptor_set_layout_builder {
     // Dynarray
@@ -49,7 +58,6 @@ typedef struct descriptor_set_allocator_growable {
     VkDescriptorPool* full_pools;
     u32 sets_per_pool;
 } ds_allocator_growable;
-/* NOTE: END */
 
 // TEMP: Until my vulkan memory management is implemented
 // TODO: Store memory information for when implementing memory management
@@ -71,7 +79,6 @@ typedef struct buffer {
 } buffer;
 // TEMP: END
 
-// NOTE: vkguide.dev structs
 typedef struct gpu_mesh_buffers {
     buffer index_buffer;
     buffer vertex_buffer;
@@ -82,7 +89,6 @@ typedef struct gpu_draw_push_constants {
     m4s world_matrix;
     VkDeviceAddress vertex_buffer;
 } gpu_draw_push_constants;
-// NOTE: END
 
 typedef struct GPU_scene_data {
     m4s view;
@@ -310,137 +316,3 @@ typedef struct device {
     VkQueue transfer_queue;
     VkQueue present_queue;
 } device;
-
-typedef struct renderer_state {
-    VkInstance instance;
-#ifdef _DEBUG
-    VkDebugUtilsMessengerEXT debug_messenger;
-    PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
-#endif
-    VkAllocationCallbacks* allocator;
-
-    // Window elements
-    // Extent of render image decides resolution
-    VkExtent3D render_extent;
-    i32 width;
-    i32 height;
-    VkSurfaceKHR surface;
-    // True if window was resized
-    b8 swapchain_dirty;
-
-    device device;
-
-    VkSwapchainKHR swapchain;
-    VkFormat swapchain_image_format;
-
-    // Determines amount of frames: Length of perframe arrays
-    u32 image_count;
-    VkExtent3D window_extent;
-    VkImage* swapchain_images;
-    VkImageView* swapchain_image_views;
-
-    // Image to render to that get copied onto the swapchain image
-    image render_image;
-    image depth_image;
-
-    // Index into per frame arrays: TODO: Rename to frame_index maybe??
-    u32 current_frame; 
-    
-    // NOTE: Per frame structures/data. Add to separate struct??
-    VkSemaphore* swapchain_semaphores;
-    VkSemaphore* render_semaphores;
-
-    VkFence* render_fences;
-    
-    // Going to use the graphics queue for everything for now until I get a
-    // better handle on things. 
-    VkCommandPool* graphics_pools;
-    VkCommandBuffer* main_graphics_command_buffers;
-
-    ds_allocator_growable* frame_allocators;
-    // NOTE: Per frame END
-
-    // Immediate command pool & buffer
-    // TODO: How does this fit into place with with queues 
-    // and multiple queue families 
-    VkCommandPool imm_pool;
-    VkCommandBuffer imm_buffer;
-    VkFence imm_fence;
-
-    void (*immediate_begin)(struct renderer_state* state);
-    void (*immediate_end)(struct renderer_state* state);
-
-    // Global descriptor set allocator
-    ds_allocator_growable global_ds_allocator;
-
-    shader gradient_shader;
-    compute_effect gradient_effect;
-
-    VkDescriptorSet draw_image_descriptor_set;
-    VkDescriptorSetLayout draw_image_descriptor_set_layout;
-    VkDescriptorSetLayout single_image_descriptor_set_layout;
-
-    // Testing loading data to vertex & index buffer as well as buffer references
-    shader mesh_vertex;
-    shader mesh_fragment;
-
-    VkPipeline mesh_pipeline;
-    VkPipelineLayout mesh_pipeline_layout;
-
-    // TEMP: Until loading a scene instead of meshes
-    mesh_asset* meshes;
-    // TEMP: END
-
-    // TEMP: Section 4 of guide
-    // Default images/textures to use
-    image white_image;
-    image black_image;
-    image grey_image;
-    image error_checkerboard_image;
-
-    VkSampler default_sampler_linear;
-    VkSampler default_sampler_nearest;
-    
-    GLTF_MR metal_rough_material;
-    buffer material_constants;
-
-    // Scene data
-    draw_context main_draw_context;
-    GPU_scene_data scene_data;
-    material_instance default_data;
-
-    // TODO: Make this a hash_map. For now, just an array of pointers
-    node** loaded_nodes;
-
-    VkDescriptorSetLayout scene_data_descriptor_set_layout;
-
-    // Buffers for each frame to store scene data
-    buffer* scene_data_buffers;
-    // TEMP: END
-
-    gpu_mesh_buffers rectangle;
-} renderer_state;
-
-#define IMM_CMD_BUFFER(state) state->imm_buffer
-
-/** 
- * Hacky macro for encapsulating code, ... portion, inside the 
- * vulkan start and end function for the command buffer designated for 
- * immediate submissions
- */
-#define IMMEDIATE_SUBMIT(state, ...)          \
-do {                                            \
-    state->immediate_begin(state);              \
-    do {                                        \
-        __VA_ARGS__;                            \
-    } while (0);                                \
-    state->immediate_end(state);                \
-} while(0);                                     \
-
-#ifdef _DEBUG
-// TODO: Move definition to a utility function file
-b8 renderer_set_debug_object_name(renderer_state* state, VkObjectType object_type, u64 object_handle, const char* object_name);
-#define SET_DEBUG_NAME(render_state, object_type, object_handle, object_name) renderer_set_debug_object_name(render_state, object_type, (u64)(object_handle), object_name)
-#elif 
-#define SET_DEBUG_NAME()
-#endif

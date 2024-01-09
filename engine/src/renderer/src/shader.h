@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/src/vk_types.h"
+#include "renderer/src/renderer.h"
 
 // TODO: Better isolate this library (spirv reflect) in the system to make
 // changing it out to something else like SPIRV-Cross easier if it becomes

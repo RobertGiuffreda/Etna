@@ -108,7 +108,7 @@ b8 event_fire(u16 event_code, event_data data) {
     u64 i_obs_count = dynarray_length(i_obs);
     for (u64 i = 0; i < i_obs_count; ++i) {
         event_observer eo = i_obs[i];
-        if (eo.on_event(event_code, data)) {
+        if (eo.on_event(event_code, eo.observer, data)) {
             // on_event returning true means it has handled the event completly & 
             // other observers will not see it
             return true;

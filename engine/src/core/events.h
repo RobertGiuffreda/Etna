@@ -2,6 +2,8 @@
 
 #include "defines.h"
 
+// TODO: Macros for grabbing data out of event_data
+// to make it more readable
 typedef struct event_data {
     union {
         i64 i64[2];
@@ -23,7 +25,8 @@ typedef struct event_data {
 } event_data;
 
 // Observer callback function
-typedef b8 (*pfn_on_event)(u16 event_code, event_data data);
+// TODO: change event_code type to enum system_event.
+typedef b8 (*pfn_on_event)(u16 event_code, void* observer, event_data data);
 
 typedef struct events_state_t events_state;
 
@@ -56,7 +59,8 @@ typedef enum system_event {
     /* event_data data.u16[0] = button_code */
     EVENT_CODE_BUTTON_RELEASE = 0x06,
 
-    /* event_data data.i32[0] = x
+    /**
+     * event_data data.i32[0] = x
      * event_data data.i32[1] = y
      */
     EVENT_CODE_MOUSE_MOVE = 0x07,

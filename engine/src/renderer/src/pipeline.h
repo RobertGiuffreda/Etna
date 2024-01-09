@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/src/vk_types.h"
+#include "renderer/src/renderer.h"
 
 // TODO: Add option to set the name of the pipeline & pipeline layout
 

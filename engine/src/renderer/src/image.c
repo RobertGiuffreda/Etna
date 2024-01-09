@@ -1,12 +1,13 @@
 #include "image.h"
 
 #include "core/etmemory.h"
+#include "core/logger.h"
 
 #include "renderer/src/utilities/vkinit.h"
-
+#include "renderer/src/renderer.h"
 #include "renderer/src/buffer.h"
 
-#include "core/logger.h"
+
 
 // TODO: Multisampling bits in ImageCreateInfo
 // TODO: Check if tiling and sample settings are supported for the specific image format
@@ -92,9 +93,7 @@ void image2D_create_data(
         memory_flags,
         out_image);
     
-    IMMEDIATE_SUBMIT(state, {
-        VkCommandBuffer cmd = state->imm_buffer;
-
+    IMMEDIATE_SUBMIT(state, cmd, {
         // Transition image to optimal transfer destination layout
         image_barrier(cmd, out_image->handle, out_image->aspects,
             VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,

@@ -130,6 +130,14 @@
         "chrono": "c",
         "regex": "c",
         "type_traits": "c",
-        "renderables.h": "c"
+        "renderables.h": "c",
+        "rendererapi.h": "c",
+        "iomanip": "c",
+        "istream": "c",
+        "ostream": "c",
+        "xlocmon": "c",
+        "xlocnum": "c",
+        "camera.h": "c",
+        "input.h": "c"
     }
 }

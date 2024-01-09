@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer/src/vk_types.h"
+#include "renderer/src/renderer.h"
 
 void image2D_create(
     renderer_state* state,

@@ -1,6 +1,7 @@
 #include "device.h"
 
 #include "renderer/src/utilities/vkinit.h"
+#include "renderer/src/renderer.h"
 
 #include "containers/dynarray.h"
 #include "core/etmemory.h"

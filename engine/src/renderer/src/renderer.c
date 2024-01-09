@@ -1,4 +1,5 @@
-#include "renderer/src/vk_types.h"
+#include "renderer/rendererAPI.h"
+#include "vk_types.h"
 #include "renderer.h"
 
 #include "renderer/src/utilities/vkinit.h"
@@ -296,6 +297,9 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
 
     initialize_mesh_mat_pipeline(state);
 
+    camera_create(&state->main_camera);
+    state->main_camera.position = (v3s){.raw = {0.f, 0.f, 5.f}};
+
     if (!intialize_default_data(state)) {
         ETFATAL("Error intializing data.");
         return false;
@@ -310,6 +314,8 @@ void renderer_shutdown(renderer_state* state) {
     // Destroy reverse order of creation
 
     shutdown_default_data(state);
+
+    camera_destroy(&state->main_camera);
 
     shutdown_mesh_mat_pipeline(state);
 
@@ -364,22 +370,22 @@ void renderer_shutdown(renderer_state* state) {
 }
 
 void renderer_update_scene(renderer_state* state) {
-    dynarray_clear(state->main_draw_context.opaque_surfaces);
+    camera_update(&state->main_camera);
 
-    node_draw(state->loaded_nodes[2], glms_mat4_identity(), &state->main_draw_context);
-    // ETINFO("state->meshes[%lu]: name %s", 2, state->meshes[2].name);
+    
+    // m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
+    m4s view = camera_get_view_matrix(&state->main_camera);
 
-    m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
-
-    // TODO: Figure out projection matrix mess ups & confusion
     m4s project = glms_perspective(glm_rad(70.f), ((f32)state->window_extent.width/(f32)state->window_extent.height), 10000.f, 0.1f);
-    // m4s project = glms_perspective(glm_rad(70.f), ((f32)render_extent.width/(f32)render_extent.height), 10000.f, 0.1f);
+
+    // invert the Y direction on projection matrix so that we are more similar
+    // to opengl and gltf axis
     project.raw[1][1] *= -1;
 
     m4s vp = glms_mat4_mul(project, view);
 
-    state->scene_data.proj = project;
     state->scene_data.view = view;
+    state->scene_data.proj = project;
     state->scene_data.viewproj = vp;
 
     v4s a_color = { .raw = {.1f, .1f, .1f, .1f}};
@@ -389,10 +395,12 @@ void renderer_update_scene(renderer_state* state) {
     state->scene_data.ambient_color = a_color;
     state->scene_data.sunlight_color = s_color;
     state->scene_data.sunlight_direction = sl_dir;
+
+    dynarray_clear(state->main_draw_context.opaque_surfaces);
+    node_draw(state->loaded_nodes[2], glms_mat4_identity(), &state->main_draw_context);
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
-    renderer_update_scene(state);
 
     // Wait for the current frame to end rendering by waiting on its render fence
     // Reset the render fence for reuse
@@ -481,11 +489,6 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_ACCESS_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
-    // Blit command to copy from render image to swapchain
-    VkExtent3D blit_extent = {
-        .width = state->width,
-        .height = state->height,
-        .depth = 1};
     // TODO: Have this function take two image sizes for the swapchain image and the 
     // render. This way we can render to whatever size image we want and display the output
     // on whatever size swapchain image we want
@@ -975,12 +978,25 @@ static b8 intialize_default_data(renderer_state* state) {
         return false;
     }
 
-    state->main_draw_context.opaque_surfaces = dynarray_create(0, sizeof(render_object));
-    state->loaded_nodes = dynarray_create(0, sizeof(node*));
-    for (u32 i = 0; i < dynarray_length(state->meshes); ++i) {
+    // Get mesh count for memory allcoation
+    state->backing_mesh_node_count = dynarray_length(state->meshes);
+    
+    // Create backing memory for the loaded node pointers to point to
+    state->backing_mesh_nodes = etallocate(
+        sizeof(mesh_node) * state->backing_mesh_node_count,
+        MEMORY_TAG_RENDERER);
+
+    // Create dynarray to store loaded node pointers
+    state->loaded_nodes = dynarray_create(state->backing_mesh_node_count, sizeof(node*));
+
+    for (u32 i = 0; i < state->backing_mesh_node_count; ++i) {
         mesh_asset* m = &state->meshes[i];
 
-        mesh_node* new_node = mesh_node_create();
+        // Initialize mesh node i in backing mesh node array
+        mesh_node_create(&state->backing_mesh_nodes[i]);
+
+        // pointer to initialized mesh node for convinience
+        mesh_node* new_node = &state->backing_mesh_nodes[i];
         new_node->mesh = m;
         new_node->base.local_transform = glms_mat4_identity();
         new_node->base.world_transform = glms_mat4_identity();
@@ -989,21 +1005,31 @@ static b8 intialize_default_data(renderer_state* state) {
             geo_surface* s = &new_node->mesh->surfaces[j];
             s->material = (GLTF_material*)&state->default_data;
         }
+        // Get node reference
         node* node = node_from_mesh_node(new_node);
         dynarray_push((void**)&state->loaded_nodes, &node);
     }
 
+    // Create a dynarray to store the opaque surfaces
+    state->main_draw_context.opaque_surfaces = dynarray_create(0, sizeof(render_object));
     return true;
 }
 
 static void shutdown_default_data(renderer_state* state) {
+    dynarray_destroy(state->main_draw_context.opaque_surfaces);
+    dynarray_destroy(state->loaded_nodes);
+
     // TODO: Place destruction of created node graph into own file.
     // node_recurse_destroy function perhaps
-    for (u32 i = 0; i < dynarray_length(state->loaded_nodes); ++i) {
-        node_destroy(state->loaded_nodes[i]);
+    for (u32 i = 0; i < state->backing_mesh_node_count; ++i) {
+        mesh_node_destroy(&state->backing_mesh_nodes[i]);
     }
-    dynarray_destroy(state->loaded_nodes);
-    dynarray_destroy(state->main_draw_context.opaque_surfaces);
+
+    // Free backing nodes
+    etfree(state->backing_mesh_nodes,
+        sizeof(mesh_node) * state->backing_mesh_node_count,
+        MEMORY_TAG_RENDERER);
+
 
     // TODO: Place destruction of loaded meshes into a function somewhere
     for (u32 i = 0; i < dynarray_length(state->meshes); ++i) {
@@ -1183,83 +1209,9 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 }
 
 void renderer_on_resize(renderer_state* state, i32 width, i32 height) {
-    state->render_extent.width = (u32)width;
-    state->render_extent.height = (u32)height;
+    // state->window_extent.width = (u32)width;
+    // state->window_extent.height = (u32)height;
     state->swapchain_dirty = true;
-}
-
-// TODO: Move to another separate file for handling utility functions
-// TODO: Remove the VK_MEMORY_PROPERTY_HOST_COHERENT_BIT bit from the staging buffer and flush manually
-// TODO:GOAL: Use queue from dedicated transfer queue family(state->device.transfer_queue) to do the transfer
-gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
-    const u64 vertex_buffer_size = vertex_count * sizeof(vertex);
-    const u64 index_buffer_size = index_count * sizeof(u32);
-
-    gpu_mesh_buffers new_surface;
-
-    // Create Vertex Buffer
-    buffer_create(
-        state,
-        vertex_buffer_size,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-        | VK_BUFFER_USAGE_TRANSFER_DST_BIT
-        | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &new_surface.vertex_buffer);
-    
-    VkBufferDeviceAddressInfo device_address_info = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-        .pNext = 0,
-        .buffer = new_surface.vertex_buffer.handle};
-    // Get Vertex buffer address
-    new_surface.vertex_buffer_address = vkGetBufferDeviceAddress(state->device.handle, &device_address_info);
-
-    // Create Index Buffer
-    buffer_create(
-        state,
-        index_buffer_size,
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT
-        | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &new_surface.index_buffer);
-    
-    // Create staging buffer to transfer memory from VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT to VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-    buffer staging;
-    buffer_create(
-        state,
-        vertex_buffer_size + index_buffer_size,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &staging);
-
-    void* mapped_memory;
-    vkMapMemory(state->device.handle, staging.memory, 0, vertex_buffer_size + index_buffer_size, 0, &mapped_memory);
-
-    etcopy_memory(mapped_memory, vertices, vertex_buffer_size);
-    etcopy_memory((u8*)mapped_memory + vertex_buffer_size, indices, index_buffer_size);
-
-    vkUnmapMemory(state->device.handle, staging.memory);
-
-    IMMEDIATE_SUBMIT(state, {
-        VkCommandBuffer cmd = state->imm_buffer;
-        VkBufferCopy vertex_copy = {
-            .dstOffset = 0,
-            .srcOffset = 0,
-            .size = vertex_buffer_size};
-
-        vkCmdCopyBuffer(cmd, staging.handle, new_surface.vertex_buffer.handle, 1, &vertex_copy);
-
-        VkBufferCopy index_copy = {
-            .dstOffset = 0,
-            .srcOffset = vertex_buffer_size,
-            .size = index_buffer_size};
-
-        vkCmdCopyBuffer(cmd, staging.handle, new_surface.index_buffer.handle, 1, &index_copy);
-    });
-
-    buffer_destroy(state, &staging);
-
-    return new_surface;
 }
 
 // Name is a bit confusing with recreate_swapchain around as well

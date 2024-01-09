@@ -5,6 +5,7 @@
 #include "core/logger.h"
 
 #include "renderer/src/utilities/vkinit.h"
+#include "renderer/src/renderer.h"
 
 /* NOTE: Functions for: Descriptor Set Layout Builder */
 dsl_builder descriptor_set_layout_builder_create(void) {

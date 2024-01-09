@@ -6,14 +6,17 @@
 #include "core/logger.h"
 #include "core/etstring.h"
 
+// TODO:TEMP: Loader should not need to know the renderer implementation details
+// 
 #include "renderer/src/utilities/vkinit.h"
+#include "renderer/src/renderer.h"
 
 static void recurse_print_nodes(cgltf_node* node, u32 depth);
 static cgltf_accessor* get_accessor_fron_attributes(cgltf_attribute* attributes, cgltf_size attributes_count, const char* name);
 
 static u64 node_count = 0;
 
-mesh_asset* load_gltf_meshes(const char* path, renderer_state* state) {
+mesh_asset* load_gltf_meshes(const char* path, struct renderer_state* state) {
     cgltf_options options = {0};
     cgltf_data* data = NULL;
     cgltf_result result = cgltf_parse_file(&options, path, &data);
