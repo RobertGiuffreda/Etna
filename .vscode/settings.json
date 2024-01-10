@@ -138,6 +138,7 @@
         "xlocmon": "c",
         "xlocnum": "c",
         "camera.h": "c",
-        "input.h": "c"
+        "input.h": "c",
+        "vulkan_core.h": "c"
     }
 }

@@ -14,7 +14,10 @@
 
 struct etwindow_state {
     GLFWwindow* impl_window;
+    b8 cursor_captured;
 };
+
+static b8 etwindow_on_key_event(u16 code, void* window, event_data data);
 
 static void key_callback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods);
 static void mouse_button_callback(GLFWwindow* window, i32 button, i32 action, i32 mods);
@@ -45,16 +48,21 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_stat
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetWindowSizeCallback(window, resize_callback);
 
-
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSetWindowPos(window, config->x_start_pos, config->y_start_pos);
     glfwShowWindow(window);
 
     *out_window_state = (etwindow_state*)etallocate(sizeof(struct etwindow_state), MEMORY_TAG_WINDOW);
     (*out_window_state)->impl_window = window;
+    (*out_window_state)->cursor_captured = true;
+
+    event_observer_register(EVENT_CODE_KEY_RELEASE, (*out_window_state), etwindow_on_key_event);
     return true;
 }
 
 void etwindow_shutdown(etwindow_state* window_state) {
+    event_observer_deregister(EVENT_CODE_KEY_RELEASE, window_state, etwindow_on_key_event);
+    
     // Destroy window & free state memory
     glfwDestroyWindow(window_state->impl_window);
     etfree(window_state, sizeof(struct etwindow_state), MEMORY_TAG_WINDOW);
@@ -66,6 +74,17 @@ b8 etwindow_should_close(etwindow_state* window_state) {
 
 void etwindow_pump_messages(void) {
     glfwPollEvents();
+}
+
+static b8 etwindow_on_key_event(u16 code, void* window, event_data data) {
+    struct etwindow_state* win = (struct etwindow_state*)window;
+    keys key = (keys)data.i32[0];
+    
+    if (key == KEY_P) {
+        win->cursor_captured = !win->cursor_captured;
+        glfwSetInputMode(win->impl_window, GLFW_CURSOR, (win->cursor_captured) ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+    }
+    return false;
 }
 
 // Action possible values are GLFW_PRESS = 1, GLFW_RELEASE = 0, GLFW_REPEAT = 2. Fits in u8

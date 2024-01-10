@@ -49,6 +49,13 @@ void events_shutdown(events_state* event_system_state) {
     etfree(event_system_state, sizeof(struct events_state_t), MEMORY_TAG_EVENTS);
 }
 
+// event_observer *i_obs = system_state->immediate_observers[event_code];
+// ^^^^^ this creates a copy of the pointer to the memory where the array is
+// dynarray_push((void**)&i_obs, &new_event_observer);
+// ^^^^^ This function modifies the pointer passed if it needs to reallocate memory
+// Because this pointer is just a copy of the pointer stored in state, the pointer in
+// the state does not change, leaving it pointing to freed memory, and leaving the new 
+// memory allocation lost
 b8 event_observer_register(u16 event_code, void* observer, pfn_on_event on_event) {
     ETASSERT((system_state != 0));
 
@@ -68,7 +75,9 @@ b8 event_observer_register(u16 event_code, void* observer, pfn_on_event on_event
     event_observer new_event_observer;
     new_event_observer.observer = observer;
     new_event_observer.on_event = on_event;
-    dynarray_push((void**)&i_obs, &new_event_observer);
+    
+    // dynarray_push((void**)&i_obs, &new_event_observer);
+    dynarray_push((void**)&system_state->immediate_observers[event_code], &new_event_observer);
 
     return true;
 }

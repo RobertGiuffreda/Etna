@@ -108,6 +108,8 @@ b8 camera_on_mouse_move(u16 code, void* cam, event_data data) {
     c->yaw += (f32)x_offset/200.f;
     c->pitch -= (f32)y_offset/200.f;
 
+    c->pitch = glm_clamp(c->pitch, glm_rad(-89.f), glm_rad(89.f));
+
     ETINFO("Camera Yaw: %lf.", c->yaw);
     ETINFO("Camera Pitch: %lf.", c->pitch);
 
