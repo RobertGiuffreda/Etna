@@ -93,18 +93,26 @@ void dynarray_destroy(void* array)
     }
 }
 
-// TODO: Warn the user that adding to array they resized will cause
-// a resize on the next push unless index is moved
-void dynarray_resize(void** array_ptr, u64 length)
-{
+// TODO: Take a value to copy into the array for uninitialized memory??
+void dynarray_resize(void** array_ptr, u64 length) {
     dynarray* header = (dynarray*)(*array_ptr) - 1;
-    if (length > header->capacity)  {
+    if (length > header->capacity) {
         header = _dynarray_resize(header, length);
-        header->length = header->capacity;
-    } else if (length < header->length) {
-        header->length = length;
+    }
+    header->length = length;
+    *array_ptr = (void*)(header + 1);
+}
+
+void dynarray_reserve(void** array_ptr, u64 capacity) {
+    dynarray* header = (dynarray*)(*array_ptr) - 1;
+    if (capacity > header->capacity) {
+        header = _dynarray_resize(header, capacity);
     }
     *array_ptr = (void*)(header + 1);
+}
+
+void dynarray_length_set(void* array, u64 length) {
+    ((dynarray*)array - 1)->length = length;
 }
 
 void dynarray_push(void** array_ptr, const void* element)

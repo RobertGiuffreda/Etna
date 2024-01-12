@@ -5,6 +5,7 @@
 #include "math/etmath.h"
 
 #include "core/etmemory.h"
+#include "core/logger.h"
 
 // Internal static functions
 static inline void _renderable_destroy(renderable* renderable);
@@ -144,7 +145,12 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
             .transform = node_matrix,
             .vertex_buffer_address = node->mesh->mesh_buffers.vertex_buffer_address
         };
-        dynarray_push((void**)&ctx->opaque_surfaces, &def);
+        if (s->material->data.pass_type == MATERIAL_PASS_TRANSPARENT) {
+            dynarray_push((void**)&ctx->transparent_surfaces, &def);
+        }
+        else {
+            dynarray_push((void**)&ctx->opaque_surfaces, &def);
+        }
     }
 
     _node_draw(&node->base, top_matrix, ctx);
@@ -152,4 +158,70 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
 
 node* node_from_mesh_node(mesh_node* node) {
     return &node->base;
+}
+
+void gltf_draw(struct loaded_gltf* gltf, const m4s top_matrix, struct draw_context* ctx) {
+    u32 node_count = dynarray_length(gltf->top_nodes);
+    for (u32 i = 0; i < node_count; ++i) {
+        node_draw(gltf->top_nodes[i], top_matrix, ctx);
+    }
+}
+
+void mesh_asset_print(mesh_asset* m_asset) {
+    ETINFO("Mesh asset %s data:", m_asset->name);
+    for (u32 i = 0; i < dynarray_length(m_asset->surfaces); ++i) {
+        geo_surface* surface = &m_asset->surfaces[i];
+        ETINFO(
+            "Surface %lu: Start index: %lu | index_count: %lu", 
+            i, surface->start_index, surface->count
+        );
+    }
+}
+
+void node_print(node* node) {
+    ETINFO("Local transform: ");
+    glms_mat4_print(node->local_transform, stderr);
+    ETINFO("World transform: ");
+    glms_mat4_print(node->world_transform, stderr);
+}
+
+void mesh_node_print(mesh_node* node) {
+    mesh_asset_print(node->mesh);
+    node_print(&node->base);
+}
+
+void gltf_print(struct loaded_gltf* gltf, const char* gltf_name) {
+    ETINFO("GLTF: %s's data:", gltf_name);
+    ETINFO(
+        "Mesh count: %lu | Image count: %lu | Material count: %lu | Sampler count %lu.",
+        gltf->mesh_count, gltf->image_count, gltf->material_count, gltf->sampler_count
+    );
+    ETINFO(
+        "Mesh node count: %lu | node count: %lu | Top node count: %lu",
+        gltf->mesh_node_count, gltf->node_count, gltf->top_node_count
+    );
+    ETINFO("Mesh asset information: ");
+    for (u32 i = 0; i < gltf->mesh_node_count; ++i) {
+        mesh_node_print(&gltf->mesh_nodes[i]);
+    }
+}
+
+void draw_context_print(draw_context* ctx) {
+    ETINFO("Opaque surfaces: ");
+    for (u32 i = 0; i < dynarray_length(ctx->opaque_surfaces); ++i) {
+        render_object* rob = &ctx->opaque_surfaces[i];
+        ETINFO(
+            "Render Object %lu: Start index: %lu | Index count: %lu",
+            i, rob->first_index, rob->index_count
+        );
+    }
+    ETINFO("Transparent surfaces: ");
+    for (u32 i = 0; i < dynarray_length(ctx->transparent_surfaces); ++i) {
+        render_object* rob = &ctx->transparent_surfaces[i];
+        ETINFO(
+            "Render Object %lu: Start index: %lu | Index count: %lu",
+            i, rob->first_index, rob->index_count
+        );
+    }
+
 }

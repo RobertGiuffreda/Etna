@@ -51,7 +51,8 @@ typedef struct engine_state {
 
 static engine_state* state;
 
-b8 engine_on_resize(u16 event_code, void* engine_state, event_data data);
+static b8 engine_on_resize(u16 event_code, void* engine_state, event_data data);
+static b8 engine_on_key_event(u16 event_code, void* engine_state, event_data data);
 
 b8 engine_initialize(engine_config engine_details, application_config app_details) {
     // Initialize memory first, so all memory allocations are tracked.
@@ -115,7 +116,7 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
-    // Func takes renderer_state so register after renderer is initialized
+    event_observer_register(EVENT_CODE_KEY_RELEASE, (void*)state, engine_on_key_event);
     event_observer_register(EVENT_CODE_RESIZE, (void*)state, engine_on_resize);
 
     // Transfer app information
@@ -139,15 +140,14 @@ b8 engine_run(void) {
 
     state->app_update(state->app_state);
 
-    while (state->is_running) {
+    while (state->is_running && !etwindow_should_close(state->window_state)) {
+        // TODO: renderer_update_scene should not be a renderer function
+        // Renderer should have a draw scene function that takes a scene
         renderer_update_scene(state->renderer_state);
-
         renderer_draw_frame(state->renderer_state);
 
         input_update(state->input_state);
-
-        etwindow_pump_messages();
-        state->is_running = !etwindow_should_close(state->window_state);
+        etwindow_pump_messages(); // glfwPollEvents()
     }
     return true;
 }
@@ -172,6 +172,7 @@ void engine_shutdown(void) {
 
     // Deregister engine events & Shutdown event system
     event_observer_deregister(EVENT_CODE_RESIZE, (void*)state, engine_on_resize);
+    event_observer_deregister(EVENT_CODE_KEY_RELEASE, (void*)state, engine_on_key_event);
     events_shutdown(state->events_state);
 
     // Shutdown log file
@@ -187,6 +188,19 @@ void engine_shutdown(void) {
 b8 engine_on_resize(u16 event_code, void* engine_state, event_data data) {
     // TODO: Register renderer for resizes in the renderer and not here
     renderer_on_resize(state->renderer_state, data.i32[0], data.i32[1]);
-    // Other events should handle this event code as well
+    // Other events should handle this event code as well, so false
     return false;
+}
+
+b8 engine_on_key_event(u16 event_code, void* engine_state, event_data data) {
+    keys key = (keys)data.u16[0];
+    switch (event_code)
+    {
+    case EVENT_CODE_KEY_RELEASE:
+        if (key == KEY_ESCAPE) {
+            state->is_running = false;
+        }
+        break;
+    }
+    return true;
 }

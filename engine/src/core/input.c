@@ -1,6 +1,7 @@
 #include "input.h"
 
 #include "core/etmemory.h"
+#include "core/logger.h"
 #include "core/events.h"
 
 typedef struct mouse_state {
@@ -47,7 +48,7 @@ void input_update(input_state* input_system_state) {
  */
 void input_process_key(keys key, u8 action) {
     event_data e;
-    e.i32[0] = (i32)key;
+    e.u16[0] = (u16)key;
     switch(action)
     {
     case KEY_RELEASE:
@@ -67,7 +68,7 @@ void input_process_key(keys key, u8 action) {
 
 void input_process_button(buttons button, b8 pressed) {
     event_data e;
-    e.i32[0] = (i32)button;
+    e.u16[0] = (u16)button;
     if (pressed) {
         event_fire(EVENT_CODE_BUTTON_PRESS, e);
     } else {

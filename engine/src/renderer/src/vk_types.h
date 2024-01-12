@@ -120,6 +120,7 @@ typedef struct material_instance {
     material_pass pass_type;
 } material_instance;
 
+// Could just: typedef struct material_instance GLTF_material here
 typedef struct GLTF_material {
     material_instance data;
 } GLTF_material;
@@ -154,6 +155,7 @@ typedef struct render_object {
 typedef struct draw_context {
     // Dynarray
     render_object* opaque_surfaces;
+    render_object* transparent_surfaces;
 } draw_context;
 
 // TODO: Should not be visible
@@ -196,6 +198,37 @@ typedef struct mesh_node {
     // Pointer as mesh can be shared between multiple nodes
     mesh_asset* mesh;
 } mesh_node;
+
+typedef struct loaded_gltf {
+    // TODO: Have this extend renderable
+
+    // The loaded_gltf struct currently stores the backing memory for 
+    // it's meshes, images, materials, and nodes.
+    mesh_asset* meshes;
+    u32 mesh_count;
+    image* images;
+    u32 image_count;
+    GLTF_material* materials;
+    u32 material_count;
+
+    mesh_node* mesh_nodes;
+    u32 mesh_node_count;
+    node* nodes;
+    u32 node_count;
+
+    VkSampler* samplers;
+    u32 sampler_count;
+
+    // Dynarray of top level node pointers/references
+    node** top_nodes;
+    u32 top_node_count;
+
+    ds_allocator_growable descriptor_allocator;
+
+    buffer material_data_buffer;
+
+    renderer_state* render_state;
+} loaded_gltf;
 
 typedef struct GLTFMetallic_Roughness {
     material_pipeline opaque_pipeline;

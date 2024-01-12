@@ -185,7 +185,9 @@ VkDescriptorSet descriptor_set_allocator_allocate(ds_allocator* allocator, VkDes
     return ds;
 }
 
-/* NOTE: Function for growable descriptor set allocator */
+/* NOTE: Functions for growable descriptor set allocator */
+// TODO: Create a function that allocates a copy of an array
+// that does not need to be a dynarray instead and use it instead
 void descriptor_set_allocator_growable_initialize(
     ds_allocator_growable* allocator,
     u32 initial_sets,

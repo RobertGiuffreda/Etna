@@ -76,9 +76,9 @@ void image2D_create_data(
     vkMapMemory(
         state->device.handle,
         staging.memory,
-        0,
+        /* offset: */ 0,
         data_size,
-        0,
+        /* flags: */ 0,
         &mapped_memory);
     etcopy_memory(mapped_memory, data, data_size);
     vkUnmapMemory(state->device.handle, staging.memory);

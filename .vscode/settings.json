@@ -139,6 +139,8 @@
         "xlocnum": "c",
         "camera.h": "c",
         "input.h": "c",
-        "vulkan_core.h": "c"
+        "vulkan_core.h": "c",
+        "gltfmetallic_roughness.h": "c",
+        "variant": "c"
     }
 }

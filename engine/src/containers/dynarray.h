@@ -52,7 +52,12 @@ void* dynarray_copy(void* src);
 
 void dynarray_destroy(void* array);
 
+// Currently also sets the length variable
 void dynarray_resize(void** array_ptr, u64 length);
+
+void dynarray_reserve(void** array_ptr, u64 capacity);
+
+void dynarray_length_set(void* array, u64 length);
 
 /*
  * To use this function the address of the array (pointer). &arr

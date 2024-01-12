@@ -51,7 +51,7 @@ static void shutdown_mesh_pipeline(renderer_state* state);
 static void initialize_mesh_mat_pipeline(renderer_state* state);
 static void shutdown_mesh_mat_pipeline(renderer_state* state);
 
-static b8 intialize_default_data(renderer_state* state);
+static b8 initialize_default_data(renderer_state* state);
 static void shutdown_default_data(renderer_state* state);
 
 static void draw_geometry(renderer_state* state, VkCommandBuffer cmd);
@@ -300,7 +300,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     camera_create(&state->main_camera);
     state->main_camera.position = (v3s){.raw = {0.f, 0.f, 5.f}};
 
-    if (!intialize_default_data(state)) {
+    if (!initialize_default_data(state)) {
         ETFATAL("Error intializing data.");
         return false;
     }
@@ -371,11 +371,8 @@ void renderer_shutdown(renderer_state* state) {
 
 void renderer_update_scene(renderer_state* state) {
     camera_update(&state->main_camera);
-
     
-    // m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
     m4s view = camera_get_view_matrix(&state->main_camera);
-
     m4s project = glms_perspective(glm_rad(70.f), ((f32)state->window_extent.width/(f32)state->window_extent.height), 10000.f, 0.1f);
 
     // invert the Y direction on projection matrix so that we are more similar
@@ -397,7 +394,10 @@ void renderer_update_scene(renderer_state* state) {
     state->scene_data.sunlight_direction = sl_dir;
 
     dynarray_clear(state->main_draw_context.opaque_surfaces);
-    node_draw(state->loaded_nodes[2], glms_mat4_identity(), &state->main_draw_context);
+    dynarray_clear(state->main_draw_context.transparent_surfaces);
+
+    // gltf_draw(&state->scene, glms_mat4_identity(), &state->main_draw_context);
+    node_draw(state->scene.top_nodes[0], glms_mat4_identity(), &state->main_draw_context);
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
@@ -473,7 +473,6 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
 
-
     // Draw the geometry
     draw_geometry(state, frame_cmd);
 
@@ -489,9 +488,6 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_ACCESS_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
-    // TODO: Have this function take two image sizes for the swapchain image and the 
-    // render. This way we can render to whatever size image we want and display the output
-    // on whatever size swapchain image we want
     blit_image2D_to_image2D(
         frame_cmd,
         state->render_image.handle,
@@ -523,8 +519,9 @@ b8 renderer_draw_frame(renderer_state* state) {
         1, &signal_submit);
     
     // Submit commands
-    VK_CHECK(vkQueueSubmit2(state->device.graphics_queue, 1,
-        &submit_info, state->render_fences[state->current_frame]));
+    VkResult queue_result = vkQueueSubmit2(state->device.graphics_queue, 1,
+        &submit_info, state->render_fences[state->current_frame]);
+    VK_CHECK(queue_result);
 
     // Present the image
     VkPresentInfoKHR present_info = {
@@ -837,7 +834,7 @@ static void shutdown_mesh_mat_pipeline(renderer_state* state) {
     GLTF_MR_destroy_pipelines(&state->metal_rough_material, state);
 }
 
-static b8 intialize_default_data(renderer_state* state) {
+static b8 initialize_default_data(renderer_state* state) {
     vertex* vertices = etallocate(sizeof(vertex) * 4, MEMORY_TAG_RENDERER);
 
     vertices[0].position = (v3s){.raw = { 0.5f, -0.5f, 0.0f}};
@@ -1010,12 +1007,16 @@ static b8 intialize_default_data(renderer_state* state) {
         dynarray_push((void**)&state->loaded_nodes, &node);
     }
 
-    // Create a dynarray to store the opaque surfaces
+    // Create a dynarray to store the draw context surface render objects
     state->main_draw_context.opaque_surfaces = dynarray_create(0, sizeof(render_object));
+    state->main_draw_context.transparent_surfaces = dynarray_create(0, sizeof(render_object));
+    load_gltf(&state->scene, path, state);
+    // gltf_print(&state->scene, "Test gltf");
     return true;
 }
 
 static void shutdown_default_data(renderer_state* state) {
+    dynarray_destroy(state->main_draw_context.transparent_surfaces);
     dynarray_destroy(state->main_draw_context.opaque_surfaces);
     dynarray_destroy(state->loaded_nodes);
 
@@ -1029,7 +1030,6 @@ static void shutdown_default_data(renderer_state* state) {
     etfree(state->backing_mesh_nodes,
         sizeof(mesh_node) * state->backing_mesh_node_count,
         MEMORY_TAG_RENDERER);
-
 
     // TODO: Place destruction of loaded meshes into a function somewhere
     for (u32 i = 0; i < dynarray_length(state->meshes); ++i) {
@@ -1089,54 +1089,6 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     scissor.extent.height = render_extent.height;
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-    // // Mesh pipeline draw
-    // vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline);
-
-    // // Descriptor set creation
-    // VkDescriptorSet image_set = descriptor_set_allocator_growable_allocate(
-    //     &state->frame_allocators[state->current_frame],
-    //     state->single_image_descriptor_set_layout,
-    //     state);
-    // ds_writer writer = descriptor_set_writer_create_initialize();
-    // descriptor_set_writer_write_image(
-    //     &writer,
-    //     /* Binding: */ 0,
-    //     state->error_checkerboard_image.view,
-    //     state->default_sampler_nearest,
-    //     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    //     VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    // descriptor_set_writer_update_set(&writer, image_set, state);
-    // descriptor_set_writer_shutdown(&writer);
-
-    // vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, state->mesh_pipeline_layout, 0, 1, &image_set, 0, 0);
-
-    // gpu_draw_push_constants push_constants = {
-    //     .world_matrix = glms_mat4_identity(),
-    //     .vertex_buffer = state->rectangle.vertex_buffer_address};
-    // vkCmdPushConstants(cmd, state->mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants);
-
-    // vkCmdBindIndexBuffer(cmd, state->rectangle.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-    // vkCmdDrawIndexed(cmd, 6, 1, 0, 0, 0);
-
-    // MVP calculation: 
-    // m4s view = glms_translate_make((v3s){.raw = {0.f, 0.f, -5.f}});
-
-    // // TODO: Figure out projection matrix mess ups & confusion
-    // m4s project = glms_perspective(glm_rad(70.f), ((f32)state->window_extent.width/(f32)state->window_extent.height), 10000.f, 0.1f);
-    // // m4s project = glms_perspective(glm_rad(70.f), ((f32)render_extent.width/(f32)render_extent.height), 10000.f, 0.1f);
-    // project.raw[1][1] *= -1;
-
-    // m4s vp = glms_mat4_mul(project, view);
-
-    // gpu_draw_push_constants push_constants1 = {
-    //     .world_matrix = vp,
-    //     .vertex_buffer = state->meshes[2].mesh_buffers.vertex_buffer_address};
-    // vkCmdPushConstants(cmd, state->mesh_pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants1);
-
-    // vkCmdBindIndexBuffer(cmd, state->meshes[2].mesh_buffers.index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-    // vkCmdDrawIndexed(cmd, state->meshes[2].surfaces[0].count, 1, state->meshes[2].surfaces[0].start_index, 0, 0);
-
 
     // guide 4 scene data
     void* mapped_scene_data;

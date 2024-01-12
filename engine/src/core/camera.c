@@ -95,13 +95,8 @@ b8 camera_on_mouse_move(u16 code, void* cam, event_data data) {
     i32 current_x = data.i32[0];
     i32 current_y = data.i32[1];
 
-    ETINFO("Previous mouse: x: %d. y: %d", previous_x, previous_y);
-    ETINFO("Current mouse: x: %d. y: %d", current_x, current_y);
-
     i32 x_offset = current_x - previous_x;
     i32 y_offset = current_y - previous_y;
-
-    ETINFO("Mouse offset: x: %d y: %d", x_offset, y_offset);
 
     camera* c = (camera*)cam;
 
@@ -109,9 +104,5 @@ b8 camera_on_mouse_move(u16 code, void* cam, event_data data) {
     c->pitch -= (f32)y_offset/200.f;
 
     c->pitch = glm_clamp(c->pitch, glm_rad(-89.f), glm_rad(89.f));
-
-    ETINFO("Camera Yaw: %lf.", c->yaw);
-    ETINFO("Camera Pitch: %lf.", c->pitch);
-
     return false;
 }

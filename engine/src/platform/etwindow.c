@@ -78,7 +78,7 @@ void etwindow_pump_messages(void) {
 
 static b8 etwindow_on_key_event(u16 code, void* window, event_data data) {
     struct etwindow_state* win = (struct etwindow_state*)window;
-    keys key = (keys)data.i32[0];
+    keys key = (keys)data.u16[0];
     
     if (key == KEY_P) {
         win->cursor_captured = !win->cursor_captured;

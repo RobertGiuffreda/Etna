@@ -79,10 +79,6 @@ typedef struct renderer_state {
     VkPipeline mesh_pipeline;
     VkPipelineLayout mesh_pipeline_layout;
 
-    // TEMP: Until loading a scene instead of meshes
-    mesh_asset* meshes;
-    // TEMP: END
-
     // TEMP: Section 4 of guide
     // Default images/textures to use
     image white_image;
@@ -109,6 +105,12 @@ typedef struct renderer_state {
     u32 backing_node_count;
     node* backing_nodes;
     // TEMP:TODO: END
+
+    // TEMP: Until loading a scene instead of meshes
+    mesh_asset* meshes;
+    // TEMP: END
+
+    loaded_gltf scene;
 
     // An array of pointers to nodes located in the backing array above
     node** loaded_nodes;
