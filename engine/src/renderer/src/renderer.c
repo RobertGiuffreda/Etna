@@ -120,7 +120,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     for (u32 i = 0; i < required_extension_count; ++i) {
         b8 found = false;
         for (u32 j = 0; j < supported_extension_count; ++j) {
-            b8 str_equal = strings_equal(required_extensions[i], supported_extensions[j].extensionName);
+            b8 str_equal = strs_equal(required_extensions[i], supported_extensions[j].extensionName);
             if (str_equal) {
                 found = true;
                 ETINFO("Found required extension: '%s'.", required_extensions[i]);
@@ -142,7 +142,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     for (u32 i = 0; i < required_layer_count; ++i) {
         b8 found = false;
         for (u32 j = 0; j < supported_layer_count; ++j) {
-            b8 str_equal = strings_equal(required_layers[i], supported_layers[j].layerName);
+            b8 str_equal = strs_equal(required_layers[i], supported_layers[j].layerName);
             if (str_equal) {
                 found = true;
                 ETINFO("Found required layer: '%s'.", required_layers[i]);
@@ -396,8 +396,8 @@ void renderer_update_scene(renderer_state* state) {
     dynarray_clear(state->main_draw_context.opaque_surfaces);
     dynarray_clear(state->main_draw_context.transparent_surfaces);
 
-    // gltf_draw(&state->scene, glms_mat4_identity(), &state->main_draw_context);
-    node_draw(state->scene.top_nodes[0], glms_mat4_identity(), &state->main_draw_context);
+    gltf_draw(&state->scene, glms_mat4_identity(), &state->main_draw_context);
+    // node_draw(state->scene.top_nodes[0], glms_mat4_identity(), &state->main_draw_context);
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
@@ -968,78 +968,29 @@ static b8 initialize_default_data(renderer_state* state) {
 
     state->default_data = GLTF_MR_write_material(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
 
-    const char* path = "build/assets/gltf/basicmesh.glb";
-    state->meshes = load_gltf_meshes(path, state);
-    if (!state->meshes) {
-        ETERROR("Error loading file %s", path);
-        return false;
-    }
+    const char* path = "build/assets/gltf/zda_test.glb";
 
-    // Get mesh count for memory allcoation
-    state->backing_mesh_node_count = dynarray_length(state->meshes);
+    // Currrently working: 
+    // const char* path = "build/assets/gltf/structure.glb";
     
-    // Create backing memory for the loaded node pointers to point to
-    state->backing_mesh_nodes = etallocate(
-        sizeof(mesh_node) * state->backing_mesh_node_count,
-        MEMORY_TAG_RENDERER);
-
-    // Create dynarray to store loaded node pointers
-    state->loaded_nodes = dynarray_create(state->backing_mesh_node_count, sizeof(node*));
-
-    for (u32 i = 0; i < state->backing_mesh_node_count; ++i) {
-        mesh_asset* m = &state->meshes[i];
-
-        // Initialize mesh node i in backing mesh node array
-        mesh_node_create(&state->backing_mesh_nodes[i]);
-
-        // pointer to initialized mesh node for convinience
-        mesh_node* new_node = &state->backing_mesh_nodes[i];
-        new_node->mesh = m;
-        new_node->base.local_transform = glms_mat4_identity();
-        new_node->base.world_transform = glms_mat4_identity();
-
-        for (u32 j = 0; j < dynarray_length(new_node->mesh->surfaces); j++) {
-            geo_surface* s = &new_node->mesh->surfaces[j];
-            s->material = (GLTF_material*)&state->default_data;
-        }
-        // Get node reference
-        node* node = node_from_mesh_node(new_node);
-        dynarray_push((void**)&state->loaded_nodes, &node);
+    // Load the chosen gltf into the scene
+    if (!load_gltf(&state->scene, path, state)) {
+        ETFATAL("Error loading gltf %s.", path);
+        return false;
     }
 
     // Create a dynarray to store the draw context surface render objects
     state->main_draw_context.opaque_surfaces = dynarray_create(0, sizeof(render_object));
     state->main_draw_context.transparent_surfaces = dynarray_create(0, sizeof(render_object));
-    load_gltf(&state->scene, path, state);
-    // gltf_print(&state->scene, "Test gltf");
     return true;
 }
 
 static void shutdown_default_data(renderer_state* state) {
     dynarray_destroy(state->main_draw_context.transparent_surfaces);
     dynarray_destroy(state->main_draw_context.opaque_surfaces);
-    dynarray_destroy(state->loaded_nodes);
 
-    // TODO: Place destruction of created node graph into own file.
-    // node_recurse_destroy function perhaps
-    for (u32 i = 0; i < state->backing_mesh_node_count; ++i) {
-        mesh_node_destroy(&state->backing_mesh_nodes[i]);
-    }
-
-    // Free backing nodes
-    etfree(state->backing_mesh_nodes,
-        sizeof(mesh_node) * state->backing_mesh_node_count,
-        MEMORY_TAG_RENDERER);
-
-    // TODO: Place destruction of loaded meshes into a function somewhere
-    for (u32 i = 0; i < dynarray_length(state->meshes); ++i) {
-        buffer_destroy(state, &state->meshes[i].mesh_buffers.vertex_buffer);
-        buffer_destroy(state, &state->meshes[i].mesh_buffers.index_buffer);
-        state->meshes[i].mesh_buffers.vertex_buffer_address = 0;
-        dynarray_destroy(state->meshes[i].surfaces);
-    }
-    dynarray_destroy(state->meshes);
-    ETINFO("Test GLTF file unloaded");
+    unload_gltf(&state->scene);
+    ETINFO("Scene GLTF file unloaded");
 
     buffer_destroy(state, &state->material_constants);
 
@@ -1127,7 +1078,10 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     for (u32 i = 0; i < dynarray_length(state->main_draw_context.opaque_surfaces); ++i) {
         render_object* draw = &state->main_draw_context.opaque_surfaces[i];
 
+        // ETDEBUG("RO m: %s & mat: %s", draw->mesh_name, draw->material_name);
+
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->material->pipeline->pipeline);
+
         // Scene data/Global data descriptor set binding
         vkCmdBindDescriptorSets(cmd,
             VK_PIPELINE_BIND_POINT_GRAPHICS,

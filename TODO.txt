@@ -1,21 +1,13 @@
---------Immediate--------
-TODO: Make max resolution image and render to a swapchain sized portion of it using scissor & viewport & renderArea
-
-TODO: state->window_extent should be set before the swapchain in case the swapchain current extent is 0xFFFFFFFF. 
-Special value to say the app is in control of the size
-
-TODO: If we change the resolution of the render_image we need to update the descriptor sets that reference it with the new image view sampler etc...
-TODO: Descriptor sets still reference old render image. So they need to be updated
 
 ---------------------More Immediate---------------------
-TODO: Load gltf textures 
-
 TODO: RendererAPI:
       TODO: Create default scene & load that by default are in engine settings
       TODO: Functions to expose loading & models & scenes
       TODO: Functions to expose loading shaders & making materials from them
 
 GOAL: Nothing hardcoded in renderer. Systems supply renderables, Application code supplies what to load into systems.
+
+TODO: u32 is used for index instead of size_t many times. This should be fixed
 
 --------Improvements for after rendering architecture framework is down but not optimized at all--------
 TODO: Way of measuring performance: FPS and/or CPU & GPU profilers
@@ -80,9 +72,18 @@ renderer_state --> renderer/RenderEngine etc...
 Adopt a new naming paradigm/style guide.
 Snake case for function names and camel case for type names or something.
 
+Maybes
+TODO: Make max resolution image and render to a swapchain sized portion of it using scissor & viewport & renderArea
+
+TODO: state->window_extent should be set before the swapchain in case the swapchain current extent is 0xFFFFFFFF. 
+Special value to say the app is in control of the size
+
+TODO: If we change the resolution of the render_image we need to update the descriptor sets that reference it with the new image view sampler etc...
+TODO: Descriptor sets would still reference old render image. So they need to be updated
+
+--------When rendering & code are despaghettified and simple performance improvements have been made & RenderingAPI has been created to expose functionality--------
 TODO: Nuklear UI vs some sort of imgui integration
 
---------When rendering is at an acceptable level & RenderingAPI has been created to expose functionality--------
 TODO: Serialization
     TODO: Config file for engine to load settings
     TODO: Config file for renderer to load settings
@@ -99,8 +100,6 @@ TODO: Material Experimentaion editor feature.
       Ability to link this material to existing objects
 
 TODO: Runtime check for GLSL extension support
-
-TODO: Clang makefile creation to check for strict aliasing violation
 
 --------Finally can do some graphics programming--------
 NOTE: Sample 2D slice of 3D texture for wierd patterns.

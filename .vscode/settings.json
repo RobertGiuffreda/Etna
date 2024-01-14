@@ -141,6 +141,12 @@
         "input.h": "c",
         "vulkan_core.h": "c",
         "gltfmetallic_roughness.h": "c",
-        "variant": "c"
+        "variant": "c",
+        "iterator": "c",
+        "map": "c",
+        "set": "c",
+        "unordered_map": "c",
+        "unordered_set": "c",
+        "stb_image.h": "c"
     }
 }

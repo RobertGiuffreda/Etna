@@ -43,7 +43,7 @@ m4s camera_get_rotation_matrix(camera* camera) {
 
 void camera_update(camera* camera) {
     m4s cam_rotation = camera_get_rotation_matrix(camera);
-    camera->position = glms_vec3_add(camera->position, glms_mat4_mulv3(cam_rotation, glms_vec3_scale(camera->velocity, 0.5f), 0.f));
+    camera->position = glms_vec3_add(camera->position, glms_mat4_mulv3(cam_rotation, glms_vec3_scale(camera->velocity, 0.05f), 0.f));
 }
 
 b8 camera_on_key_event(u16 code, void* cam, event_data data) {

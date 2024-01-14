@@ -143,7 +143,10 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
             .index_buffer = node->mesh->mesh_buffers.index_buffer.handle,
             .material = &s->material->data,
             .transform = node_matrix,
-            .vertex_buffer_address = node->mesh->mesh_buffers.vertex_buffer_address
+            .vertex_buffer_address = node->mesh->mesh_buffers.vertex_buffer_address,
+
+            .mesh_name = node->base.name,
+            .material_name = s->material->name
         };
         if (s->material->data.pass_type == MATERIAL_PASS_TRANSPARENT) {
             dynarray_push((void**)&ctx->transparent_surfaces, &def);
@@ -161,6 +164,7 @@ node* node_from_mesh_node(mesh_node* node) {
 }
 
 void gltf_draw(struct loaded_gltf* gltf, const m4s top_matrix, struct draw_context* ctx) {
+    // ETDEBUG("Gltf %s.", gltf->name);
     u32 node_count = dynarray_length(gltf->top_nodes);
     for (u32 i = 0; i < node_count; ++i) {
         node_draw(gltf->top_nodes[i], top_matrix, ctx);

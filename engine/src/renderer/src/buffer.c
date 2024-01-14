@@ -45,6 +45,7 @@ void buffer_create(
         &out_buffer->memory));
     VkBindBufferMemoryInfo bind_info = init_bind_buffer_memory_info(out_buffer->handle, out_buffer->memory, 0);
     VK_CHECK(vkBindBufferMemory2(state->device.handle, 1, &bind_info));
+    out_buffer->size = memory_requirements.size;
 }
 
 void buffer_destroy(renderer_state* state, buffer* buffer) {
@@ -52,4 +53,5 @@ void buffer_destroy(renderer_state* state, buffer* buffer) {
     buffer->memory = 0;
     vkDestroyBuffer(state->device.handle, buffer->handle, state->allocator);
     buffer->handle = 0;
+    buffer->size = 0;
 }

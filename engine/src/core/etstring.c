@@ -4,15 +4,35 @@
 
 #include <string.h>
 
-u64 string_length(const char* str) {
+u64 str_length(const char* str) {
     return strlen(str);
 }
 
-b8 strings_equal(const char* str0, const char* str1) {
+b8 strs_equal(const char* str0, const char* str1) {
     return strcmp(str0, str1) == 0;
 }
 
-char* string_duplicate_allocate(const char* str) {
+b8 strsn_equal(const char* str0, const char* str1, u64 n) {
+    return strncmp(str0, str1, n) == 0;
+}
+
+char* strn_copy(char* dst, const char* src, u64 n) {
+    return strncpy(dst, src, n);
+}
+
+char* str_copy(char* dst, const char* src) {
+    return strcpy(dst, src);
+}
+
+char* str_char_search(const char* str, int c) {
+    return strchr(str, c);
+}
+
+char* str_str_search(const char* str, const char* sub_str) {
+    return strstr(str, sub_str);
+}
+
+char* str_duplicate_allocate(const char* str) {
     u32 len = strlen(str);
     char* str2 = etallocate(sizeof(char) * len + 1, MEMORY_TAG_STRING);
     etcopy_memory(str2, str, sizeof(char) * len);
@@ -20,6 +40,6 @@ char* string_duplicate_allocate(const char* str) {
     return str2;
 }
 
-void string_duplicate_free(char* str) {
+void str_duplicate_free(char* str) {
     etfree(str, sizeof(char) * (strlen(str) + 1), MEMORY_TAG_STRING);
 }

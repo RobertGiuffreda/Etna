@@ -149,6 +149,8 @@ b8 engine_run(void) {
         input_update(state->input_state);
         etwindow_pump_messages(); // glfwPollEvents()
     }
+    
+    // dump_gltf_json("build/assets/gltf/zda_test.glb", "glb_json.json");
     return true;
 }
 

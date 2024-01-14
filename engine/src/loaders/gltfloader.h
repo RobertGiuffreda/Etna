@@ -3,10 +3,10 @@
 
 #include "containers/dynarray.h"
 
-// NOTE: This only supports loading .glb files currently
-
 // TODO: Unexpose the renderer functions from this
-// Dynarray for mesh_asset returned
-struct mesh_asset* load_gltf_meshes(const char* path, struct renderer_state* state);
+b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* state);
+void unload_gltf(struct loaded_gltf* gltf);
 
-void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* state);
+// NOTE: Outputs the read json data from the glb file out to the specified file
+// If the file doesn't exist it is created.
+b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path);

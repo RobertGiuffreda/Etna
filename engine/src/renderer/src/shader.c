@@ -55,7 +55,7 @@ b8 load_shader(renderer_state* state, const char* path, shader* out_shader) {
     etfree(shader_code, code_size, MEMORY_TAG_RENDERER);
     filesystem_close(shader_file);
 
-    out_shader->entry_point = string_duplicate_allocate(spv_reflect_module.entry_point_name);
+    out_shader->entry_point = str_duplicate_allocate(spv_reflect_module.entry_point_name);
     out_shader->stage = reflect_shader_stage_to_vulkan_shader_stage(spv_reflect_module.shader_stage);
 
     u32 set_count = 0;
@@ -143,7 +143,7 @@ void unload_shader(renderer_state* state, shader* shader) {
         etfree(shader->_sets[i]._bindings, sizeof(binding) * shader->_sets[i].binding_count, MEMORY_TAG_SHADER);
     }
     etfree(shader->_sets, sizeof(set) * shader->set_count, MEMORY_TAG_SHADER);
-    string_duplicate_free(shader->entry_point);
+    str_duplicate_free(shader->entry_point);
     vkDestroyShaderModule(state->device.handle, shader->module, state->allocator);
 }
 

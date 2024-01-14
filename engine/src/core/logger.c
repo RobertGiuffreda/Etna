@@ -25,6 +25,7 @@ b8 logger_initialize(void) {
 void logger_shutdown(void) {}
 
 // TODO: Linear allocator for this
+// TODO: Use etstring for string manipulation for the sake of it
 void log_output(log_level level, const char* format, ...) {
     const u32 log_str_len = 9;
     const char* log_level_strings[LOG_LEVEL_MAX] = {

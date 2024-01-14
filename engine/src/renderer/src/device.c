@@ -343,7 +343,7 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
     for (u32 i = 0; i < requirements->device_extension_count; ++i) {
         b8 found = false;
         for (u32 j = 0; j < supported_extension_count; ++j) {
-            if (strings_equal(
+            if (strs_equal(
                 requirements->device_extensions[i], 
                 supported_extensions[j].extensionName))
             {

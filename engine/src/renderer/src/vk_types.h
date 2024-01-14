@@ -70,6 +70,7 @@ typedef struct image {
     VkExtent3D extent;
     VkFormat format;
     VkImageAspectFlags aspects;
+
 } image;
 
 typedef struct buffer {
@@ -122,6 +123,7 @@ typedef struct material_instance {
 
 // Could just: typedef struct material_instance GLTF_material here
 typedef struct GLTF_material {
+    char* name;
     material_instance data;
 } GLTF_material;
 
@@ -134,7 +136,7 @@ typedef struct geo_surface {
 } geo_surface;
 
 typedef struct mesh_asset {
-    const char* name;
+    char* name;
 
     // Dynarray
     geo_surface* surfaces;
@@ -142,6 +144,9 @@ typedef struct mesh_asset {
 } mesh_asset;
 
 typedef struct render_object {
+    char* mesh_name;
+    char* material_name;
+
     u32 index_count;
     u32 first_index;
     VkBuffer index_buffer;
@@ -185,6 +190,7 @@ typedef struct node {
     node_vt* vt;
 
     // Actual struct node data
+    char* name;
     struct node* parent;
     struct node** children;
     m4s local_transform;
@@ -201,6 +207,7 @@ typedef struct mesh_node {
 
 typedef struct loaded_gltf {
     // TODO: Have this extend renderable
+    char* name;
 
     // The loaded_gltf struct currently stores the backing memory for 
     // it's meshes, images, materials, and nodes.

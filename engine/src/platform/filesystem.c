@@ -50,6 +50,7 @@ b8 filesystem_open(const char* path, etfile_flags flags, etfile** out_file) {
     return true;
 }
 
+// TODO: Warning for if statement failure
 void filesystem_close(etfile* file) {
     if (file && file->handle) {
         fclose(file->handle);

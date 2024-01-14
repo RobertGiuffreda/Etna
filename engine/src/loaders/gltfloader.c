@@ -3,8 +3,13 @@
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 #include "core/logger.h"
 #include "core/etstring.h"
+
+#include "platform/filesystem.h"
 
 // TODO: Store and use the names provided by the gltf file
 
@@ -12,12 +17,16 @@
 // TODO: Create a function to call when loading a file fails
 // that checks for memory allocations and frees them before returning
 
+// TODO: Handle cases where parts of the gltf are missing/not present
+// No materials or images, no tex coords, etc... 
+
 // TODO:TEMP: Loader should not need to know the renderer implementation details
 #include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/renderer.h"
 
 #include "renderer/src/descriptor.h"
 #include "renderer/src/buffer.h"
+#include "renderer/src/image.h"
 
 #include "renderer/src/GLTFMetallic_Roughness.h"
 
@@ -34,195 +43,15 @@
 static void recurse_print_nodes(cgltf_node* node, u32 depth, u64* node_count);
 static cgltf_accessor* get_accessor_from_attributes(cgltf_attribute* attributes, cgltf_size attributes_count, const char* name);
 
+static b8 load_image(cgltf_image* in_image, const char* gltf_path, renderer_state* state, image* out_image);
+static void load_gltf_failure(struct loaded_gltf* gltf);
+
+static void gltf_combine_paths(char* path, const char* base, const char* uri);
+
 static VkFilter gltf_filter_to_vk_filter(cgltf_int filter);
 static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter);
 
-mesh_asset* load_gltf_meshes(const char* path, struct renderer_state* state) {
-    cgltf_options options = {0};
-    cgltf_data* data = NULL;
-    cgltf_result result = cgltf_parse_file(&options, path, &data);
-    if (result != cgltf_result_success) {
-        ETERROR("Error loading gltf file %s.", path);
-        return (void*)0;
-    }
-
-    result = cgltf_load_buffers(&options, data, 0);
-    if (result != cgltf_result_success) {
-        ETERROR("Error loading gltf file %s's buffers.", path);
-        cgltf_free(data);
-        return (void*)0;
-    }
-
-    mesh_asset* meshes = dynarray_create(data->meshes_count, sizeof(mesh_asset));
-
-    // Use the same vectors for all meshes so that the memory doesnt 
-    // reallocate as often
-    vertex* vertices = dynarray_create(1, sizeof(vertex));
-    u32* indices = dynarray_create(1, sizeof(u32));
-    for (u32 i = 0; i < data->meshes_count; i++) {
-        // Examine each mesh
-        cgltf_mesh* mesh = &data->meshes[i];
-        
-        mesh_asset new_mesh;
-
-        new_mesh.name = string_duplicate_allocate(mesh->name);
-        new_mesh.surfaces = dynarray_create(mesh->primitives_count, sizeof(geo_surface));
-
-        dynarray_clear(indices);
-        dynarray_clear(vertices);
-
-        // Examine each primitive in each mesh
-        for (u32 j = 0; j < mesh->primitives_count; ++j) {
-            cgltf_primitive* primitive = &mesh->primitives[j];
-
-            geo_surface new_surface;
-            new_surface.start_index = (u32)dynarray_length(indices);
-            new_surface.count = (u32)primitive->indices->count;
-
-            u32 initial_vertex = dynarray_length(vertices);
-
-            // NOTE: elements are pushed to indices and vertices after a resize
-            // TODO: Use dynarray reserve or don't use dynarray push
-
-            // load indices
-            cgltf_accessor* index_accessor = primitive->indices;
-            dynarray_reserve((void**)&indices, dynarray_length(indices) + index_accessor->count);
-
-            for (u32 k = 0; k < index_accessor->count; ++k) {
-                u32 index = initial_vertex + cgltf_accessor_read_index(index_accessor, k);
-                dynarray_push((void**)&indices, &index);
-            }
-
-            // load vertex positions
-            cgltf_accessor* position = get_accessor_from_attributes(
-                primitive->attributes, primitive->attributes_count, "POSITION");
-            if (position) {
-                dynarray_resize((void**)&vertices, dynarray_length(vertices) + position->count);
-                cgltf_size element_size = cgltf_calc_size(position->type, position->component_type);
-                for (u32 k = 0; k < position->count; k++) {
-                    vertex new_v = {
-                        .position = (v3s){.raw = {0.f, 0.f, 0.f}},
-                        .normal = (v3s){.raw = {1.f, 0.f, 0.f}},
-                        .color = (v4s){.raw = {1.f, 1.f, 1.f, 1.f}},
-                        .uv_x = 0,
-                        .uv_y = 0,
-                    };
-                    f32* pos = new_v.position.raw;
-                    if (!(cgltf_accessor_read_float(position, k, pos, element_size))) {
-                        ETERROR("Error attempting to read position value from %s.", path);
-                        dynarray_destroy(meshes);
-                        return 0;
-                    }
-                    vertices[initial_vertex + k] = new_v;
-                }
-            } else {
-                ETERROR("Attempted to load mesh without vertex positions");
-                dynarray_destroy(meshes);
-                return 0;
-            }
-
-            // load vertex normals
-            cgltf_accessor* normal = get_accessor_from_attributes(
-                primitive->attributes, primitive->attributes_count, "NORMAL");
-            if (normal) {
-                cgltf_size element_size = cgltf_calc_size(normal->type, normal->component_type);
-                for (u32 k = 0; k < normal->count; ++k) {
-                    vertex* v = &vertices[initial_vertex + k];
-                    if (!cgltf_accessor_read_float(normal, k, v->normal.raw, element_size)) {
-                        ETERROR("Error attempting to read normal value from %s.", path);
-                        dynarray_destroy(meshes);
-                        return 0;
-                    }
-                }
-            } else {
-                ETERROR("Attempted to load mesh without vertex normals");
-                dynarray_destroy(meshes);
-                return 0;
-            }
-
-            // load UV's
-            cgltf_accessor* uv = get_accessor_from_attributes(
-                primitive->attributes, primitive->attributes_count, "TEXCOORD_0");
-            if (uv) {
-                cgltf_size element_size = cgltf_calc_size(uv->type, uv->component_type);
-                for (u32 k = 0; k < uv->count; ++k) {
-                    vertex* v = &vertices[initial_vertex + k];
-                    v2s uvs = {.raw = {0, 0}};
-                    if (!cgltf_accessor_read_float(uv, k, uvs.raw, element_size)) {
-                        ETERROR("Error attempting to read uv value from %s.", path);
-                        dynarray_destroy(meshes);
-                        return 0;
-                    }
-                    v->uv_x = uvs.x;
-                    v->uv_y = uvs.y;
-                }
-            } else {
-                ETERROR("Attempted to load mesh without vertex texture coords");
-                dynarray_destroy(meshes);
-                return 0;
-            }
-
-            // Load vertex colors
-            cgltf_accessor* color = get_accessor_from_attributes(
-                primitive->attributes, primitive->attributes_count, "COLOR_0");
-            if (color) {
-                cgltf_size element_size = cgltf_calc_size(color->type, color->component_type);
-                for (u32 k = 0; k < color->count; ++k) {
-                    vertex* v = &vertices[initial_vertex + k];
-                    if (!cgltf_accessor_read_float(color, k, v->color.raw, element_size)) {
-                        ETERROR("Error attempting to read normal value from %s.", path);
-                        dynarray_destroy(meshes);
-                        return 0;
-                    }
-                }
-            }
-
-            // Push the new surface into the mesh asset dynarray of surfaces
-            dynarray_push((void**)&new_mesh.surfaces, &new_surface);
-        }
-        bool override_colors = false;
-        if (override_colors) {
-            for (u32 i = 0; i < dynarray_length(vertices); ++i) {
-                vertices[i].color.r = vertices[i].normal.r;
-                vertices[i].color.g = vertices[i].normal.g;
-                vertices[i].color.b = vertices[i].normal.b;
-            }
-        }
-        // Upload mesh data to the GPU
-        new_mesh.mesh_buffers = upload_mesh(state,
-            dynarray_length(indices), indices,
-            dynarray_length(vertices), vertices);
-
-        // Place the new mesh into the meshes dynamic array
-        dynarray_push((void**)&meshes, &new_mesh);
-
-        u32 max_index_value = 0;
-        for (u32 i = 0; i < dynarray_length(indices); ++i) {
-            max_index_value = (max_index_value < indices[i]) ? indices[i] : max_index_value;
-        }
-        ETINFO("Vertex count: %lu", dynarray_length(vertices));
-        ETINFO("Max index value: %lu", max_index_value);
-    }
-
-    dynarray_destroy(vertices);
-    dynarray_destroy(indices);
-
-    cgltf_free(data);
-    return meshes;
-}
-
-// TODO: Use cgltf_attribute_type instead to find the accessor instead
-static cgltf_accessor* get_accessor_from_attributes(cgltf_attribute* attributes, cgltf_size attributes_count, const char* name) {
-    for (cgltf_size i = 0; i < attributes_count; ++i) {
-        if (strings_equal(attributes[i].name, name)) {
-            return attributes[i].data;
-        }
-    }
-    return (void*)0;
-}
-
-// TODO: Handle texture_view implementation here (cgltf_texture_view)
-void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* state) {
+b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* state) {
     gltf->render_state = state;
     
     // Attempt to load gltf file data with cgltf library
@@ -231,7 +60,7 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
     cgltf_result result = cgltf_parse_file(&options, path, &data);
     if (result != cgltf_result_success) {
         ETERROR("Failed to load gltf file %s.", path);
-        return;
+        return false;
     }
 
     // Attempt to load the data from buffers in
@@ -239,8 +68,10 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
     if (result != cgltf_result_success) {
         ETERROR("Failed to load gltf file %s.", path);
         cgltf_free(data);
-        return;
+        return false;
     }
+
+    gltf->name = str_duplicate_allocate(path);
 
     // Descriptor Allocator for gltf
     pool_size_ratio ratios[] = {
@@ -282,6 +113,14 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
     gltf->images = etallocate(sizeof(image) * data->images_count, MEMORY_TAG_RENDERABLE);
     for (u32 i = 0; i < data->images_count; ++i) {
         gltf->images[i] = state->error_checkerboard_image;
+        b8 image_result = load_image(
+            &data->images[i],
+            path,
+            state,
+            &gltf->images[i]);
+        if (!image_result) {
+            ETERROR("Error loading image %s. from gltf file %s", data->images[i].name, path);
+        }
     }
     gltf->image_count = data->images_count;
 
@@ -309,8 +148,12 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
         MEMORY_TAG_RENDERABLE);
 
     // Create Materials
+    // TODO: Better checking of pbr materials presence in this loop
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material* i_material = (data->materials + i);
+
+        // NOTE: Name copy
+        gltf->materials[i].name = str_duplicate_allocate(i_material->name);
 
         // TODO: Check for cgltf_pbr_metallic_roughness beforehand
         // if not present use some default values
@@ -345,16 +188,35 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
             .data_buffer_offset = sizeof(struct material_constants) * i
         };
 
-        if (i_material->has_pbr_metallic_roughness &&
-            i_material->pbr_metallic_roughness.base_color_texture.texture)
-        {
-            cgltf_texture* tex = i_material->pbr_metallic_roughness.base_color_texture.texture;
-            u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, tex->image);
-            u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, tex->sampler);
+        if (i_material->has_pbr_metallic_roughness) {
+            if (i_material->pbr_metallic_roughness.base_color_texture.texture) {
+                cgltf_texture* color_tex = i_material->pbr_metallic_roughness.base_color_texture.texture;
+                u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, color_tex->image);
+                u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, color_tex->sampler);
 
-            material_resources.color_image = gltf->images[img_index];
-            material_resources.color_sampler = gltf->samplers[smpl_index];
+                material_resources.color_image = gltf->images[img_index];
+                material_resources.color_sampler = gltf->samplers[smpl_index];
+
+            }
+            if (i_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
+                cgltf_texture* mr_tex = i_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
+                u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, mr_tex->image);
+                u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, mr_tex->sampler);
+
+                material_resources.metal_rough_image = gltf->images[img_index];
+                material_resources.metal_rough_sampler = gltf->samplers[smpl_index];
+            }
         }
+
+        struct material_resources material_resources_test = {
+            .color_image = state->error_checkerboard_image,
+            .color_sampler = state->default_sampler_nearest,
+            .metal_rough_image = state->error_checkerboard_image,
+            .metal_rough_sampler = state->default_sampler_nearest,
+
+            .data_buffer = state->material_constants.handle,
+            .data_buffer_offset = 0
+        };
 
         // Write the material instance
         gltf->materials[i].data = GLTF_MR_write_material(
@@ -377,7 +239,7 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
 
         mesh_asset* new_mesh = &gltf->meshes[i];
 
-        new_mesh->name = string_duplicate_allocate(mesh->name);
+        new_mesh->name = str_duplicate_allocate(mesh->name);
 
         // Allocate memory for mesh surfaces:
         // TODO: Store the amount of surfaces and use that instead of dynarray
@@ -416,7 +278,7 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
                 primitive->attributes, primitive->attributes_count, "POSITION");
             if (!position) {
                 ETERROR("Attempted to load mesh without vertex positions.");
-                return;
+                return false;
             }
 
             dynarray_resize((void**)&vertices, dynarray_length(vertices) + position->count);
@@ -432,7 +294,7 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
                 
                 if (!cgltf_accessor_read_float(position, k, new_v.position.raw, pos_element_size)) {
                     ETERROR("Error attempting to read position value from %s.", path);
-                    return;
+                    return false;
                 }
                 vertices[initial_vertex + k] = new_v;
             }
@@ -441,8 +303,8 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
             cgltf_accessor* normal = get_accessor_from_attributes(
                 primitive->attributes, primitive->attributes_count, "NORMAL");
             if (!normal) {
-                ETERROR("Attempted to load mesh without vertex normals.");
-                return;
+                ETERROR("Attempt to load mesh without vertex normals.");
+                return false;
             }
 
             cgltf_size norm_element_size = cgltf_calc_size(normal->type, normal->component_type);
@@ -450,31 +312,30 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
                 vertex* v = &vertices[initial_vertex + k];
                 if (!cgltf_accessor_read_float(normal, k, v->normal.raw, norm_element_size)) {
                     ETERROR("Error attempting to read normal value from %s.", path);
-                    return;
                 }
             }
 
             // Load texture coordinates, UVs
             cgltf_accessor* uv = get_accessor_from_attributes(
                 primitive->attributes, primitive->attributes_count, "TEXCOORD_0");
-            if (!uv) {
-                ETERROR("Attempted to load mesh without vertex texture coords.");
-                return;
-            }
+            if (uv) {
+                cgltf_size uv_element_size = cgltf_calc_size(uv->type, uv->component_type);
+                for (u32 k = 0; k < uv->count; ++k) {
+                    vertex* v = &vertices[initial_vertex + k];
 
-            cgltf_size uv_element_size = cgltf_calc_size(uv->type, uv->component_type);
-            for (u32 k = 0; k < uv->count; ++k) {
-                vertex* v = &vertices[initial_vertex + k];
+                    v2s uvs = {.raw = {0.f, 0.f}};
+                    if (!cgltf_accessor_read_float(uv, k, uvs.raw, uv_element_size)) {
+                        ETERROR("Error attempting to read uvs from %s.", path);
+                        return false;
+                    }
 
-                v2s uvs = {.raw = {0.f, 0.f}};
-                if (!cgltf_accessor_read_float(uv, k, uvs.raw, uv_element_size)) {
-                    ETERROR("Error attempting to read uvs from %s.", path);
-                    return;
+                    v->uv_x = uvs.x;
+                    v->uv_y = uvs.y;
                 }
-
-                v->uv_x = uvs.x;
-                v->uv_y = uvs.y;
+            } else {
+                ETWARN("Loading mesh[%lu]: %s without texture coordinates.", i, mesh->name);
             }
+
 
             // Load vertex color information
             cgltf_accessor* color = get_accessor_from_attributes(
@@ -485,7 +346,7 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
                     vertex* v = &vertices[initial_vertex + k];
                     if (!cgltf_accessor_read_float(color, k, v->color.raw, element_size)) {
                         ETERROR("Error attempting to read color value from %s.", path);
-                        return;
+                        return false;
                     }
                 }
             }
@@ -553,6 +414,8 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
         cgltf_node_transform_local(&data->nodes[i], (cgltf_float*)node->local_transform.raw);
         cgltf_node_transform_world(&data->nodes[i], (cgltf_float*)node->world_transform.raw);
 
+        node->name = str_duplicate_allocate(data->nodes[i].name);
+
         // Store the node address in the nodes_by_index to grab a reference by index when
         // setting up the node hierarchy
         nodes_by_index[i] = node;
@@ -566,7 +429,7 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
         dynarray_resize((void**)&node->children, data->nodes[i].children_count);
         for (u32 j = 0; j < data->nodes[i].children_count; ++j) {
             u32 child_node_index = CGLTF_ARRAY_INDEX(cgltf_node, data->nodes, data->nodes[i].children[j]);
-            dynarray_push((void**)&node->children, &nodes_by_index[child_node_index]);
+            node->children[j] = nodes_by_index[child_node_index];
         }
         if (data->nodes[i].parent) {
             node->parent = nodes_by_index[CGLTF_ARRAY_INDEX(cgltf_node, data->nodes, data->nodes[i].parent)];
@@ -586,24 +449,224 @@ void load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state
 
     // Clean up memory
     cgltf_free(data);
+    return true;
 }
 
+// TODO: Remove
 void unload_gltf(struct loaded_gltf* gltf) {
-    dynarray_destroy(gltf->top_nodes);
+    renderer_state* state = gltf->render_state;
 
-    /** TODO: Destroy and free memory for:
-     * images
-     * samplers
-     * materials
-     * material_data_buffer
-     * meshes
-     * 
-     * mesh_nodes
-     * nodes
-     * 
-     * descriptor_allocator
-     */
+    dynarray_destroy(gltf->top_nodes);
     
+    for (u32 i = 0; i < gltf->mesh_node_count; ++i) {
+        str_duplicate_free(gltf->mesh_nodes[i].base.name);
+        mesh_node_destroy(&gltf->mesh_nodes[i]);
+    }
+    etfree(gltf->mesh_nodes, sizeof(mesh_node) * gltf->mesh_node_count, MEMORY_TAG_RENDERABLE);
+
+    for (u32 i = 0; i < gltf->node_count; ++i) {
+        str_duplicate_free(gltf->nodes[i].name);
+        node_destroy(&gltf->nodes[i]);
+    }
+    etfree(gltf->nodes, sizeof(node) * gltf->node_count, MEMORY_TAG_RENDERABLE);
+
+    for (u32 i = 0; i < gltf->mesh_count; ++i) {
+        buffer_destroy(state, &gltf->meshes[i].mesh_buffers.vertex_buffer);
+        buffer_destroy(state, &gltf->meshes[i].mesh_buffers.index_buffer);
+        dynarray_destroy(gltf->meshes[i].surfaces);
+        str_duplicate_free(gltf->meshes[i].name);
+    }
+    etfree(gltf->meshes, sizeof(mesh_asset) * gltf->mesh_count, MEMORY_TAG_RENDERABLE);
+
+    buffer_destroy(state, &gltf->material_data_buffer);
+    for (u32 i = 0; i < gltf->material_count; ++i)
+        str_duplicate_free(gltf->materials[i].name);
+    etfree(gltf->materials, sizeof(GLTF_material) * gltf->material_count, MEMORY_TAG_RENDERABLE);
+
+    for (u32 i = 0; i < gltf->image_count; ++i)
+        image2D_destroy(state, &gltf->images[i]);
+    etfree(gltf->images, sizeof(image) * gltf->image_count, MEMORY_TAG_RENDERABLE);
+
+    for (u32 i = 0; i < gltf->sampler_count; ++i)
+        vkDestroySampler(state->device.handle, gltf->samplers[i], state->allocator);
+    etfree(gltf->samplers, sizeof(VkSampler) * gltf->sampler_count, MEMORY_TAG_RENDERABLE);
+
+    descriptor_set_allocator_growable_shutdown(&gltf->descriptor_allocator, state);
+
+    str_duplicate_free(gltf->name);
+}
+
+b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
+    cgltf_options options = {0};
+    cgltf_data* data = 0;
+    cgltf_result result = cgltf_parse_file(&options, gltf_path, &data);
+    if (result != cgltf_result_success) {
+        ETERROR("Failed to load gltf file %s.", gltf_path);
+        return false;
+    }
+
+    etfile* json_dump_file = NULL;
+    b8 file_result = true;
+    
+    file_result = filesystem_open(dump_file_path, FILE_WRITE_FLAG, &json_dump_file);
+    if (!file_result) {
+        ETERROR("%s failed to open.", dump_file_path);
+        return false;
+    }
+
+    u64 bytes_written = 0;
+    file_result = filesystem_write(json_dump_file, data->json_size, (void*)data->json, &bytes_written);
+    if (!file_result) {
+        ETERROR("Failed to write %s's json data to %s.", gltf_path, dump_file_path);
+        return false;
+    }
+    filesystem_close(json_dump_file);
+    ETINFO("Json from %s successfully dumped to %s", gltf_path, dump_file_path);
+    return true;
+}
+
+static b8 load_image(cgltf_image* in_image, const char* gltf_path, renderer_state* state, image* out_image) {
+    if (in_image->uri == NULL && in_image->buffer_view == NULL) {
+        return false;
+    }
+
+    int width, height, channels;
+
+    // Load the image from a buffer view
+    if (in_image->buffer_view) {
+        void* buffer_data = in_image->buffer_view->buffer->data;
+        u64 byte_offset = in_image->buffer_view->offset;
+        u64 byte_length = in_image->buffer_view->size;
+
+        void* data = stbi_load_from_memory(
+            (u8*)buffer_data + byte_offset, byte_length, &width, &height, &channels, 4);
+        if (data) {
+            VkExtent3D image_size = {
+                .width = width,
+                .height = height,
+                .depth = 1
+            };
+            image2D_create_data(
+                state,
+                data,
+                image_size,
+                VK_FORMAT_R8G8B8A8_UNORM,
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_IMAGE_ASPECT_COLOR_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                out_image
+            );
+            stbi_image_free(data);
+            return true;
+        }
+        return false;
+    }
+
+    const char* uri = in_image->uri;
+
+    // https://en.wikipedia.org/wiki/Data_URI_scheme
+    // base64 is 6 bits stored in a string character. As a byte is 8 bits, a min of 
+    // string length * (3/4) bytes in memory to hold the resulting data
+    if (strsn_equal(uri, "data:", 5)) {
+        const char* comma = str_char_search(uri, ',');
+        if (comma && comma - uri >= 7 && strsn_equal(comma - 7, ";base64", 7)) {
+            cgltf_options options = {0};
+            cgltf_size size = (str_length(comma - 7) * 3) / 4;
+
+            void* decoded_data;
+            cgltf_result result = cgltf_load_buffer_base64(&options, size, comma, &decoded_data);
+            if (result != cgltf_result_success) {
+                return false;
+            }
+
+            void* data = stbi_load_from_memory(
+                decoded_data, (int)size, &width, &height, &channels, 4);
+            if (data) {
+                VkExtent3D image_size = {
+                    .width = width,
+                    .height = height,
+                    .depth = 1
+                };
+                image2D_create_data(
+                    state,
+                    data,
+                    image_size,
+                    VK_FORMAT_R8G8B8A8_UNORM,
+                    VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    out_image
+                );
+                stbi_image_free(data);
+                CGLTF_FREE(decoded_data);
+                return true;
+            }
+            CGLTF_FREE(decoded_data);
+            return false;
+        }
+    }
+
+    // Image is located in an external file
+    if (str_str_search(uri, "://") == NULL && gltf_path) {
+        u64 full_path_bytes = str_length(gltf_path) + str_length(uri) + 1;
+        char* full_path = etallocate(
+            full_path_bytes,
+            MEMORY_TAG_STRING);
+        gltf_combine_paths(full_path, gltf_path, uri);
+        cgltf_decode_uri(full_path + str_length(full_path) - str_length(uri));
+        void* data = stbi_load(full_path, &width, &height, &channels, 4);
+        if (data) {
+            VkExtent3D image_size = {
+                .width = width,
+                .height = height,
+                .depth = 1
+            };
+            image2D_create_data(
+                state,
+                data,
+                image_size,
+                VK_FORMAT_R8G8B8_UNORM,
+                VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_IMAGE_ASPECT_COLOR_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                out_image
+            );
+            stbi_image_free(data);
+            etfree(full_path, full_path_bytes, MEMORY_TAG_STRING);
+            return true;
+        }
+        etfree(full_path, full_path_bytes, MEMORY_TAG_STRING);
+        return false;
+    }
+
+    return false;
+}
+
+// TODO: Call on errors loading the gltf file and freeing memory
+static void load_gltf_failure(struct loaded_gltf* gltf) {
+    
+}
+
+// From cgltf_implementation
+static void gltf_combine_paths(char* path, const char* base, const char* uri) {
+    const char* b0 = base;
+    const char* s0 = NULL;
+    const char* s1 = NULL;
+    while(*b0 != '\0') {
+        if (*b0 == '/') s0 = b0;
+        if (*b0 == '\\') s1 = b0;
+        ++b0;
+    }
+    const char* slash = s0 ? (s1 && s1 > s0 ? s1 : s0) : s1;
+
+    if (slash) {
+        u64 prefix = slash - base + 1;
+
+        strn_copy(path, base, prefix);
+        str_copy(path + prefix, uri);
+    } else {
+        str_copy(path, uri);
+    }
 }
 
 static void print_nodes(cgltf_node* head) {
@@ -662,4 +725,14 @@ static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter) {
     default:
         return VK_SAMPLER_MIPMAP_MODE_LINEAR;
     }
+}
+
+// TODO: Use cgltf_attribute_type instead to find the accessor instead
+static cgltf_accessor* get_accessor_from_attributes(cgltf_attribute* attributes, cgltf_size attributes_count, const char* name) {
+    for (cgltf_size i = 0; i < attributes_count; ++i) {
+        if (strs_equal(attributes[i].name, name)) {
+            return attributes[i].data;
+        }
+    }
+    return (void*)0;
 }

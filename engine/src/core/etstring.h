@@ -2,12 +2,23 @@
 
 #include "defines.h"
 
-u64 string_length(const char* str);
+// TODO: Implement own string concept (maybe)
 
-b8 strings_equal(const char* str0, const char* str1);
+u64 str_length(const char* str);
 
-char* string_duplicate_allocate(const char* str);
+b8 strs_equal(const char* str0, const char* str1);
 
-void string_duplicate_free(char* str);
+b8 strsn_equal(const char* str0, const char* str1, u64 n);
 
-void string_format(char* dest, ...);
+char* strn_copy(char* dst, const char* src, u64 n);
+
+char* str_copy(char* dst, const char* src);
+
+char* str_char_search(const char* str, int c);
+
+char* str_str_search(const char* str, const char* sub_str);
+
+char* str_duplicate_allocate(const char* str);
+
+// TODO: Calls strlen to free this mem which is bad
+void str_duplicate_free(char* str);
