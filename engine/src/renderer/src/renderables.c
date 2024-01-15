@@ -133,6 +133,7 @@ static inline void _mesh_node_draw_vt(void* self, const m4s top_matrix, draw_con
 }
 static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_context* ctx) {
     m4s node_matrix = glms_mat4_mul(top_matrix, node->base.world_transform);
+    // Calculate the normal matrix and pass. TBN when normal maps are introduced
 
     u32 surface_count = dynarray_length(node->mesh->surfaces);
     for (u32 i = 0; i < surface_count; ++i) {
@@ -164,7 +165,6 @@ node* node_from_mesh_node(mesh_node* node) {
 }
 
 void gltf_draw(struct loaded_gltf* gltf, const m4s top_matrix, struct draw_context* ctx) {
-    // ETDEBUG("Gltf %s.", gltf->name);
     u32 node_count = dynarray_length(gltf->top_nodes);
     for (u32 i = 0; i < node_count; ++i) {
         node_draw(gltf->top_nodes[i], top_matrix, ctx);

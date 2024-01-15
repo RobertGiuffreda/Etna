@@ -101,9 +101,6 @@ typedef struct GPU_scene_data {
     v4s padding;            // 256 byte minimum on my GPU
 } GPU_scene_data;
 
-// TODO:TEMP: Hacky c code mimicking C++ OOP from vkguide.dev. 
-// This is until something more scalable or better for c is 
-// ironed out. 
 typedef enum material_pass {
     MATERIAL_PASS_MAIN_COLOR,
     MATERIAL_PASS_TRANSPARENT,
@@ -121,11 +118,36 @@ typedef struct material_instance {
     material_pass pass_type;
 } material_instance;
 
-// Could just: typedef struct material_instance GLTF_material here
 typedef struct GLTF_material {
     char* name;
     material_instance data;
 } GLTF_material;
+
+typedef struct GLTFMetallic_Roughness {
+    material_pipeline opaque_pipeline;
+    material_pipeline transparent_pipeline;
+
+    VkDescriptorSetLayout material_layout;
+
+    struct material_constants {
+        v4s color_factors;
+        v4s metal_rough_factors;
+        v4s padding[14];
+    };
+
+    struct material_resources {
+        image color_image;
+        VkSampler color_sampler;
+
+        image metal_rough_image;
+        VkSampler metal_rough_sampler;
+
+        VkBuffer data_buffer;
+        u32 data_buffer_offset;
+    };
+
+    ds_writer writer;
+} GLTF_MR;
 
 typedef struct geo_surface {
     u32 start_index;
@@ -163,19 +185,19 @@ typedef struct draw_context {
     render_object* transparent_surfaces;
 } draw_context;
 
-// TODO: Should not be visible
+/** NOTE: Hacky c code mimicking C++ OOP inheritance of node classes from vkguide.dev.
+ * TODO: Move this into the renderables section
+ */
 typedef struct renderable_virtual_table {
     void (*draw)(void* self, const m4s top_matrix, draw_context* ctx);
     void (*destroy)(void* self);
 } renderable_vt;
 
-// TODO: This should be opaque type
 typedef struct renderable {
     void* self;
     renderable_vt* vt;
 } renderable;
 
-// TODO: Should not be visible
 typedef struct node_virtual_table {
     void (*draw)(void* self, const m4s top_matrix, draw_context* ctx);
     void (*destroy)(void* self);
@@ -236,35 +258,9 @@ typedef struct loaded_gltf {
 
     renderer_state* render_state;
 } loaded_gltf;
+// TODO: END
 
-typedef struct GLTFMetallic_Roughness {
-    material_pipeline opaque_pipeline;
-    material_pipeline transparent_pipeline;
-
-    VkDescriptorSetLayout material_layout;
-
-    struct material_constants {
-        v4s color_factors;
-        v4s metal_rough_factors;
-        v4s padding[14];
-    };
-
-    struct material_resources {
-        image color_image;
-        VkSampler color_sampler;
-
-        image metal_rough_image;
-        VkSampler metal_rough_sampler;
-
-        VkBuffer data_buffer;
-        u32 data_buffer_offset;
-    };
-
-    ds_writer writer;
-} GLTF_MR;
-
-// TODO:TEMP: END
-
+// NOTE: Reflection info is unused at the moment 
 typedef struct binding {
     u32 binding;
     VkDescriptorType descriptor_type;
@@ -282,6 +278,7 @@ typedef struct set {
     binding* _bindings;
 } set;
 
+// TODO: Reflection data used to create a material
 typedef struct shader {
     VkShaderModule module;
     VkShaderStageFlagBits stage;
@@ -295,14 +292,12 @@ typedef struct shader {
         u32 temp;
     }*push_constants;
 
-    // TODO: Add type information maybe
     u32 input_count;
     struct {
         u32 location;
         VkFormat format;
     }*inputs;
 
-    // TODO: Add type information maybe
     u32 output_count;
     struct {
         u32 location;
@@ -310,7 +305,7 @@ typedef struct shader {
     }*outputs;
 } shader;
 
-/** TEMP: & TODO:
+/** TEMP:TODO:
  * This section involving compute effects is a bit of a mess and
  * is temporary. This will be here until a material system is thought out and 
  * implemented.
@@ -334,9 +329,7 @@ typedef struct compute_effect {
 
     compute_push_constants data;
 } compute_effect;
-// NOTE: END
-
-/* TEMP: & TODO: END */
+// TEMP:TODO: END
 
 typedef struct device {
     VkDevice handle;

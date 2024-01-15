@@ -13,30 +13,33 @@ typedef struct renderer_state {
 #endif
     VkAllocationCallbacks* allocator;
 
-    // Window elements
-    // Extent of render image decides resolution
-    VkExtent3D render_extent;
-    VkSurfaceKHR surface;
-    // True if window was resized
-    b8 swapchain_dirty;
-
     device device;
 
+    // NOTE: Swapchain & window data
     VkSwapchainKHR swapchain;
+    VkImage* swapchain_images;
+    VkImageView* swapchain_image_views;
     VkFormat swapchain_image_format;
 
     // Determines amount of frames: Length of perframe arrays
     u32 image_count;
-    VkExtent3D window_extent;
-    VkImage* swapchain_images;
-    VkImageView* swapchain_image_views;
 
-    // Image to render to that get copied onto the swapchain image
+    VkSurfaceKHR surface;
+    // TODO: Rename swapchain extent??
+    VkExtent3D window_extent;
+    
+    // True if window was resized
+    b8 swapchain_dirty;
+    // NOTE: END
+
+    // NOTE: Main render images and attachments
+    VkExtent3D render_extent;
     image render_image;
     image depth_image;
+    // NOTE: END
 
-    // Index into per frame arrays: TODO: Rename to frame_index maybe??
-    u32 current_frame; 
+    // TODO: Rename to frame_index maybe??
+    u32 current_frame;
     
     // NOTE: Per frame structures/data. Add to separate struct??
     VkSemaphore* swapchain_semaphores;
@@ -50,9 +53,12 @@ typedef struct renderer_state {
     VkCommandBuffer* main_graphics_command_buffers;
 
     ds_allocator_growable* frame_allocators;
+
+    // Buffers for each frame to store scene data. Idk if this should be per frame
+    buffer* scene_data_buffers;
     // NOTE: Per frame END
 
-    // Immediate command pool & buffer
+    // NOTE: Immediate command pool & buffer
     // TODO: How does this fit into place with with queues 
     // and multiple queue families 
     VkCommandPool imm_pool;
@@ -61,26 +67,20 @@ typedef struct renderer_state {
 
     void (*immediate_begin)(struct renderer_state* state);
     void (*immediate_end)(struct renderer_state* state);
+    // NOTE: END
 
     // Global descriptor set allocator
     ds_allocator_growable global_ds_allocator;
 
+    // NOTE: Compute effect members
     shader gradient_shader;
     compute_effect gradient_effect;
 
-    VkDescriptorSet draw_image_descriptor_set;
     VkDescriptorSetLayout draw_image_descriptor_set_layout;
-    VkDescriptorSetLayout single_image_descriptor_set_layout;
+    VkDescriptorSet draw_image_descriptor_set;
+    // NOTE: END
 
-    // Testing loading data to vertex & index buffer as well as buffer references
-    shader mesh_vertex;
-    shader mesh_fragment;
-
-    VkPipeline mesh_pipeline;
-    VkPipelineLayout mesh_pipeline_layout;
-
-    // TEMP: Section 4 of guide
-    // Default images/textures to use
+    // NOTE: Default images, samplers, materials
     image white_image;
     image black_image;
     image grey_image;
@@ -90,42 +90,22 @@ typedef struct renderer_state {
     VkSampler default_sampler_nearest;
     
     GLTF_MR metal_rough_material;
-    buffer material_constants;
 
-    // Scene data
-    draw_context main_draw_context;
+    material_instance default_material_instance;
+    buffer default_material_constants;
+    // NOTE: END
+
+    // Scene data. Per frame buffers for passing scene data to shaders above 
     GPU_scene_data scene_data;
-    material_instance default_data;
-
-    // TEMP:TODO: Have a node allocator that allocates backing nodes
-    // and returns references to them.
-    // For now have the backing mesh nodes & nodes backed here in memory
-    u32 backing_mesh_node_count;
-    mesh_node* backing_mesh_nodes;
-    u32 backing_node_count;
-    node* backing_nodes;
-    // TEMP:TODO: END
-
-    // TEMP: Until loading a scene instead of meshes
-    mesh_asset* meshes;
-    // TEMP: END
-
-    loaded_gltf scene;
-
-    // An array of pointers to nodes located in the backing array above
-    node** loaded_nodes;
-
     VkDescriptorSetLayout scene_data_descriptor_set_layout;
+    
+    draw_context main_draw_context;
 
-    // Buffers for each frame to store scene data
-    buffer* scene_data_buffers;
-    // TEMP: END
-
-    gpu_mesh_buffers rectangle;
-
-    // TEMP: Guide chapter 5
+    loaded_gltf _gltf;
     camera main_camera;
-    // TEMP: END
+
+    // TEMP: Here in case of testing
+    gpu_mesh_buffers rectangle;
 } renderer_state;
 
 /** Takes a code block in the ... argument and begins recording of a command buffer before the 
@@ -145,7 +125,6 @@ do {                                            \
 } while(0);                                     \
 
 #ifdef _DEBUG
-// TODO: Move definition to a utility function file
 b8 renderer_set_debug_object_name(renderer_state* state, VkObjectType object_type, u64 object_handle, const char* object_name);
 #define SET_DEBUG_NAME(render_state, object_type, object_handle, object_name) renderer_set_debug_object_name(render_state, object_type, (u64)(object_handle), object_name)
 #elif 

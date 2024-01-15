@@ -7,8 +7,6 @@
 #include "renderer/src/renderer.h"
 #include "renderer/src/buffer.h"
 
-
-
 // TODO: Multisampling bits in ImageCreateInfo
 // TODO: Check if tiling and sample settings are supported for the specific image format
 void image2D_create(

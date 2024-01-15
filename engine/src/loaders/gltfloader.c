@@ -207,17 +207,7 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
                 material_resources.metal_rough_sampler = gltf->samplers[smpl_index];
             }
         }
-
-        struct material_resources material_resources_test = {
-            .color_image = state->error_checkerboard_image,
-            .color_sampler = state->default_sampler_nearest,
-            .metal_rough_image = state->error_checkerboard_image,
-            .metal_rough_sampler = state->default_sampler_nearest,
-
-            .data_buffer = state->material_constants.handle,
-            .data_buffer_offset = 0
-        };
-
+        
         // Write the material instance
         gltf->materials[i].data = GLTF_MR_write_material(
             &state->metal_rough_material,

@@ -45,9 +45,6 @@ static void create_scene_data_buffers(renderer_state* state);
 static void destroy_scene_data_buffers(renderer_state* state);
 
 // TEMP: Until material framework is stood up
-static void initialize_mesh_pipeline(renderer_state* state);
-static void shutdown_mesh_pipeline(renderer_state* state);
-
 static void initialize_mesh_mat_pipeline(renderer_state* state);
 static void shutdown_mesh_mat_pipeline(renderer_state* state);
 
@@ -219,13 +216,15 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
         .height = state->window_extent.height,
         .depth = 1};
     state->render_extent = render_resolution;
+
     // Rendering attachment images initialization
+    
+    // Color attachment
     VkImageUsageFlags draw_image_usages = {0};
     draw_image_usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     draw_image_usages |= VK_IMAGE_USAGE_STORAGE_BIT;
     draw_image_usages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    // Color attachment
     image2D_create(state,
         state->render_extent,
         VK_FORMAT_R16G16B16A16_SFLOAT,
@@ -235,6 +234,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
         &state->render_image);
     ETINFO("Render image created");
 
+    // Depth attachment
     VkImageUsageFlags depth_image_usages = {0};
     depth_image_usages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
@@ -247,20 +247,20 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
         &state->depth_image);
     ETINFO("Depth image created");
 
+    // Per frame initializations
     create_frame_command_structures(state);
     ETINFO("Frame command structures created.");
     create_frame_synchronization_structures(state);
     ETINFO("Frame synchronization structures created.");
-
-    // Set immediate command buffer start and end functions
-    state->immediate_begin = immediate_begin;
-    state->immediate_end = immediate_end;
+    create_scene_data_buffers(state);
+    ETINFO("Frame scene data buffers created");
 
     initialize_descriptors(state);
     ETINFO("Descriptors Initialized.");
 
-    create_scene_data_buffers(state);
-    ETINFO("Scene data buffers created");
+    // Set immediate command buffer start and end functions
+    state->immediate_begin = immediate_begin;
+    state->immediate_end = immediate_end;
 
     // TEMP: Until post processing effect structure/system is created/becomes more robust. 
     load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader);
@@ -293,8 +293,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     ETINFO("Gradient compute effect created.");
     // TEMP: END
 
-    initialize_mesh_pipeline(state);
-
     initialize_mesh_mat_pipeline(state);
 
     camera_create(&state->main_camera);
@@ -318,8 +316,6 @@ void renderer_shutdown(renderer_state* state) {
     camera_destroy(&state->main_camera);
 
     shutdown_mesh_mat_pipeline(state);
-
-    shutdown_mesh_pipeline(state);
 
     // TEMP: Until post processing effect structure/system is created/becomes more robust. 
     vkDestroyPipeline(state->device.handle, state->gradient_effect.pipeline, state->allocator);
@@ -396,12 +392,11 @@ void renderer_update_scene(renderer_state* state) {
     dynarray_clear(state->main_draw_context.opaque_surfaces);
     dynarray_clear(state->main_draw_context.transparent_surfaces);
 
-    gltf_draw(&state->scene, glms_mat4_identity(), &state->main_draw_context);
-    // node_draw(state->scene.top_nodes[0], glms_mat4_identity(), &state->main_draw_context);
+    gltf_draw(&state->_gltf, glms_mat4_identity(), &state->main_draw_context);
+    // node_draw(state->_gltf.top_nodes[0], glms_mat4_identity(), &state->main_draw_context);
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
-
     // Wait for the current frame to end rendering by waiting on its render fence
     // Reset the render fence for reuse
     VK_CHECK(vkWaitForFences(
@@ -686,17 +681,12 @@ static void initialize_descriptors(renderer_state* state) {
     dynarray_destroy(global_ratios_dynarray);
     ETINFO("Global descriptor set allocator initialized.");
 
+    // Descriptor set layout for accessing the render image from a compute shader
     dsl_builder dsl_builder = descriptor_set_layout_builder_create();
     descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
     state->draw_image_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
     descriptor_set_layout_builder_destroy(&dsl_builder);
     ETINFO("Draw Image Descriptor Set Layout created.");
-
-    dsl_builder = descriptor_set_layout_builder_create();
-    descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-    state->single_image_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
-    descriptor_set_layout_builder_destroy(&dsl_builder);
-    ETINFO("Single image descriptor set layout created.");
 
     dsl_builder = descriptor_set_layout_builder_create();
     descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -743,9 +733,6 @@ static void shutdown_descriptors(renderer_state* state) {
     vkDestroyDescriptorSetLayout(state->device.handle, state->draw_image_descriptor_set_layout, state->allocator);
     ETINFO("Draw Image descriptor set layout destroyed.");
 
-    vkDestroyDescriptorSetLayout(state->device.handle, state->single_image_descriptor_set_layout, state->allocator);
-    ETINFO("Single Image descriptor set layout destroyed.");
-
     // Shutdown growable descriptor set allocators
     for (u32 i = 0; i < state->image_count; ++i) {
         descriptor_set_allocator_growable_destroy_pools(&state->frame_allocators[i], state);
@@ -773,57 +760,6 @@ static void destroy_scene_data_buffers(renderer_state* state) {
         buffer_destroy(state, &state->scene_data_buffers[i]);
     }
     etfree(state->scene_data_buffers, sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
-}
-
-static void initialize_mesh_pipeline(renderer_state* state) {
-    load_shader(state, "build/assets/shaders/mesh.vert.spv", &state->mesh_vertex);
-    load_shader(state, "build/assets/shaders/tex_image.frag.spv", &state->mesh_fragment);
-    ETINFO("Mesh pipeline shaders loaded.");
-
-    VkPushConstantRange buffer_range = {
-        .offset = 0,
-        .size = sizeof(gpu_draw_push_constants),
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT};
-    
-    VkPipelineLayoutCreateInfo pipeline_layout_info = init_pipeline_layout_create_info();
-    pipeline_layout_info.pushConstantRangeCount = 1;
-    pipeline_layout_info.pPushConstantRanges = &buffer_range;
-    pipeline_layout_info.setLayoutCount = 1;
-    pipeline_layout_info.pSetLayouts = &state->single_image_descriptor_set_layout;
-    VK_CHECK(vkCreatePipelineLayout(
-        state->device.handle,
-        &pipeline_layout_info,
-        state->allocator,
-        &state->mesh_pipeline_layout));
-    
-    pipeline_builder builder = pipeline_builder_create();
-    builder.layout = state->mesh_pipeline_layout;
-    pipeline_builder_set_shaders(&builder, state->mesh_vertex, state->mesh_fragment);
-    pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
-    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-    pipeline_builder_set_multisampling_none(&builder);
-    pipeline_builder_disable_blending(&builder);
-    // pipeline_builder_enable_blending_additive(&builder);
-    // pipeline_builder_enable_blending_alphablend(&builder);
-    pipeline_builder_enable_depthtest(&builder, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
-    pipeline_builder_set_color_attachment_format(&builder, state->render_image.format);
-    pipeline_builder_set_depth_attachment_format(&builder, state->depth_image.format);
-    state->mesh_pipeline = pipeline_builder_build(&builder, state);
-    
-    pipeline_builder_destroy(&builder);
-
-    ETINFO("Mesh pipeline & pipeline layout created");
-}
-
-static void shutdown_mesh_pipeline(renderer_state* state) {
-    vkDestroyPipeline(state->device.handle, state->mesh_pipeline, state->allocator);
-    vkDestroyPipelineLayout(state->device.handle, state->mesh_pipeline_layout, state->allocator);
-    ETINFO("Mesh pipeline & pipeline layout destroyed");
-
-    unload_shader(state, &state->mesh_fragment);
-    unload_shader(state, &state->mesh_vertex);
-    ETINFO("Mesh pipeline shaders unloaded.");
 }
 
 static void initialize_mesh_mat_pipeline(renderer_state* state) {
@@ -951,7 +887,7 @@ static b8 initialize_default_data(renderer_state* state) {
         sizeof(struct material_constants),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &state->material_constants
+        &state->default_material_constants
     );
 
     struct material_constants scene_uniform_data = {
@@ -959,22 +895,20 @@ static b8 initialize_default_data(renderer_state* state) {
         .metal_rough_factors = (v4s){.raw = {1.f, .5f, 0.f, 0.f}},
     };
     struct material_constants* mapped_data;
-    vkMapMemory(state->device.handle, state->material_constants.memory, 0, sizeof(struct material_constants), 0, &mapped_data);
+    vkMapMemory(state->device.handle, state->default_material_constants.memory, 0, sizeof(struct material_constants), 0, &mapped_data);
     *mapped_data = scene_uniform_data;
-    vkUnmapMemory(state->device.handle, state->material_constants.memory);
+    vkUnmapMemory(state->device.handle, state->default_material_constants.memory);
 
-    mat_resources.data_buffer = state->material_constants.handle;
+    mat_resources.data_buffer = state->default_material_constants.handle;
     mat_resources.data_buffer_offset = 0;
 
-    state->default_data = GLTF_MR_write_material(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
+    state->default_material_instance = GLTF_MR_write_material(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
 
-    const char* path = "build/assets/gltf/zda_test.glb";
-
-    // Currrently working: 
-    // const char* path = "build/assets/gltf/structure.glb";
+    // const char* path = "build/assets/gltf/zda_test.glb";
+    const char* path = "build/assets/gltf/structure.glb";
     
-    // Load the chosen gltf into the scene
-    if (!load_gltf(&state->scene, path, state)) {
+    // Load the chosen gltf into the _gltf
+    if (!load_gltf(&state->_gltf, path, state)) {
         ETFATAL("Error loading gltf %s.", path);
         return false;
     }
@@ -989,10 +923,10 @@ static void shutdown_default_data(renderer_state* state) {
     dynarray_destroy(state->main_draw_context.transparent_surfaces);
     dynarray_destroy(state->main_draw_context.opaque_surfaces);
 
-    unload_gltf(&state->scene);
+    unload_gltf(&state->_gltf);
     ETINFO("Scene GLTF file unloaded");
 
-    buffer_destroy(state, &state->material_constants);
+    buffer_destroy(state, &state->default_material_constants);
 
     descriptor_set_writer_shutdown(&state->metal_rough_material.writer);
 
@@ -1041,7 +975,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-    // guide 4 scene data
+    // Set the per frame scene data in state->scene_data_buffers[frame_index]
     void* mapped_scene_data;
     vkMapMemory(
         state->device.handle,
@@ -1077,8 +1011,6 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     // TODO: Record draw commands for render objects here
     for (u32 i = 0; i < dynarray_length(state->main_draw_context.opaque_surfaces); ++i) {
         render_object* draw = &state->main_draw_context.opaque_surfaces[i];
-
-        // ETDEBUG("RO m: %s & mat: %s", draw->mesh_name, draw->material_name);
 
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->material->pipeline->pipeline);
 

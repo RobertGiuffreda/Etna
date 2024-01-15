@@ -24,18 +24,23 @@ void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
     matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     dsl_builder layout_builder = descriptor_set_layout_builder_create();
+    // Scene data binding
     descriptor_set_layout_builder_add_binding(
         &layout_builder,
         /* Binding: */ 0,
         /* Descriptor Count: */ 1,
         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    
+    // Color texture binding
     descriptor_set_layout_builder_add_binding(
         &layout_builder,
         /* Binding: */ 1,
         /* Descriptor Count: */ 1,
         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    
+    // Metal roughness texture binding
     descriptor_set_layout_builder_add_binding(
         &layout_builder,
         /* Binding: */ 2,
@@ -116,8 +121,7 @@ material_instance GLTF_MR_write_material(
     mat_data.pass_type = pass;
     if (pass == MATERIAL_PASS_TRANSPARENT) {
         mat_data.pipeline = &mat->transparent_pipeline;
-    }
-    else {
+    } else {
         mat_data.pipeline = &mat->opaque_pipeline;
     }
 

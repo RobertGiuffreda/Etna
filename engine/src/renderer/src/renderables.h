@@ -6,15 +6,14 @@
  * Renderable is an interface/abstract class implementation
  * Node is a parent class of mesh_node
  * Mesh_node derives from node
- * 
- * Only creating a mesh_node and putting it in a node array is currently supported
- * 
- * Instead of storing self it may be possible to just use the passed in object
+ *
+ * Instead of storing self I could use the passed in object address as the base class is
+ * always the first element of the derived class 
  */
 
 // TODO: Current Issue: Copying the struct will create a shallow copy at the moment, 
 // which means that the void* self pointers stored to pass to the function will be pointing
-// to the wrong memory. 
+// to the wrong memory.
 
 // Solutions:
 // Opt 1: Copy constructor function
@@ -32,8 +31,18 @@
 // ^^ This would not allow an array of abstract classes; Would need an array of pointers
 // Which is needed anyway as the self pointer would be stored in the renderable struct
 
-// TODO: Create a windows equivelent of the container_of macro 
+// TODO: Create a container_of macro for multiple inheritance?? (Curiosity not need)
 // if I want the derived struct to inherit multiple things.
+
+/** TODO: Functions to add
+ * xxxx* xxxx_allocate()
+ * xxxx* xxxx_deallocate()
+ * 
+ * These would allocate the memory and return a pointer to the allocated memory
+ * Deallocate would be virtual
+ * 
+ * Function to add any kind of node to a scene graph
+ */
 
 void renderable_destroy(renderable* renderable);
 void renderable_draw(renderable* renderable, const m4s top_matrix, draw_context* ctx);

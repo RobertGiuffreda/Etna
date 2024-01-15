@@ -1,92 +1,76 @@
+---------------------Code TODO: List
+TODO: Compute effect descriptor set layout and allocated descriptor set moved to a
+      function for allocating the compute effect's descriptor set
 
----------------------More Immediate---------------------
+TODO: Create separate branch for adding in UI. Immediate mode UI Nuklear for the time being
+
 TODO: RendererAPI:
-      TODO: Create default scene & load that by default are in engine settings
-      TODO: Functions to expose loading & models & scenes
-      TODO: Functions to expose loading shaders & making materials from them
+TODO: Choose default scene & load that by default
+TODO: Define functions to expose loading gltf scenes
+TODO: Define functions to expose loading shaders & making materials from them
 
 GOAL: Nothing hardcoded in renderer. Systems supply renderables, Application code supplies what to load into systems.
+NOTE: Things hardcoded in engine. Goal does not mean serialization or GUI interaction
 
+---------------------Refactor (Changes organization of the code with the same functionality(mostly))
 TODO: u32 is used for index instead of size_t many times. This should be fixed
+TODO: Result of vulkan commands checking done with VK_CHECK & other result checking when necessary:
+TODO: Private header files to support unit tests testing opaque types internals
+TODO: state->window_extent should be set before the swapchain in case the swapchain current extent is 0xFFFFFFFF. 
+      Special value to say the app is in control of the size
+TODO: Vulkan string library or something like that
+TODO: Logger uses etstring abstractions (just wrappers for now)
+TODO: When systems fail they should be able to call shutdown procedures if the failure is recoverable: Failing with grace
+TODO: Make functions not all return booleans when unnecessary
+TODO: Filesystem improvements (I forgot what this meant but the file interaction is not great anyway).
 
---------Improvements for after rendering architecture framework is down but not optimized at all--------
+TODO: Variables, structs, functions are renamed according to new convention. (snake case is looking ugly and long)
+TODO: End _state naming paradigm:
+TODO: renderer_state --> renderer/RenderEngine etc...
+
+---------------------Implementation (Adding code to implement a feature)
+TODO: Handle minimizing
+TODO: Logger outputs to log file.
 TODO: Way of measuring performance: FPS and/or CPU & GPU profilers
 
-NOTE: Renderer specific:
-    TODO: Manage vulkan buffer & image memory by allocating from GPU in 
+TODO: Serialization & file parsing system:
+TODO: Config file for engine to load settings
+TODO: Config file for renderer to load settings
+
+---------------------Optimizations (Changes to already present code to improve it in some manner)
+TODO: Manage vulkan buffer & image memory by allocating from GPU in 
     chunks and allocating whats needed from that via views and subsections
     of the buffer/image resource.
+TODO: Use multiple queue families instead of just the one. For other stuff
+TODO: Use the TRANSFER QUEUE to copy the data from rendering image to the swapchain image
+TODO: Staging buffer improvment: For loading on the fly | Use TRANSFER QUEUE | Eventual multithreaded
+TODO: vkCreateDescriptorUpdateTemplate to use update instead of stuff
 
-    TODO: Result of vulkan commands checking done with VK_CHECK & other result checking when unnecessary:
-    TODO: Vulkan string library or something like that
-
-    TODO: Use multiple queue families instead of just the one. For other stuff
-
-    TODO: SPIR-V optimizer commands in cmake
-    TODO: Runtime compilation of shader for realtime updating & loading
-
-    TODO: Check if image format has VkFormatFeatureFlagBits set for what I want to use it for
-    TODO: VkImageViewUsageCreateInfo structure to the pNext chain, but the view usage must be a subset of the image usage.
-
-    TODO: Make Render image format configurable from engine editor.
-
-    TODO: Use the TRANSFER QUEUE to copy the data from rendering image to the swapchain image
-    TODO: Validate that the device is able to create the descriptor set layouts gotten from the shaders
-    ^^vkGetDescriptorSetLayoutSupport & (VkPhysicalDeviceMaintenance3Properties + vkGetPhysicalDeviceProperties2)
-
-    TODO: Make the renderer a dynamically loaded plugin.
-
-NOTE: Not Renderer specific:
-    TODO: Handle minimizing
-    
-    TODO: Logger outputs to log file.
-
-    TODO: Logger uses etstring abstractions (just wrappers for now)
-
-    TODO: FIFO Struct to place events into
-    TODO: Setup event overwritting or adding based on behavior of event. When event is fired,
-          it would be able to overwrite the event waiting in the event queue or
-          it would be able to combine its parameters in a predefined way(func pointer??)
-    TODO: Events: Data struct to support insertions with ordering(priority) value
-
-    TODO: Use multiple queue families instead of just the one. For other stuff
-
-    TODO: Staging buffer improvment: For loading on the fly | Use transfer queue | Eventual multithreaded
-    TODO: vkCreateDescriptorUpdateTemplate to use update instead of stuff
-
-    TODO: Make functions not all return booleans when unnecessary
-    TODO: Change from passing by pointer unless value is changing
-    TODO: Filesystem typedef FILE etfile instead of struct nonsense
-    TODO: Better way of doing the filesystem.
-
-    TODO: When systems fail they should be able to call shutdown procedures if the failure is recoverable
-
-    TODO: Make the game code a dynamically loaded plugin.
-
-TODO: Unit tests
-TODO: Setup Debug & Release configurations
 GOAL: De-spaghettification of code & unit tests to make sure optimizations and features break nothing.
-Rename types to more suitable things: End _state naming paradigm:
-renderer_state --> renderer/RenderEngine etc...
 
-Adopt a new naming paradigm/style guide.
-Snake case for function names and camel case for type names or something.
+---------------------Eventual (Move from here to above categories)
+TODO: Runtime compilation of shader for realtime updating & loading
+TODO: Check if image format has VkFormatFeatureFlagBits set for what I want to use it for
+TODO: VkImageViewUsageCreateInfo structure to the pNext chain, but the view usage must be a subset of the image usage.
+TODO: Make Render image format configurable from engine editor.
+TODO: Validate that the device is able to create the descriptor set layouts gotten from the shaders
+^^^^^^vkGetDescriptorSetLayoutSupport & (VkPhysicalDeviceMaintenance3Properties + vkGetPhysicalDeviceProperties2)
 
-Maybes
 TODO: Make max resolution image and render to a swapchain sized portion of it using scissor & viewport & renderArea
+TODO: If we change the resolution of the render_image, at runtime, we need to update the descriptor sets that reference it with the new image view sampler etc...
 
-TODO: state->window_extent should be set before the swapchain in case the swapchain current extent is 0xFFFFFFFF. 
-Special value to say the app is in control of the size
+TODO: Make the renderer a dynamically loaded plugin. So it can be worked on while the engine is running
+TODO: Make the game code a dynamically loaded plugin.
 
-TODO: If we change the resolution of the render_image we need to update the descriptor sets that reference it with the new image view sampler etc...
-TODO: Descriptor sets would still reference old render image. So they need to be updated
+TODO: Handle window creation without a library
 
---------When rendering & code are despaghettified and simple performance improvements have been made & RenderingAPI has been created to expose functionality--------
-TODO: Nuklear UI vs some sort of imgui integration
+TODO: Multithreading
 
-TODO: Serialization
-    TODO: Config file for engine to load settings
-    TODO: Config file for renderer to load settings
+TODO: FIFO Struct to place events into, Deferred events.
+TODO: Setup event overwritting or adding based on behavior of event. When event is fired,
+        it would be able to overwrite the event waiting in the event queue or
+        it would be able to combine its parameters in a predefined way(func pointer??)
+TODO: Events: Data struct to support insertions with ordering(priority) value
 
 TODO: Command Line/Terminal/Bash for the system until UI is created. As well as for temporary setting selection
 TODO: UI Layer & functionality 
@@ -101,7 +85,11 @@ TODO: Material Experimentaion editor feature.
 
 TODO: Runtime check for GLSL extension support
 
---------Finally can do some graphics programming--------
+---------------------Build system
+TODO: Setup Debug & Release configurations
+TODO: SPIR-V optimizer commands in cmake
+
+--------Graphics programming--------
 NOTE: Sample 2D slice of 3D texture for wierd patterns.
 Like mod world position with texture limits to index into tiling 3D texture.
 
@@ -110,12 +98,11 @@ NOTE: 3D texture coords to warp the viewport for neat effects
 NOTE: Use post processing texture group code to styilize procedurally generated textures
 
 --------Future Optimizations or Refactoring--------
-CPU profiler & GPU profiler to profile performance
 Create a different dynamic array data structure where the array data is not hidden
 from the user but does not need to be initialized. This would be for data structures to use so a create or 
 initialize function is not needed when before said structure is used;
 
-----------------------Code I am worried I might still need but is cluttering code 
+----------------------Code I am worried I might still need but is cluttering up project code 
     f32 fov_rad = glm_rad(70.f);
     f32 aspect_ratio = ((f32)state->render_extent.width/(f32)state->render_extent.height);
     f32 n = 10000.f;
@@ -234,3 +221,56 @@ initialize function is not needed when before said structure is used;
         node* node = node_from_mesh_node(new_node);
         dynarray_push((void**)&state->loaded_nodes, &node);
     }
+
+
+
+static void initialize_mesh_pipeline(renderer_state* state) {
+    load_shader(state, "build/assets/shaders/mesh.vert.spv", &state->mesh_vertex);
+    load_shader(state, "build/assets/shaders/tex_image.frag.spv", &state->mesh_fragment);
+    ETINFO("Mesh pipeline shaders loaded.");
+
+    VkPushConstantRange buffer_range = {
+        .offset = 0,
+        .size = sizeof(gpu_draw_push_constants),
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT};
+    
+    VkPipelineLayoutCreateInfo pipeline_layout_info = init_pipeline_layout_create_info();
+    pipeline_layout_info.pushConstantRangeCount = 1;
+    pipeline_layout_info.pPushConstantRanges = &buffer_range;
+    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = &state->single_image_descriptor_set_layout;
+    VK_CHECK(vkCreatePipelineLayout(
+        state->device.handle,
+        &pipeline_layout_info,
+        state->allocator,
+        &state->mesh_pipeline_layout));
+    
+    pipeline_builder builder = pipeline_builder_create();
+    builder.layout = state->mesh_pipeline_layout;
+    pipeline_builder_set_shaders(&builder, state->mesh_vertex, state->mesh_fragment);
+    pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipeline_builder_set_multisampling_none(&builder);
+    pipeline_builder_disable_blending(&builder);
+    // pipeline_builder_enable_blending_additive(&builder);
+    // pipeline_builder_enable_blending_alphablend(&builder);
+    pipeline_builder_enable_depthtest(&builder, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+    pipeline_builder_set_color_attachment_format(&builder, state->render_image.format);
+    pipeline_builder_set_depth_attachment_format(&builder, state->depth_image.format);
+    state->mesh_pipeline = pipeline_builder_build(&builder, state);
+    
+    pipeline_builder_destroy(&builder);
+
+    ETINFO("Mesh pipeline & pipeline layout created");
+}
+
+static void shutdown_mesh_pipeline(renderer_state* state) {
+    vkDestroyPipeline(state->device.handle, state->mesh_pipeline, state->allocator);
+    vkDestroyPipelineLayout(state->device.handle, state->mesh_pipeline_layout, state->allocator);
+    ETINFO("Mesh pipeline & pipeline layout destroyed");
+
+    unload_shader(state, &state->mesh_fragment);
+    unload_shader(state, &state->mesh_vertex);
+    ETINFO("Mesh pipeline shaders unloaded.");
+}

@@ -148,5 +148,6 @@
         "unordered_map": "c",
         "unordered_set": "c",
         "stb_image.h": "c"
-    }
+    },
+    "C_Cpp.dimInactiveRegions": false
 }
