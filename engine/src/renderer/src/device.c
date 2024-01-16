@@ -160,7 +160,6 @@ b8 device_create(renderer_state* state, device* out_device) {
         .features = {
             .samplerAnisotropy = requirements.sampler_anisotropy}};
 
-    // TODO: Logical device creation
     VkDeviceCreateInfo device_cinfo = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = &enabled_features2, 
@@ -296,7 +295,6 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
 }
 
 static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surface, gpu_reqs* requirements) {
-    // TODO: Use VkPhysicalDeviceDynamicRenderingFeatures
     // Get physical device features
     VkPhysicalDeviceVulkan13Features features13 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,

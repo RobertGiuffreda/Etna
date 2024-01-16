@@ -362,8 +362,8 @@ VkCopyBufferToImageInfo2 init_copy_buffer_to_image_info2(
     };
     return info;
 }
-// TODO: Move this to a utilities file
 /** TODO:
+ * Move this to a utilities file
  * Documentation explaining what this does and how it works
  * NOTE: Improvement??: Cache/store the indices of known memory usage bit indices and 
  * start traversing from that index

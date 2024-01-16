@@ -31,12 +31,11 @@ endforeach(SHADER_FILE)
 set(GLTF_DIRECTORY ${PROJECT_BINARY_DIR}/assets/gltf)
 file(MAKE_DIRECTORY ${GLTF_DIRECTORY})
 
-#zda folder in build/obj/
+# Copy over the gltf files
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/zda_test.glb ${GLTF_DIRECTORY}/zda_test.glb COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/basicmesh.glb ${GLTF_DIRECTORY}/basicmesh.glb COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/structure.glb ${GLTF_DIRECTORY}/structure.glb COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/monkeyHD.glb ${GLTF_DIRECTORY}/monkeyHD.glb COPYONLY)
-
 
 #NOTE: External dependencies
 #Add glfw as a dependency to be built alongside the engine
@@ -45,14 +44,7 @@ set(GLFW_BUILD_EXAMPLES False)
 set(GLFW_BUILD_TESTS False)
 add_subdirectory(${CMAKE_SOURCE_DIR}/extern/glfw)
 
-#Add cglm as a dependency to be built alongside the engine
-# NOTE: Using header only for now. Idk why not
-# set(CGLM_SHARED False)
-# set(CGLM_STATIC True)
-# set(CGLM_USE_C99 False)
-# set(CGLM_USE_TEST False)
-# add_subdirectory(${CMAKE_SOURCE_DIR}/extern/cglm/)
-
+#Add spirv-reflect as dependency to be built alongside the engine
 set(SPIRV_REFLECT_EXECUTABLE OFF)
 set(SPIRV_REFLECT_STATIC_LIB ON)
 set(SPIRV_REFLECT_BUILD_TESTS OFF)
@@ -77,12 +69,8 @@ target_include_directories(engine
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/SPIRV-Reflect/
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/stb_image/
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/cgltf/
+    PRIVATE ${CMAKE_SOURCE_DIR}/extern/Nuklear/
     PRIVATE $ENV{VULKAN_SDK}/include/)
-
-# target_link_libraries(engine
-#     PRIVATE glfw
-#     PRIVATE cglm
-#     PRIVATE spirv-reflect-static)
 
 target_link_directories(engine PRIVATE $ENV{VULKAN_SDK}/Lib)
 
@@ -99,15 +87,18 @@ file(GLOB_RECURSE SANDBOX_HEADER_FILES "sandbox/src/*.h")
 
 #Specify executable
 add_executable(sandbox ${SANDBOX_SRC_FILES} ${SANDBOX_HEADER_FILES})
+
 #Compiler defines for sandbox
 target_compile_definitions(sandbox PRIVATE _DEBUG)
+
 #Include directories for sandbox
 target_include_directories(sandbox
     PRIVATE ${CMAKE_SOURCE_DIR}/engine/src
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/cglm/include)
+
 #Link libraries to sandbox
 target_link_directories(sandbox PRIVATE $ENV{VULKAN_SDK}/Lib)
-target_link_libraries(sandbox 
+target_link_libraries(sandbox
     PRIVATE engine
     PRIVATE vulkan-1)
 

@@ -3,13 +3,14 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/engine/src",
-                "${VULKAN_SDK}/include",
+                "${workspaceFolder}/engine/src/",
+                "${VULKAN_SDK}/include/",
                 "${workspaceFolder}/extern/glfw/include/",
                 "${workspaceFolder}/extern/cglm/include/",
                 "${workspaceFolder}/extern/SPIRV-Reflect/",
                 "${workspaceFolder}/extern/stb_image/",
-                "${workspaceFolder}/extern/cgltf"
+                "${workspaceFolder}/extern/cgltf/",
+                "${workspaceFolder}/extern/Nuklear/"
             ],
             "defines": [
                 "UNICODE",

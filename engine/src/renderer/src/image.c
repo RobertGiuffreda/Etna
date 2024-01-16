@@ -13,7 +13,7 @@ void image2D_create(
     renderer_state* state,
     VkExtent3D extent,
     VkFormat format,
-    VkImageUsageFlagBits usage_flags,
+    VkImageUsageFlags usage_flags,
     VkImageAspectFlags aspect_flags,
     VkMemoryPropertyFlags memory_flags,
     image* out_image)
@@ -56,12 +56,14 @@ void image2D_create_data(
     void* data,
     VkExtent3D extent,
     VkFormat format,
-    VkImageUsageFlagBits usage_flags,
+    VkImageUsageFlags usage_flags,
     VkImageAspectFlags aspect_flags,
     VkMemoryPropertyFlags memory_flags,
     image* out_image)
 {
     // Create staging buffer and upload data to it
+
+    // TODO: Change 4 to a get element size from vkformat utility function
     u64 data_size = extent.width * extent.height * extent.depth * 4;
     buffer staging = {0};
     buffer_create(

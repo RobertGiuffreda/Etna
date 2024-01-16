@@ -71,12 +71,17 @@ typedef struct image {
     VkFormat format;
     VkImageAspectFlags aspects;
 
+    // For use in transfer system.
+    VkPipelineStageFlags2 stages;
 } image;
 
 typedef struct buffer {
     VkBuffer handle;
     VkDeviceMemory memory;
     u64 size;
+
+    // For use in transfer system.
+    VkPipelineStageFlags2 stages;
 } buffer;
 // TEMP: END
 
@@ -337,7 +342,7 @@ typedef struct device {
     VkPhysicalDeviceLimits gpu_limits;
     VkPhysicalDeviceMemoryProperties gpu_memory_props;
 
-    // TODO: Better name which reflects that it is a queue family index
+    // TODO: _queue_index --> _qfi
     // Not just a queue index
     i32 graphics_queue_index;
     i32 compute_queue_index;
