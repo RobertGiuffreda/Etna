@@ -1,7 +1,7 @@
 #pragma once
-#include "loader_types.h"
 
-// TODO: Unexpose the renderer functions from this
+#include "defines.h"
+
 b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* state);
 void unload_gltf(struct loaded_gltf* gltf);
 

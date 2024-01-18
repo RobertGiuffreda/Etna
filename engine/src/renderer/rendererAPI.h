@@ -1,6 +1,8 @@
 #pragma once
 
-#include "renderer_types.h"
+#include "defines.h"
+
+typedef struct renderer_state renderer_state;
 
 b8 renderer_initialize(renderer_state** state, struct etwindow_state* window, const char* application_name);
 

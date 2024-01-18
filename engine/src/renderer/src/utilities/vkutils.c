@@ -24,11 +24,11 @@ i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
 // TODO: Move to another separate file for handling utility functions
 // TODO: Remove the VK_MEMORY_PROPERTY_HOST_COHERENT_BIT bit from the staging buffer and flush manually
 // TODO:GOAL: Use queue from dedicated transfer queue family(state->device.transfer_queue) to do the transfer
-gpu_mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
+mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
     const u64 vertex_buffer_size = vertex_count * sizeof(vertex);
     const u64 index_buffer_size = index_count * sizeof(u32);
 
-    gpu_mesh_buffers new_surface;
+    mesh_buffers new_surface;
 
     // Create Vertex Buffer
     buffer_create(

@@ -7,6 +7,39 @@
 // TEMP: END
 
 #include "renderer/src/vk_types.h"
+#include "renderer/src/renderables.h"
+
+// TODO: Move to loader folder
+typedef struct loaded_gltf {
+    char* name;
+
+    // The loaded_gltf struct currently stores the backing memory for
+    // it's meshes, images, materials, and nodes.
+    mesh* meshes;
+    u32 mesh_count;
+    image* images;
+    u32 image_count;
+    material* materials;
+    u32 material_count;
+
+    mesh_node* mesh_nodes;
+    u32 mesh_node_count;
+    node* nodes;
+    u32 node_count;
+
+    VkSampler* samplers;
+    u32 sampler_count;
+
+    // Dynarray of top level node pointers/references
+    node** top_nodes;
+    u32 top_node_count;
+
+    ds_allocator_growable descriptor_allocator;
+
+    buffer material_data_buffer;
+
+    renderer_state* render_state;
+} loaded_gltf;
 
 // TODO: Use this instead of 
 typedef struct frame_data {
@@ -121,7 +154,7 @@ typedef struct renderer_state {
     camera main_camera;
 
     // TEMP: Here in case of testing
-    gpu_mesh_buffers rectangle;
+    mesh_buffers rectangle;
 } renderer_state;
 
 /** Takes a code block in the ... argument and begins recording of a command buffer before the 

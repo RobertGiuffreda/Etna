@@ -13,8 +13,6 @@
 
 #include "platform/filesystem.h"
 
-// TODO: Store and use the names provided by the gltf file
-
 // NOTE: Currenly leaks memory on failure to load gltf file
 // TODO: Create a function to call when loading a file fails
 // that checks for memory allocations and frees them before returning
@@ -22,7 +20,7 @@
 // TODO: Handle cases where parts of the gltf are missing/not present
 // No materials or images, no tex coords, etc... 
 
-// TODO:TEMP: Loader should not need to know the renderer implementation details
+// TEMP: Make renderer implementation agnostic
 #include "renderer/src/utilities/vkutils.h"
 #include "renderer/src/renderer.h"
 
@@ -33,7 +31,7 @@
 #include "renderer/src/GLTFMetallic_Roughness.h"
 
 #include "renderer/src/renderables.h"
-// TODO:TEMP: END
+// TEMP: END
 
 // TODO: Replace use of this macro with cgltf functions for getting index
 /** HELPER FOR CGLTF
@@ -146,7 +144,7 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
     
     // Allocate memory for storing materials
     gltf->materials = etallocate(
-        sizeof(GLTF_material) * data->materials_count,
+        sizeof(material) * data->materials_count,
         MEMORY_TAG_RENDERABLE);
 
     // Create Materials
@@ -222,42 +220,42 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
     gltf->material_count = data->materials_count;
 
     // Allocate memory for meshes in loaded_gltf
-    gltf->meshes = etallocate(sizeof(mesh_asset) * data->meshes_count, MEMORY_TAG_RENDERABLE);
+    gltf->meshes = etallocate(sizeof(mesh) * data->meshes_count, MEMORY_TAG_RENDERABLE);
     
     vertex* vertices = dynarray_create(1, sizeof(vertex));
     u32* indices = dynarray_create(1, sizeof(u32));
     for (u32 i = 0; i < data->meshes_count; ++i) {
-        cgltf_mesh* mesh = &data->meshes[i];
+        cgltf_mesh* gltf_mesh = &data->meshes[i];
 
-        mesh_asset* new_mesh = &gltf->meshes[i];
+        mesh* new_mesh = &gltf->meshes[i];
 
-        new_mesh->name = str_duplicate_allocate(mesh->name);
+        new_mesh->name = str_duplicate_allocate(gltf_mesh->name);
 
         // Allocate memory for mesh surfaces:
         // TODO: Store the amount of surfaces and use that instead of dynarray
         // I want to use dynarrays when they are needed. Not just convinient
         // new_mesh->surfaces = etallocate(
-        //     mesh->primitives_count * sizeof(geo_surface),
+        //     mesh->primitives_count * sizeof(surface),
         //     MEMORY_TAG_RENDERABLE);
         new_mesh->surfaces = dynarray_create(
-            mesh->primitives_count,
-            sizeof(geo_surface));
-        dynarray_length_set(new_mesh->surfaces, mesh->primitives_count);
+            gltf_mesh->primitives_count,
+            sizeof(surface));
+        dynarray_length_set(new_mesh->surfaces, gltf_mesh->primitives_count);
 
         dynarray_clear(indices);
         dynarray_clear(vertices);
 
-        for (u32 j = 0; j < mesh->primitives_count; ++j) {
-            cgltf_primitive* primitive = &mesh->primitives[j];
+        for (u32 j = 0; j < gltf_mesh->primitives_count; ++j) {
+            cgltf_primitive* gltf_primitive = &gltf_mesh->primitives[j];
 
-            geo_surface* new_surface = &new_mesh->surfaces[j];
+            surface* new_surface = &new_mesh->surfaces[j];
             new_surface->start_index = dynarray_length(indices);
-            new_surface->count = primitive->indices->count;
+            new_surface->count = gltf_primitive->indices->count;
 
             u64 initial_vertex = dynarray_length(vertices);
 
             // load indices
-            cgltf_accessor* index_accessor = primitive->indices;
+            cgltf_accessor* index_accessor = gltf_primitive->indices;
             dynarray_reserve((void**)&indices, dynarray_length(indices) + index_accessor->count);
 
             for (u32 k = 0; k < index_accessor->count; ++k) {
@@ -267,7 +265,7 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
 
             // Load position information
             cgltf_accessor* position = get_accessor_from_attributes(
-                primitive->attributes, primitive->attributes_count, "POSITION");
+                gltf_primitive->attributes, gltf_primitive->attributes_count, "POSITION");
             if (!position) {
                 ETERROR("Attempted to load mesh without vertex positions.");
                 return false;
@@ -293,7 +291,7 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
 
             // Load normal information
             cgltf_accessor* normal = get_accessor_from_attributes(
-                primitive->attributes, primitive->attributes_count, "NORMAL");
+                gltf_primitive->attributes, gltf_primitive->attributes_count, "NORMAL");
             if (!normal) {
                 ETERROR("Attempt to load mesh without vertex normals.");
                 return false;
@@ -309,7 +307,7 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
 
             // Load texture coordinates, UVs
             cgltf_accessor* uv = get_accessor_from_attributes(
-                primitive->attributes, primitive->attributes_count, "TEXCOORD_0");
+                gltf_primitive->attributes, gltf_primitive->attributes_count, "TEXCOORD_0");
             if (uv) {
                 cgltf_size uv_element_size = cgltf_calc_size(uv->type, uv->component_type);
                 for (u32 k = 0; k < uv->count; ++k) {
@@ -324,14 +322,15 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
                     v->uv_x = uvs.x;
                     v->uv_y = uvs.y;
                 }
-            } else {
-                ETWARN("Loading mesh[%lu]: %s without texture coordinates.", i, mesh->name);
             }
+            // else {
+            //     ETWARN("Loading mesh[%lu]: %s without texture coordinates.", i, mesh->name);
+            // }
 
 
             // Load vertex color information
             cgltf_accessor* color = get_accessor_from_attributes(
-                primitive->attributes, primitive->attributes_count, "COLOR_0");
+                gltf_primitive->attributes, gltf_primitive->attributes_count, "COLOR_0");
             if (color) {
                 cgltf_size element_size = cgltf_calc_size(color->type, color->component_type);
                 for (u32 k = 0; k < color->count; ++k) {
@@ -344,14 +343,14 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
             }
 
             // Set material
-            if (primitive->material) {
-                u64 mat_index = CGLTF_ARRAY_INDEX(cgltf_material, data->materials, primitive->material);
+            if (gltf_primitive->material) {
+                u64 mat_index = CGLTF_ARRAY_INDEX(cgltf_material, data->materials, gltf_primitive->material);
                 new_surface->material = &gltf->materials[mat_index];
             } else {
                 new_surface->material = &gltf->materials[0];
             }
         }
-        new_mesh->mesh_buffers = upload_mesh(state,
+        new_mesh->buffers = upload_mesh(state,
             dynarray_length(indices), indices,
             dynarray_length(vertices), vertices
         );
@@ -444,7 +443,6 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
     return true;
 }
 
-// TODO: Remove
 void unload_gltf(struct loaded_gltf* gltf) {
     renderer_state* state = gltf->render_state;
 
@@ -463,20 +461,20 @@ void unload_gltf(struct loaded_gltf* gltf) {
     etfree(gltf->nodes, sizeof(node) * gltf->node_count, MEMORY_TAG_RENDERABLE);
 
     for (u32 i = 0; i < gltf->mesh_count; ++i) {
-        buffer_destroy(state, &gltf->meshes[i].mesh_buffers.vertex_buffer);
-        buffer_destroy(state, &gltf->meshes[i].mesh_buffers.index_buffer);
+        buffer_destroy(state, &gltf->meshes[i].buffers.vertex_buffer);
+        buffer_destroy(state, &gltf->meshes[i].buffers.index_buffer);
         dynarray_destroy(gltf->meshes[i].surfaces);
         str_duplicate_free(gltf->meshes[i].name);
     }
-    etfree(gltf->meshes, sizeof(mesh_asset) * gltf->mesh_count, MEMORY_TAG_RENDERABLE);
+    etfree(gltf->meshes, sizeof(mesh) * gltf->mesh_count, MEMORY_TAG_RENDERABLE);
 
     buffer_destroy(state, &gltf->material_data_buffer);
     for (u32 i = 0; i < gltf->material_count; ++i)
         str_duplicate_free(gltf->materials[i].name);
-    etfree(gltf->materials, sizeof(GLTF_material) * gltf->material_count, MEMORY_TAG_RENDERABLE);
+    etfree(gltf->materials, sizeof(material) * gltf->material_count, MEMORY_TAG_RENDERABLE);
 
     for (u32 i = 0; i < gltf->image_count; ++i)
-        image2D_destroy(state, &gltf->images[i]);
+        image_destroy(state, &gltf->images[i]);
     etfree(gltf->images, sizeof(image) * gltf->image_count, MEMORY_TAG_RENDERABLE);
 
     for (u32 i = 0; i < gltf->sampler_count; ++i)

@@ -308,8 +308,8 @@ void renderer_shutdown(renderer_state* state) {
     destroy_frame_command_structures(state);
     ETINFO("Frame command structures destroyed.");
 
-    image2D_destroy(state, &state->depth_image);
-    image2D_destroy(state, &state->render_image);
+    image_destroy(state, &state->depth_image);
+    image_destroy(state, &state->render_image);
     ETINFO("Rendering attachments (color, depth) destroyed.");
 
     shutdown_swapchain(state);
@@ -947,10 +947,10 @@ static void shutdown_default_data(renderer_state* state) {
     vkDestroySampler(state->device.handle, state->default_sampler_linear, state->allocator);
     vkDestroySampler(state->device.handle, state->default_sampler_nearest, state->allocator);
 
-    image2D_destroy(state, &state->error_checkerboard_image);
-    image2D_destroy(state, &state->black_image);
-    image2D_destroy(state, &state->grey_image);
-    image2D_destroy(state, &state->white_image);
+    image_destroy(state, &state->error_checkerboard_image);
+    image_destroy(state, &state->black_image);
+    image_destroy(state, &state->grey_image);
+    image_destroy(state, &state->white_image);
 
     buffer_destroy(state, &state->rectangle.vertex_buffer);
     buffer_destroy(state, &state->rectangle.index_buffer);

@@ -134,7 +134,7 @@ void image2D_create_data(
     buffer_destroy(state, &staging);
 }
 
-void image2D_destroy(renderer_state* state, image* image) {
+void image_destroy(renderer_state* state, image* image) {
     image->format = VK_FORMAT_UNDEFINED;
     image->extent.width = 0;
     image->extent.height = 0;

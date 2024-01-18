@@ -5,6 +5,8 @@
 #include "core/etmemory.h"
 #include "core/logger.h"
 
+#include "renderer/src/renderer.h"
+
 b8 initialize_swapchain(renderer_state* state) {
     // Surface format detection & selection
     VkFormat image_format;
