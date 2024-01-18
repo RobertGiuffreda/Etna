@@ -7,8 +7,6 @@
 
 #include "renderer/src/renderer.h"
 
-#include <vulkan/vulkan.h>
-#include <vulkan/vulkan_core.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -111,17 +109,4 @@ void resize_callback(GLFWwindow* window, i32 width, i32 height) {
     e.i32[0] = width;
     e.i32[1] = height;
     event_fire(EVENT_CODE_RESIZE, e);
-}
-
-b8 window_create_vulkan_surface(struct renderer_state* renderer_state, etwindow_state* window_state) {
-    VkResult result = glfwCreateWindowSurface(
-        renderer_state->instance,
-        window_state->impl_window,
-        renderer_state->allocator,
-        &renderer_state->surface);
-    return result == VK_SUCCESS;
-}
-
-const char** window_get_required_extension_names(i32* count) {
-    return glfwGetRequiredInstanceExtensions(count);
 }

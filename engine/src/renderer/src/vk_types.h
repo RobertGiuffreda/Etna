@@ -7,7 +7,7 @@
 
 #include <vulkan/vulkan.h>
 
-/**
+/** NOTE: In progress
  * TODO: These should have renderer agnostic represenations for the engine:
  * struct image
  * struct buffer
@@ -71,8 +71,8 @@ typedef struct image {
     VkFormat format;
     VkImageAspectFlags aspects;
 
-    // For use in transfer system.
-    VkPipelineStageFlags2 stages;
+    // For use in transfer system. 
+    VkPipelineStageFlags2 stages; // NOTE: Unused
 } image;
 
 typedef struct buffer {
@@ -81,7 +81,7 @@ typedef struct buffer {
     u64 size;
 
     // For use in transfer system.
-    VkPipelineStageFlags2 stages;
+    VkPipelineStageFlags2 stages; // NOTE: Unused
 } buffer;
 // TEMP: END
 
@@ -236,7 +236,7 @@ typedef struct loaded_gltf {
     // TODO: Have this extend renderable
     char* name;
 
-    // The loaded_gltf struct currently stores the backing memory for 
+    // The loaded_gltf struct currently stores the backing memory for
     // it's meshes, images, materials, and nodes.
     mesh_asset* meshes;
     u32 mesh_count;

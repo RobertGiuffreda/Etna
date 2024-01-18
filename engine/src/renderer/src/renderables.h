@@ -1,14 +1,18 @@
 #pragma once
 
-#include "vk_types.h"
+#include "renderer/src/vk_types.h"
+
+/** NOTE: Renderables should be visible outside of the renderer
+ * struct scene
+ * struct node
+ * struct mesh
+ * struct mesh_node
+ */
 
 /** NOTE:
  * Renderable is an interface/abstract class implementation
  * Node is a parent class of mesh_node
  * Mesh_node derives from node
- *
- * Instead of storing self I could use the passed in object address as the base class is
- * always the first element of the derived class 
  */
 
 // TODO: Current Issue: Copying the struct will create a shallow copy at the moment, 

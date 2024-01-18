@@ -1,6 +1,8 @@
 #pragma once
-#include "defines.h"
+#include "renderer/src/renderer.h"
 
-b8 window_create_vulkan_surface(struct renderer_state* renderer_state, struct etwindow_state* window_state);
+typedef struct etwindow_state etwindow_state;
+
+b8 window_create_vulkan_surface(renderer_state* renderer_state, etwindow_state* window_state);
 
 const char** window_get_required_extension_names(i32* count);

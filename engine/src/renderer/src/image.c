@@ -149,6 +149,7 @@ void image2D_destroy(renderer_state* state, image* image) {
     image->handle = 0;
 }
 
+// TODO: Have this function take struct image instead of parameters 
 void blit_image2D_to_image2D(
     VkCommandBuffer cmd,
     VkImage src, VkImage dst,

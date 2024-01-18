@@ -68,7 +68,8 @@ typedef enum system_event {
     /* event_data data.u8[0] = z_delta */
     EVENT_CODE_MOUSE_WHEEL = 0x08,
 
-    /* event_data data.u32[0] = width
+    /**
+     * event_data data.u32[0] = width
      * event_data data.u32[1] = height
      */
     EVENT_CODE_RESIZE = 0x09,

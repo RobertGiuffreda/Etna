@@ -1,16 +1,18 @@
 ---------------------Code TODO: List
-TODO: Compute effect descriptor set layout and allocated descriptor set moved to a
-      function for allocating the compute effect's descriptor set
+NOTE: The there is not a vulkan agnostic representation of the renderer for now. 
+      So vulkan types may have to be exposed for the rest of the engine to use the
+      renderer. This will be temporary.
+TODO: Create image manager that manages images/textures
+TODO: Create material manager that manages materials
 
-TODO: Create separate branch for adding in UI. Immediate mode UI Nuklear for the time being
-
-TODO: RendererAPI:
-TODO: Choose default scene & load that by default
-TODO: Define functions to expose loading gltf scenes
-TODO: Define functions to expose loading shaders & making materials from them
-
-GOAL: Nothing hardcoded in renderer. Systems supply renderables, Application code supplies what to load into systems.
+GOAL: Nothing hardcoded in renderer. Engine supplies renderables, Application code supplies what to load into engine.
 NOTE: Things hardcoded in engine. Goal does not mean serialization or GUI interaction
+
+TODO: Create separate branch for adding in UI. Immediate mode UI Nuklear for the time being.
+
+TODO: Variables, structs, functions are renamed according to new convention. (snake case is looking ugly and long)
+TODO: End _state naming paradigm:
+TODO: renderer_state --> renderer/RenderEngine etc...
 
 ---------------------Refactor (Changes organization of the code with the same functionality(mostly))
 TODO: u32 is used for index instead of size_t many times. This should be fixed
@@ -23,10 +25,6 @@ TODO: Logger uses etstring abstractions (just wrappers for now)
 TODO: When systems fail they should be able to call shutdown procedures if the failure is recoverable: Failing with grace
 TODO: Make functions not all return booleans when unnecessary
 TODO: Filesystem improvements (I forgot what this meant but the file interaction is not great anyway).
-
-TODO: Variables, structs, functions are renamed according to new convention. (snake case is looking ugly and long)
-TODO: End _state naming paradigm:
-TODO: renderer_state --> renderer/RenderEngine etc...
 
 ---------------------Implementation (Adding code to implement a feature)
 TODO: Handle minimizing

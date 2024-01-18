@@ -21,6 +21,7 @@ static const char* memory_strings[MEMORY_TAG_MAX] = {
     "Events:        ",
     "Input:         ",
     "Window:        ",
+    "UI:            ",
     "Renderer:      ",
     "Renderable:    ",
     "Shader:        ",

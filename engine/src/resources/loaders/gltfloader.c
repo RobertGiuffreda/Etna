@@ -6,6 +6,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#include "containers/dynarray.h"
+
 #include "core/logger.h"
 #include "core/etstring.h"
 
@@ -21,7 +23,7 @@
 // No materials or images, no tex coords, etc... 
 
 // TODO:TEMP: Loader should not need to know the renderer implementation details
-#include "renderer/src/utilities/vkinit.h"
+#include "renderer/src/utilities/vkutils.h"
 #include "renderer/src/renderer.h"
 
 #include "renderer/src/descriptor.h"

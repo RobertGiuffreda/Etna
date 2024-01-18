@@ -6,7 +6,7 @@ void image2D_create(
     renderer_state* state,
     VkExtent3D extent,
     VkFormat format,
-    VkImageUsageFlagBits usage_flags,
+    VkImageUsageFlags usage_flags,
     VkImageAspectFlags aspect_flags,
     VkMemoryPropertyFlags memory_flags,
     image* out_image);
@@ -16,7 +16,7 @@ void image2D_create_data(
     void* data,
     VkExtent3D extent,
     VkFormat format,
-    VkImageUsageFlagBits usage_flags,
+    VkImageUsageFlags usage_flags,
     VkImageAspectFlags aspect_flags,
     VkMemoryPropertyFlags memory_flags,
     image* out_image);

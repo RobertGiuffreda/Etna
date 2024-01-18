@@ -7,8 +7,6 @@
 #include "core/input.h"
 #include "core/clock.h"
 
-#include "loaders/gltfloader.h"
-
 #include "platform/platform.h"
 #include "platform/etwindow.h"
 

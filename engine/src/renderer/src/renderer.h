@@ -2,8 +2,22 @@
 
 #include "defines.h"
 
+// TEMP: Camera should belong to the scene being rendered. Have camera as a scene member
 #include "core/camera.h"
+// TEMP: END
+
 #include "renderer/src/vk_types.h"
+
+// TODO: Use this instead of 
+typedef struct frame_data {
+    VkSemaphore swapchain_semaphore;
+    VkSemaphore render_semaphore;
+    VkFence render_fence;
+    VkCommandPool command_pool;
+    VkCommandBuffer command_buffer;
+    ds_allocator_growable ds_allocator;
+    buffer scene_data_buffer;
+} frame_data;
 
 typedef struct renderer_state {
     VkInstance instance;
@@ -25,7 +39,8 @@ typedef struct renderer_state {
     u32 image_count;
 
     VkSurfaceKHR surface;
-    // TODO: Rename swapchain extent??
+
+    // TODO: Rename to swapchain extent??
     VkExtent3D window_extent;
     
     // True if window was resized
@@ -52,9 +67,10 @@ typedef struct renderer_state {
     VkCommandPool* graphics_pools;
     VkCommandBuffer* main_graphics_command_buffers;
 
+    // Descriptor Set allocator for allocating per frame descriptors
     ds_allocator_growable* frame_allocators;
 
-    // Buffers for each frame to store scene data. Idk if this should be per frame
+    // Per frame scene buffers to avoid synchronization
     buffer* scene_data_buffers;
     // NOTE: Per frame END
 
@@ -95,7 +111,7 @@ typedef struct renderer_state {
     buffer default_material_constants;
     // NOTE: END
 
-    // Scene data. Per frame buffers for passing scene data to shaders above 
+    // Scene data.
     GPU_scene_data scene_data;
     VkDescriptorSetLayout scene_data_descriptor_set_layout;
     

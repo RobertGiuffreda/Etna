@@ -1,8 +1,6 @@
 #pragma once
 #include "loader_types.h"
 
-#include "containers/dynarray.h"
-
 // TODO: Unexpose the renderer functions from this
 b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* state);
 void unload_gltf(struct loaded_gltf* gltf);
