@@ -145,7 +145,7 @@ typedef struct renderer_state {
     // NOTE: END
 
     // Scene data.
-    GPU_scene_data scene_data;
+    gpu_scene_data scene_data;
     VkDescriptorSetLayout scene_data_descriptor_set_layout;
     
     draw_context main_draw_context;

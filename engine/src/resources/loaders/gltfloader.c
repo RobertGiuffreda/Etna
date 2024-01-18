@@ -250,7 +250,7 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
 
             surface* new_surface = &new_mesh->surfaces[j];
             new_surface->start_index = dynarray_length(indices);
-            new_surface->count = gltf_primitive->indices->count;
+            new_surface->index_count = gltf_primitive->indices->count;
 
             u64 initial_vertex = dynarray_length(vertices);
 

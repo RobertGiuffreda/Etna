@@ -12,11 +12,11 @@ struct material_manager;
 struct node;
 
 typedef struct scene {
-    mesh_manager* mesh_bank;
-    image_manager* image_bank;
-    material_manager* material_bank;
+    struct mesh_manager* mesh_bank;
+    struct image_manager* image_bank;
+    struct material_manager* material_bank;
 
-    node** top_nodes;
+    struct node** top_nodes;
 
     camera cam;
 
@@ -26,8 +26,7 @@ typedef struct scene {
     v4s light_col;
     // TEMP: END
 
-    renderer_state* state;
+    struct renderer_state* state;
 } scene;
 
-b8 scene_load_from_gltf(scene* scene, renderer_state* state, const char* path);
-
+b8 scene_load_from_gltf(scene* scene, struct renderer_state* state, const char* path);

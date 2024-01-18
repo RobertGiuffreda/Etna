@@ -724,7 +724,7 @@ static void create_scene_data_buffers(renderer_state* state) {
     for (u32 i = 0; i < state->image_count; ++i) {
         buffer_create(
             state,
-            sizeof(GPU_scene_data),
+            sizeof(gpu_scene_data),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             &state->scene_data_buffers[i]
@@ -996,12 +996,12 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
         state->device.handle,
         state->scene_data_buffers[state->current_frame].memory,
         /* Offset: */ 0,
-        sizeof(GPU_scene_data),
+        sizeof(gpu_scene_data),
         /* Flags: */ 0,
         &mapped_scene_data);
 
-    // Cast mapped memory to GPU_scene_data pointer to read and modify it
-    GPU_scene_data* frame_scene_data = (GPU_scene_data*)mapped_scene_data;
+    // Cast mapped memory to gpu_scene_data pointer to read and modify it
+    gpu_scene_data* frame_scene_data = (gpu_scene_data*)mapped_scene_data;
     *frame_scene_data = state->scene_data;
     vkUnmapMemory(
         state->device.handle,
@@ -1017,7 +1017,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
         &writer,
         /* Binding: */ 0,
         state->scene_data_buffers[state->current_frame].handle,
-        sizeof(GPU_scene_data),
+        sizeof(gpu_scene_data),
         /* Offset: */ 0,
         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     descriptor_set_writer_update_set(&writer, scene_descriptor_set, state);

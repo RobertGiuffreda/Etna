@@ -145,7 +145,7 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
     for (u32 i = 0; i < surface_count; ++i) {
         surface* s = &node->mesh->surfaces[i];
         render_object def = {
-            .index_count = s->count,
+            .index_count = s->index_count,
             .first_index = s->start_index,
             .index_buffer = node->mesh->buffers.index_buffer.handle,
             .material = &s->material->data,
@@ -183,7 +183,7 @@ void mesh_asset_print(mesh* m_asset) {
         surface* surface = &m_asset->surfaces[i];
         ETINFO(
             "Surface %lu: Start index: %lu | index_count: %lu", 
-            i, surface->start_index, surface->count
+            i, surface->start_index, surface->index_count
         );
     }
 }

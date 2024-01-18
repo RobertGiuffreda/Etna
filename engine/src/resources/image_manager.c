@@ -1,7 +1,9 @@
 #include "image_manager.h"
 
 #include "core/etmemory.h"
+#include "core/asserts.h"
 #include "core/logger.h"
+#include "core/etstring.h"
 
 // TEMP: This should be made renderer implementation agnostic
 #include "renderer/src/vk_types.h"
@@ -38,4 +40,38 @@ void image_manager_shutdown(image_manager* manager) {
 
 image* image_get(image_manager* manager, u32 id) {
     return &manager->images[id];
+}
+
+b8 image2D_submit(
+    image_manager* manager,
+    image_config* config,
+    image** out_image_ref)
+{
+    ETASSERT(out_image_ref);
+    if (manager->image_count >= MAX_IMAGE_COUNT)
+        return false;
+
+    image* new_image = &manager->images[manager->image_count];
+    new_image->id = manager->image_count;
+    new_image->name = str_duplicate_allocate(config->name);
+    
+    VkExtent3D image_size = {
+        .width = config->width,
+        .height = config->height,
+        .depth = 1
+    };
+    image2D_create_data(
+        manager->state,
+        config->data,
+        image_size,
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        new_image
+    );
+    manager->image_count++;
+    
+    *out_image_ref = new_image;
+    return true;
 }

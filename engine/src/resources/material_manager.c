@@ -70,3 +70,25 @@ void material_manager_shutdown(material_manager* manager) {
 material* material_get(material_manager* manager, u32 id) {
     return &manager->materials[id];
 }
+
+b8 material_submit(material_manager* manager, material_config* config, material** out_material_ref) {
+    ETASSERT(out_material_ref);
+    if (manager->material_count >= MAX_MATERIAL_COUNT)
+        return false;
+
+    material* new_material = &manager->materials[manager->material_count];
+    new_material->id = manager->material_count;
+    new_material->name = str_duplicate_allocate(config->name);
+
+    new_material->data = GLTF_MR_write_material(
+        &manager->blueprint,
+        manager->state,
+        config->pass_type,
+        config->resources,
+        &manager->ds_allocator
+    );
+    manager->material_count++;
+
+    *out_material_ref = new_material;
+    return true;
+}

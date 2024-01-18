@@ -1,5 +1,6 @@
 #include "vkutils.h"
 #include "renderer/src/renderer.h"
+#include "renderer/src/buffer.h"
 
 /** TODO:
  * Move this to a utilities file

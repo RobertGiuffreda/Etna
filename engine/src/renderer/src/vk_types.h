@@ -4,23 +4,9 @@
 #include "core/asserts.h"
 
 #include "math/math_types.h"
+#include "resources/resource_types.h"
 
 #include <vulkan/vulkan.h>
-
-/** NOTE: In progress
- * TODO: These should have renderer agnostic represenations for the engine:
- * struct image
- * struct buffer
- * struct GPU_scene_data
- * struct material_instance
- * struct geo_surface
- * struct mesh_asset
- * 
- * Not renderer specific:
- * struct renderable
- * struct node
- * struct mesh_node
- */
 
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
 
@@ -63,6 +49,7 @@ typedef struct descriptor_set_allocator_growable {
 // TODO: Store memory information for when implementing memory management
 typedef struct image {
     u32 id;
+    char* name;
     VkImage handle;
     VkImageView view;
 
@@ -79,6 +66,7 @@ typedef struct image {
 } image;
 
 typedef struct buffer {
+    char* name;
     VkBuffer handle;
     VkDeviceMemory memory;
     u64 size;
@@ -99,7 +87,7 @@ typedef struct gpu_draw_push_constants {
     VkDeviceAddress vertex_buffer;
 } gpu_draw_push_constants;
 
-typedef struct GPU_scene_data {
+typedef struct gpu_scene_data {
     m4s view;
     m4s proj;
     m4s viewproj;
@@ -107,13 +95,7 @@ typedef struct GPU_scene_data {
     v4s sunlight_direction; // w for sun power
     v4s sunlight_color;
     v4s padding;            // 256 byte minimum on my GPU
-} GPU_scene_data;
-
-typedef enum material_pass {
-    MATERIAL_PASS_MAIN_COLOR,
-    MATERIAL_PASS_TRANSPARENT,
-    MATERIAL_PASS_OTHER
-} material_pass;
+} gpu_scene_data;
 
 typedef struct material_pipeline {
     VkPipeline pipeline;
@@ -126,6 +108,8 @@ typedef struct material_instance {
     material_pass pass_type;
 } material_instance;
 
+// TODO: Rename material_constants, material_resources, GLTFMetallic_Roughness
+// GLTFMetallic_Roughness is material format agnostic so the name does not make sense
 struct material_constants {
     v4s color_factors;
     v4s metal_rough_factors;
@@ -151,6 +135,7 @@ typedef struct GLTFMetallic_Roughness {
 
     ds_writer writer;
 } GLTF_MR;
+// TODO: END
 
 typedef struct material {
     u32 id;
@@ -160,7 +145,7 @@ typedef struct material {
 
 typedef struct surface {
     u32 start_index;
-    u32 count;
+    u32 index_count;
 
     // Not responsible for freeing
     material* material;

@@ -20,3 +20,9 @@
 typedef struct mesh mesh;
 typedef struct image image;
 typedef struct material material;
+
+typedef enum material_pass {
+    MATERIAL_PASS_MAIN_COLOR,
+    MATERIAL_PASS_TRANSPARENT,
+    MATERIAL_PASS_OTHER
+} material_pass;

@@ -169,7 +169,9 @@
         "image_manager.h": "c",
         "mesh_manager.h": "c",
         "resource_types.h": "c",
-        "node.h": "c"
+        "node.h": "c",
+        "*.rh": "c",
+        "xloctime": "c"
     },
     "C_Cpp.dimInactiveRegions": false
 }
