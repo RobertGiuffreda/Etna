@@ -6,7 +6,6 @@
 
 #include "core/etmemory.h"
 #include "core/logger.h"
-#include "platform/filesystem.h"
 
 #define DEFAULT_PIPELINE_STAGE_COUNT 2
 

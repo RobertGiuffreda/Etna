@@ -11,7 +11,7 @@
 #include "core/logger.h"
 #include "core/etstring.h"
 
-#include "platform/filesystem.h"
+#include "core/etfile.h"
 
 // NOTE: Currenly leaks memory on failure to load gltf file
 // TODO: Create a function to call when loading a file fails
@@ -498,19 +498,19 @@ b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
     etfile* json_dump_file = NULL;
     b8 file_result = true;
     
-    file_result = filesystem_open(dump_file_path, FILE_WRITE_FLAG, &json_dump_file);
+    file_result = file_open(dump_file_path, FILE_WRITE_FLAG, &json_dump_file);
     if (!file_result) {
         ETERROR("%s failed to open.", dump_file_path);
         return false;
     }
 
     u64 bytes_written = 0;
-    file_result = filesystem_write(json_dump_file, data->json_size, (void*)data->json, &bytes_written);
+    file_result = file_write(json_dump_file, data->json_size, (void*)data->json, &bytes_written);
     if (!file_result) {
         ETERROR("Failed to write %s's json data to %s.", gltf_path, dump_file_path);
         return false;
     }
-    filesystem_close(json_dump_file);
+    file_close(json_dump_file);
     ETINFO("Json from %s successfully dumped to %s", gltf_path, dump_file_path);
     return true;
 }

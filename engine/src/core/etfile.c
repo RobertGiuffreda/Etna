@@ -1,4 +1,4 @@
-#include "filesystem.h"
+#include "etfile.h"
 
 #include "core/logger.h"
 #include "core/etmemory.h"
@@ -15,7 +15,7 @@ struct etfile {
 
 static inline void _filesystem_size(FILE* file, u64* out_size);
 
-b8 filesystem_exists(const char* path) {
+b8 file_exists(const char* path) {
 #ifdef _MSC_VER
     struct _stat buffer;
     return _stat(path, &buffer) == 0;
@@ -25,7 +25,7 @@ b8 filesystem_exists(const char* path) {
 #endif
 }
 
-b8 filesystem_open(const char* path, etfile_flags flags, etfile** out_file) {
+b8 file_open(const char* path, etfile_flags flags, etfile** out_file) {
     const char* mode_str;
     b8 is_read = flags & FILE_READ_FLAG;
     b8 is_write = flags & FILE_WRITE_FLAG;
@@ -51,7 +51,7 @@ b8 filesystem_open(const char* path, etfile_flags flags, etfile** out_file) {
 }
 
 // TODO: Warning for if statement failure
-void filesystem_close(etfile* file) {
+void file_close(etfile* file) {
     if (file && file->handle) {
         fclose(file->handle);
         etfree(file, sizeof(struct etfile), MEMORY_TAG_FILESYSTEM);
@@ -59,7 +59,7 @@ void filesystem_close(etfile* file) {
 }
 
 // TODO: Check if works for not binary mode files
-b8 filesystem_size(etfile* file, u64* out_size) {
+b8 file_size(etfile* file, u64* out_size) {
     if (file && file->handle) {
         _filesystem_size(file->handle, out_size);
         return true;
@@ -69,7 +69,7 @@ b8 filesystem_size(etfile* file, u64* out_size) {
 
 // TODO: Custom allocator for file reading
 // TODO: Check if works for not binary mode files
-b8 filesystem_read_all_bytes(etfile* file, u8* out_bytes, u64* out_bytes_read) {
+b8 file_read_bytes(etfile* file, u8* out_bytes, u64* out_bytes_read) {
     if (file && file->handle) {
         u64 size = 0;
         _filesystem_size(file->handle, &size);
@@ -80,7 +80,7 @@ b8 filesystem_read_all_bytes(etfile* file, u8* out_bytes, u64* out_bytes_read) {
     return false;
 }
 
-b8 filesystem_write(etfile* file, u64 data_size, const void* data, u64* out_bytes_written) {
+b8 file_write(etfile* file, u64 data_size, const void* data, u64* out_bytes_written) {
     if (file && file->handle) {
         *out_bytes_written = fwrite(data, 1, data_size, file->handle);
         if (*out_bytes_written != data_size) {

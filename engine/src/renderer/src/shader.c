@@ -4,7 +4,7 @@
 #include "core/etmemory.h"
 #include "core/logger.h"
 #include "core/etstring.h"
-#include "platform/filesystem.h"
+#include "core/etfile.h"
 
 #include "renderer/src/renderer.h"
 #include "renderer/src/utilities/vkinit.h"
@@ -22,28 +22,28 @@ static VkShaderStageFlagBits reflect_shader_stage_to_vulkan_shader_stage(SpvRefl
 // TODO: Storage buffer data
 b8 load_shader(renderer_state* state, const char* path, shader* out_shader) {
     // Load passed in shader file from config
-    if (!filesystem_exists(path)) {
+    if (!file_exists(path)) {
         ETERROR("Unable to find shader file: '%s'.", path);
         return false;
     }
 
     etfile* shader_file = 0;
-    if (!filesystem_open(path, FILE_READ_FLAG | FILE_BINARY_FLAG, &shader_file)) {
+    if (!file_open(path, FILE_READ_FLAG | FILE_BINARY_FLAG, &shader_file)) {
         ETERROR("Unable to open the shader file '%s'.", path);
         return false;
     }
 
     u64 code_size = 0;
-    if (!filesystem_size(shader_file, &code_size)) {
+    if (!file_size(shader_file, &code_size)) {
         ETERROR("Unable to measure size of compute shader file: '%s'.", path);
-        filesystem_close(shader_file);
+        file_close(shader_file);
         return false;
     }
 
     void* shader_code = etallocate(code_size, MEMORY_TAG_RENDERER);
-    if (!filesystem_read_all_bytes(shader_file, shader_code, &code_size)) {
+    if (!file_read_bytes(shader_file, shader_code, &code_size)) {
         etfree(shader_code, code_size, MEMORY_TAG_RENDERER);
-        filesystem_close(shader_file);
+        file_close(shader_file);
         ETERROR("Error reading bytes from shader code.");
         return false;
     }
@@ -59,7 +59,7 @@ b8 load_shader(renderer_state* state, const char* path, shader* out_shader) {
 
     // Clean up memoory allocated for shader code and files
     etfree(shader_code, code_size, MEMORY_TAG_RENDERER);
-    filesystem_close(shader_file);
+    file_close(shader_file);
 
     out_shader->entry_point = str_duplicate_allocate(spv_reflect_module.entry_point_name);
     out_shader->stage = reflect_shader_stage_to_vulkan_shader_stage(spv_reflect_module.shader_stage);

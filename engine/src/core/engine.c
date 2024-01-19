@@ -17,12 +17,6 @@
 // TODO: Add application name to config
 
 typedef struct engine_state {
-    // TODO: Transfer these to a visible window_state_struct or something
-    // i32 x_pos;
-    // i32 y_pos;
-    // i32 width;
-    // i32 height;
-
     b8 is_running;
 
     // Application data
@@ -33,17 +27,9 @@ typedef struct engine_state {
 
     u64 app_state_size;
     application_state* app_state;
-
-    // TODO: u64 etwindow_state_size for when engine will allocate the memory
     etwindow_state* window_state;
-
-    // TODO: u64 events_state_size for when engine will allocate the memory
     events_state* events_state;
-
-    // TODO: u64 input_state_size for when engine will allocate the memory
     input_state* input_state;
-
-    // TODO: u64 input_state_size for when engine will allocate the memory
     renderer_state* renderer_state;
 } engine_state;
 
