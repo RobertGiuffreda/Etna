@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
 
-#TODO: Set visual studio startup project to sandbox.
-#Not needed from vscode tasks as sandbox.exe is run directly.
-
 #TODO: Use variables to choose whether to build tests or not
 #^^These would be defined from command line
 

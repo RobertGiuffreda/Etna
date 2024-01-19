@@ -76,7 +76,7 @@ void etwindow_pump_messages(void) {
 
 static b8 etwindow_on_key_event(u16 code, void* window, event_data data) {
     struct etwindow_state* win = (struct etwindow_state*)window;
-    keys key = (keys)data.u16[0];
+    keys key = EVENT_DATA_KEY(data);
     
     if (key == KEY_P) {
         win->cursor_captured = !win->cursor_captured;
@@ -99,7 +99,7 @@ void cursor_position_callback(GLFWwindow* window, f64 xpos, f64 ypos) {
     input_process_mouse_move((i32)xpos, (i32)ypos);
 }
 
-// TODO: This is wrong; fix it
+// TODO: Improve the input handling of mouse wheel moving
 void scroll_callback(GLFWwindow* window, f64 xoffset, f64 yoffset) {
     input_process_mouse_wheel((u8)yoffset);
 }

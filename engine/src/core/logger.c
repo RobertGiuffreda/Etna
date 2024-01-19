@@ -13,20 +13,17 @@
 // TODO: Linear allocator for this
 
 b8 logger_initialize(void) {
-    ETFATAL("This is a FATAL message.");
-    ETERROR("This is a ERROR message.");
-    ETWARN("This is a WARN message.");
-    ETINFO("This is a INFO message.");
-    ETDEBUG("This is a DEBUG message.");
-    ETTRACE("This is a TRACE message.");
+    // TODO: Open log file
     return true;
 }
 
-void logger_shutdown(void) {}
+void logger_shutdown(void) {
+    // TODO: Close log file
+}
 
-// TODO: Linear allocator for this
 // TODO: Use etstring for string manipulation for the sake of it
 void log_output(log_level level, const char* format, ...) {
+    // TODO: Write message to log file
     const u32 log_str_len = 9;
     const char* log_level_strings[LOG_LEVEL_MAX] = {
         "[FATAL]: ", "[ERROR]: ", "[WARN]:  ", "[INFO]:  ", "[DEBUG]: ", "[TRACE]: ",

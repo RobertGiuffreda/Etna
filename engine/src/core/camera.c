@@ -47,7 +47,7 @@ void camera_update(camera* camera) {
 }
 
 b8 camera_on_key_event(u16 code, void* cam, event_data data) {
-    keys key = (keys)data.u16[0];
+    keys key = EVENT_DATA_KEY(data);
     camera* c = (camera*)cam;
 
     switch (code)
@@ -92,8 +92,8 @@ b8 camera_on_key_event(u16 code, void* cam, event_data data) {
 b8 camera_on_mouse_move(u16 code, void* cam, event_data data) {
     i32 previous_x, previous_y;
     input_get_previous_mouse_position(&previous_x, &previous_y);
-    i32 current_x = data.i32[0];
-    i32 current_y = data.i32[1];
+    i32 current_x = EVENT_DATA_MOUSE_X(data);
+    i32 current_y = EVENT_DATA_MOUSE_Y(data);
 
     i32 x_offset = current_x - previous_x;
     i32 y_offset = current_y - previous_y;

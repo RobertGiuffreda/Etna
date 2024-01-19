@@ -187,13 +187,13 @@ void engine_shutdown(void) {
 
 b8 engine_on_resize(u16 event_code, void* engine_state, event_data data) {
     // TODO: Register renderer for resizes in the renderer and not here
-    renderer_on_resize(state->renderer_state, data.i32[0], data.i32[1]);
+    renderer_on_resize(state->renderer_state, EVENT_DATA_WIDTH(data), EVENT_DATA_HEIGHT(data));
     // Other events should handle this event code as well, so false
     return false;
 }
 
 b8 engine_on_key_event(u16 event_code, void* engine_state, event_data data) {
-    keys key = (keys)data.u16[0];
+    keys key = EVENT_DATA_KEY(data);
     switch (event_code)
     {
     case EVENT_CODE_KEY_RELEASE:

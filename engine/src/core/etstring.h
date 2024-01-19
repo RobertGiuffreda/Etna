@@ -2,7 +2,7 @@
 
 #include "defines.h"
 
-// TODO: Implement own string concept (maybe)
+// TODO: Implement own string concept (maybe) struct string {...} 
 
 u64 str_length(const char* str);
 

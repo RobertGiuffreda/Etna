@@ -9,13 +9,12 @@ TODO: Test image_manager, material_manager, mesh_manager
 GOAL: Nothing hardcoded in renderer. Engine supplies renderables, Application code supplies what to load into engine.
 NOTE: Things hardcoded in engine. Goal does not mean serialization or GUI interaction
 
-TODO: Create separate branch for adding in UI. Immediate mode UI Nuklear for the time being.
-
 TODO: Variables, structs, functions are renamed according to new convention. (snake case is looking ugly and long)
 TODO: End _state naming paradigm:
 TODO: renderer_state --> renderer/RenderEngine etc...
+TODO: Rename filesystem to etfile or something similar
 
-TODO: Serialization
+TODO: Serialization & Specifications for the following:
 TODO: Material blueprint file:
       Path to shader to load for this blueprint
       Layout of material blueprint descriptor set binding types & numbers. Sampler, uniform buffer, storage buffer
@@ -35,6 +34,9 @@ TODO: Mesh files: IDK for now
 TODO: Scene file: Do like GLTF file layout:
 Samplers, Images, Texture, Material Instances, Material Blueprints, Meshes, Nodes, Top nodes
 
+NOTE: Before editor make sure the system fails gracefully from any and all points of failure.
+      The system cannot just shutdown if a file fails to load. More information is needed.
+TODO: Create separate branch for creating an editor using Immediate mode UI Nuklear
 
 ---------------------Refactor (Changes organization of the code with the same functionality(mostly))
 TODO: u32 is used for index instead of size_t many times. This should be fixed
