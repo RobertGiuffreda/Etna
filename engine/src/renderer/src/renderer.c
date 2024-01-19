@@ -665,12 +665,6 @@ static void initialize_descriptors(renderer_state* state) {
     descriptor_set_layout_builder_destroy(&dsl_builder);
     ETINFO("Draw Image Descriptor Set Layout created.");
 
-    dsl_builder = descriptor_set_layout_builder_create();
-    descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    state->scene_data_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
-    descriptor_set_layout_builder_destroy(&dsl_builder);
-    ETINFO("Scene data descriptor set layout created.");
-
     state->draw_image_descriptor_set = descriptor_set_allocator_growable_allocate(&state->global_ds_allocator, state->draw_image_descriptor_set_layout, state);
     ETINFO("Draw Image Descriptor Set allocated");
 
@@ -679,6 +673,12 @@ static void initialize_descriptors(renderer_state* state) {
     descriptor_set_writer_update_set(&writer, state->draw_image_descriptor_set, state);
     descriptor_set_writer_shutdown(&writer);
     ETINFO("Draw Image Descriptor Set updated.");
+
+    dsl_builder = descriptor_set_layout_builder_create();
+    descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    state->scene_data_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
+    descriptor_set_layout_builder_destroy(&dsl_builder);
+    ETINFO("Scene data descriptor set layout created.");
 
     // Create pool size ratios to be used for the frames
     pool_size_ratio ratios[] = {

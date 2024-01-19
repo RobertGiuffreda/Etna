@@ -1,11 +1,17 @@
 #include "shader.h"
 
+
 #include "core/etmemory.h"
 #include "core/logger.h"
 #include "core/etstring.h"
 #include "platform/filesystem.h"
 
+#include "renderer/src/renderer.h"
 #include "renderer/src/utilities/vkinit.h"
+
+#include <spirv_reflect.h>
+
+#define SPIRV_REFLECT_CHECK(expr) { ETASSERT((expr) == SPV_REFLECT_RESULT_SUCCESS); }
 
 static VkDescriptorType reflect_descriptor_to_vulkan_descriptor(SpvReflectDescriptorType descriptor_type);
 static VkFormat reflect_format_to_vulkan_format(SpvReflectFormat format);

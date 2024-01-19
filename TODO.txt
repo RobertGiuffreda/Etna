@@ -15,6 +15,27 @@ TODO: Variables, structs, functions are renamed according to new convention. (sn
 TODO: End _state naming paradigm:
 TODO: renderer_state --> renderer/RenderEngine etc...
 
+TODO: Serialization
+TODO: Material blueprint file:
+      Path to shader to load for this blueprint
+      Layout of material blueprint descriptor set binding types & numbers. Sampler, uniform buffer, storage buffer
+      Layout of the inside of each struct like descriptor:
+      struct xxxx {
+          vec4,
+          vec4,
+          etc...
+      };
+TODO: Material instance file:
+      Path to material blueprint for this instance
+      Texture/Image descriptors: a path to the image
+      Buffer descriptors: buffer data
+
+TODO: Mesh files: IDK for now
+
+TODO: Scene file: Do like GLTF file layout:
+Samplers, Images, Texture, Material Instances, Material Blueprints, Meshes, Nodes, Top nodes
+
+
 ---------------------Refactor (Changes organization of the code with the same functionality(mostly))
 TODO: u32 is used for index instead of size_t many times. This should be fixed
 TODO: Result of vulkan commands checking done with VK_CHECK & other result checking when necessary:

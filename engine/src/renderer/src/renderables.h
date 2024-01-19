@@ -57,7 +57,6 @@ typedef struct mesh_node {
     mesh* mesh;
 } mesh_node;
 
-
 void renderable_destroy(renderable* renderable);
 void renderable_draw(renderable* renderable, const m4s top_matrix, draw_context* ctx);
 

@@ -15,8 +15,6 @@
  * NOTE: Managers currently untested
  */
 
-// TODO: Invalid id value
-
 typedef struct mesh mesh;
 typedef struct image image;
 typedef struct material material;

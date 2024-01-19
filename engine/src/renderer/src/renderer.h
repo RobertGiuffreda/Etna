@@ -41,7 +41,7 @@ typedef struct loaded_gltf {
     renderer_state* render_state;
 } loaded_gltf;
 
-// TODO: Use this instead of 
+// TODO: Have array of these instead of separate arrays
 typedef struct frame_data {
     VkSemaphore swapchain_semaphore;
     VkSemaphore render_semaphore;
