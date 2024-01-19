@@ -24,7 +24,7 @@ A small vulkan renderer written using the C programming language. This is writte
 * Non Blocking event system
 * Editor using Immediate Mode UI [Nuklear](https://github.com/vurtun/nuklear)
 
-# Images
+## Screenshots
 
 
 ## About
