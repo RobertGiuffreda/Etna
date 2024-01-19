@@ -18,6 +18,7 @@ static const char* memory_strings[MEMORY_TAG_MAX] = {
     "Unknown:       ",
     "Engine:        ",
     "Application:   ",
+    "Logger:        ",
     "Events:        ",
     "Input:         ",
     "Window:        ",
@@ -35,17 +36,13 @@ static const char* memory_strings[MEMORY_TAG_MAX] = {
 };
 static const u32 mem_tag_str_len = 16;
 
-void print_memory_allocations(void);
-
 b8 memory_initialize(void) {
     memset((void*)&state, 0, sizeof(struct memory_state));
     return true;
 }
 
 // Should be zero across the board
-void memory_shutdown(void) {
-    print_memory_allocations();
-}
+void memory_shutdown(void) { }
 
 void* etallocate(u64 size, memory_tag tag) {
     if (tag == MEMORY_TAG_UNKNOWN) {
@@ -84,7 +81,7 @@ u64 get_total_allocs(void) {
 
 // TODO: Specific allocation function for memory allocated before memory_intialize() is called
 // TODO: Linear allocator for this purpose??
-void print_memory_allocations(void) {
+void log_memory_allocations(void) {
     const u64 gib = 1024 * 1024 * 1024;
     const u64 mib = 1024 * 1024;
     const u64 kib = 1024;

@@ -6,6 +6,7 @@ typedef enum memory_tag {
     MEMORY_TAG_UNKNOWN,
     MEMORY_TAG_ENGINE,
     MEMORY_TAG_APPLICATION,
+    MEMORY_TAG_LOGGER,
     MEMORY_TAG_EVENTS,
     MEMORY_TAG_INPUT,
     MEMORY_TAG_WINDOW,
@@ -26,6 +27,8 @@ typedef enum memory_tag {
 b8 memory_initialize(void);
 
 void memory_shutdown(void);
+
+void log_memory_allocations(void);
 
 void* etallocate(u64 size, memory_tag tag);
 

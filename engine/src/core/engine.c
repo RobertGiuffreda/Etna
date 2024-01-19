@@ -162,6 +162,7 @@ void engine_shutdown(void) {
     events_shutdown(state->events_state);
 
     // Shutdown log file
+    log_memory_allocations();
     logger_shutdown();
     
     // Free memory used for the state
