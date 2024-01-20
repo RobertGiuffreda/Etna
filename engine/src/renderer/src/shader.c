@@ -273,7 +273,7 @@ void reflect_block_variables(block_variable* block, SpvReflectBlockVariable* spv
     block->size = spv_block->size;
     block->padded_size = spv_block->padded_size;
 
-    block->numeric.signedness = spv_block->numeric.scalar.signedness;
+    block->scalar.signedness = spv_block->numeric.scalar.signedness;
 
     block->vector.component_count = spv_block->numeric.vector.component_count;
 
@@ -330,13 +330,15 @@ void print_block_variables(block_variable* block) {
     ETINFO("Size: %lu", block->size);
     ETINFO("Padded size: %lu", block->padded_size);
 
-    ETINFO("Signedness: %lu", block->numeric.signedness);
+    ETINFO("Scalar Signedness: %lu", block->scalar.signedness);
 
-    ETINFO("Component count: %lu", block->vector.component_count);
+    ETINFO("Vector Component count: %lu", block->vector.component_count);
 
-    ETINFO("Column count: %lu", block->matrix.column_count);
-    ETINFO("Row count: %lu", block->matrix.row_count);
-    ETINFO("Stride: %lu", block->matrix.stride);
+    ETINFO("Matrix Column count: %lu", block->matrix.column_count);
+    ETINFO("Matrix Row count: %lu", block->matrix.row_count);
+    ETINFO("Matrix Stride: %lu", block->matrix.stride);
+
+    ETINFO("Type Flags: %#010x", block->flags);
 
     for (u32 i = 0; i < block->member_count; ++i) {
         print_block_variables(block->members + i);

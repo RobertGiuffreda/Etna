@@ -64,7 +64,7 @@ struct block_variable {
     // Numeric traits
     struct {
         u32 signedness;
-    } numeric;
+    } scalar;
 
     struct {
         u32 component_count;

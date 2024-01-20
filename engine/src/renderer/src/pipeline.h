@@ -26,7 +26,7 @@ void pipeline_builder_destroy(pipeline_builder* builder);
 
 VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* state);
 
-void pipeline_builder_set_shaders(pipeline_builder* builder, shader1 vertex, shader1 fragment);
+void pipeline_builder_set_shaders(pipeline_builder* builder, shader vertex, shader fragment);
 
 void pipeline_builder_set_input_topology(pipeline_builder* builder, VkPrimitiveTopology topology);
 

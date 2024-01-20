@@ -1,3 +1,4 @@
+#pragma once
 #include "renderer/src/vk_types.h"
 
 void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state);

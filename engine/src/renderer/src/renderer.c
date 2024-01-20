@@ -742,7 +742,7 @@ static void destroy_scene_data_buffers(renderer_state* state) {
 }
 
 static void initialize_compute_effects(renderer_state* state) {
-    load_shader1(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader);
+    load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader);
 
     VkPipelineLayoutCreateInfo compute_effect_pipeline_layout_info = init_pipeline_layout_create_info();
     compute_effect_pipeline_layout_info.setLayoutCount = 1;
@@ -775,7 +775,7 @@ static void shutdown_compute_effects(renderer_state* state) {
     vkDestroyPipeline(state->device.handle, state->gradient_effect.pipeline, state->allocator);
     vkDestroyPipelineLayout(state->device.handle, state->gradient_effect.layout, state->allocator);
 
-    unload_shader1(state, &state->gradient_shader);
+    unload_shader(state, &state->gradient_shader);
 }
 
 static void initialize_mesh_mat_pipeline(renderer_state* state) {

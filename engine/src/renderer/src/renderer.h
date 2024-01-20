@@ -123,7 +123,7 @@ typedef struct renderer_state {
     ds_allocator_growable global_ds_allocator;
 
     // NOTE: Compute effect members
-    shader1 gradient_shader;
+    shader gradient_shader;
     compute_effect gradient_effect;
 
     VkDescriptorSetLayout draw_image_descriptor_set_layout;
