@@ -365,7 +365,6 @@ void renderer_update_scene(renderer_state* state) {
     dynarray_clear(state->main_draw_context.transparent_surfaces);
 
     gltf_draw(&state->_gltf, glms_mat4_identity(), &state->main_draw_context);
-    // node_draw(state->_gltf.top_nodes[0], glms_mat4_identity(), &state->main_draw_context);
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
@@ -965,13 +964,12 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     VkRenderingAttachmentInfo depth_attachment = init_depth_attachment_info(
         state->depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    // TODO: Use the render_image's extent for the renderpass renderArea & scissor & viewport
+    // TODO: Use window extent instead of render_extent ????
     VkExtent2D render_extent = {.width = state->render_extent.width, .height = state->render_extent.height};
     VkRenderingInfo render_info = init_rendering_info(render_extent, &color_attachment, &depth_attachment);
 
     vkCmdBeginRendering(cmd, &render_info);
 
-    // TODO: Use the render_image's extent for the renderpass renderArea & scissor & viewport
     VkViewport viewport = {0};
     viewport.x = 0;
     viewport.y = 0;
@@ -982,7 +980,6 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 
     vkCmdSetViewport(cmd, 0, 1, &viewport);
 
-    // TODO: Use the render_image's extent for the renderpass renderArea & scissor & viewport
     VkRect2D scissor = {0};
     scissor.offset.x = 0;
     scissor.offset.y = 0;
@@ -1043,7 +1040,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
         // Material descriptor set binding
         vkCmdBindDescriptorSets(cmd,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
-            draw->material->pipeline->layout, 
+            draw->material->pipeline->layout,
             /* First Set: */ 1,
             /* Descriptor Set Count: */ 1,
             &draw->material->material_set,

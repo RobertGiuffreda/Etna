@@ -172,7 +172,8 @@
         "node.h": "c",
         "*.rh": "c",
         "xloctime": "c",
-        "etfile.h": "c"
+        "etfile.h": "c",
+        "material.h": "c"
     },
     "C_Cpp.dimInactiveRegions": false
 }
