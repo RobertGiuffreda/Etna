@@ -163,6 +163,7 @@ void engine_shutdown(void) {
 
     // Shutdown log file
     log_memory_allocations();
+    
     logger_shutdown();
     
     // Free memory used for the state

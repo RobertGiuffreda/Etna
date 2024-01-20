@@ -31,6 +31,10 @@
 [INFO]:  Descriptors Initialized.
 [INFO]:  Intialized compute effects.
 [INFO]:  Initialized mesh mat pipeline
+[INFO]:  Addr 1: 1891087731776
+[INFO]:  Addr 2: 1891087731776
 [INFO]:  Renderer camera created
-[FATAL]: Renderer failed to initialize.
-[DEBUG]: Engine Initialize failed.
+[INFO]:  White default image created.
+[INFO]:  Grey default image created.
+[INFO]:  Black default image created.
+[INFO]:  Checkerboard default image created.

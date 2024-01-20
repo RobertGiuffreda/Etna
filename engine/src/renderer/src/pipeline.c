@@ -102,7 +102,7 @@ VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* sta
     return new_pipeline;
 }
 
-void pipeline_builder_set_shaders(pipeline_builder* builder, shader vertex, shader fragment) {
+void pipeline_builder_set_shaders(pipeline_builder* builder, shader1 vertex, shader1 fragment) {
     // TODO: Set the pipeline layout information in here by creating descriptor set layout from shaders
 
     // TODO: Loop & input an array & count or dynarray

@@ -12,11 +12,19 @@
 
 #define SPIRV_REFLECT_CHECK(expr) { ETASSERT((expr) == SPV_REFLECT_RESULT_SUCCESS); }
 
+static void reflect_block_variables(block_variable* block, SpvReflectBlockVariable* spv_block);
+static void free_block_variables(block_variable* block);
+
+static type_flags convert_spv_reflect_type_flags(SpvReflectTypeFlags typeFlags);
+static descriptor_type convert_spv_reflect_descriptor_type(SpvReflectDescriptorType type);
+static b8 is_descriptor_type_image(descriptor_type type);
+static image_dim spv_dim_to_image_dim(SpvDim dim);
+
 static VkDescriptorType spv_reflect_descriptor_to_vulkan_descriptor(SpvReflectDescriptorType descriptor_type);
 static VkFormat spv_reflect_format_to_vulkan_format(SpvReflectFormat format);
 static VkShaderStageFlagBits spv_reflect_shader_stage_to_vulkan_shader_stage(SpvReflectShaderStageFlagBits stage);
 
-b8 load_shader(renderer_state* state, const char* path, shader* out_shader) {
+b8 load_shader1(renderer_state* state, const char* path, shader1* out_shader) {
     if (!file_exists(path)) {
         ETERROR("Unable to find shader file: '%s'.", path);
         return false;
@@ -125,7 +133,19 @@ b8 load_shader(renderer_state* state, const char* path, shader* out_shader) {
     return true;
 }
 
-b8 load_shader2_tests(const char* path, shader2* shader) {
+void unload_shader1(renderer_state* state, shader1* shader) {
+    etfree(shader->outputs, sizeof(shader->outputs[0]) * shader->output_count, MEMORY_TAG_SHADER);
+    etfree(shader->inputs, sizeof(shader->inputs[0]) * shader->input_count, MEMORY_TAG_SHADER);
+    etfree(shader->push_constants, sizeof(shader->push_constants[0]) * shader->push_constant_count, MEMORY_TAG_SHADER);
+    for (u32 i = 0; i < shader->set_count; ++i) {
+        etfree(shader->_sets[i]._bindings, sizeof(binding) * shader->_sets[i].binding_count, MEMORY_TAG_SHADER);
+    }
+    etfree(shader->_sets, sizeof(set) * shader->set_count, MEMORY_TAG_SHADER);
+    str_duplicate_free(shader->entry_point);
+    vkDestroyShaderModule(state->device.handle, shader->module, state->allocator);
+}
+
+b8 load_shader(renderer_state* state, const char* path, shader* shader) {
     if (!file_exists(path)) {
         ETERROR("Unable to find shader file: '%s'.", path);
         return false;
@@ -152,6 +172,12 @@ b8 load_shader2_tests(const char* path, shader2* shader) {
         return false;
     }
 
+    VkShaderModuleCreateInfo shader_info = init_shader_module_create_info();
+    shader_info.codeSize = code_size;
+    shader_info.pCode = (u32*)shader_code;
+
+    VK_CHECK(vkCreateShaderModule(state->device.handle, &shader_info, state->allocator, &shader->module));
+
     // Shader byte code loaded from file
     SpvReflectShaderModule spv_reflect_module = {0};
     SPIRV_REFLECT_CHECK(spvReflectCreateShaderModule2(SPV_REFLECT_MODULE_FLAG_NONE, code_size, shader_code, &spv_reflect_module));
@@ -173,37 +199,8 @@ b8 load_shader2_tests(const char* path, shader2* shader) {
     SpvReflectBlockVariable** push_blocks = etallocate(sizeof(SpvReflectBlockVariable*) * push_block_count, MEMORY_TAG_SHADER);
     SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstantBlocks(&spv_reflect_module, &push_block_count, push_blocks));
 
-    // u32 set = 0;
-    // while (set < set_count) {
-    //     ETINFO("Set: %lu", set);
-    //     u32 binding = 0;
-    //     while (binding < sets[set]->binding_count) {
-    //         SpvReflectDescriptorBinding* bind = sets[set]->bindings[binding];
-    //         ETINFO("Binding: %lu", binding);
-    //         ETINFO("  Binding Name: %s", bind->name);
-    //         ETINFO("  Block Name: %s", bind->block.name);
-    //         ETINFO("  Descriptor Type: %#010x", bind->descriptor_type);
-    //         ETINFO("  Descriptor Type Flags: %#010x", bind->type_description->type_flags);
-    //         ETINFO("  Descriptor Type name: %s", bind->type_description->type_name);
-    //         ETINFO("    Image dim: ");
-    //         for (u32 i = 0; i < bind->block.member_count; ++i) {
-    //             SpvReflectBlockVariable member = bind->block.members[i];
-    //             ETINFO("  Block member %lu", i);
-    //             ETINFO("    Member Name: %s", member.name);
-    //             ETINFO("    Member Type flags: %#010x", member.type_description->type_flags);
-    //             ETINFO("    Member Type name: %s", member.type_description->type_name);
-                
-    //             struct Traits* traits = &member.type_description->traits;
-    //             ETINFO("    Scalar width: %lu", traits->numeric.scalar.width);
-    //             ETINFO("    Scalar signedness: %lu", traits->numeric.scalar.signedness);
-    //         }
-    //         binding++;
-    //     }
-    //     set++;
-    // }
-
     shader->set_count = set_count;
-    shader->sets = etallocate(sizeof(set_layout) * set_count, MEMORY_TAG_SHADER);
+    shader->sets = etallocate(sizeof(set_layout) * set_count, MEMORY_TAG_SHADER2);
     for (u32 i = 0; i < set_count; ++i) {
         set_layout* set = &shader->sets[i];
         SpvReflectDescriptorSet* spv_set = sets[i];
@@ -218,21 +215,27 @@ b8 load_shader2_tests(const char* path, shader2* shader) {
             
             binding->name = str_duplicate_allocate(spv_binding->name);
             binding->index = spv_binding->binding;
-            
-            // If this descriptor is a block
-            if (spv_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER ||
-                spv_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC ||
-                spv_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
-                spv_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
-            {
-                binding->has_block = true;
-                binding->block.member_count = spv_binding->block.member_count;
-                binding->block.members = etallocate(
-                    sizeof(block_variable) * spv_binding->block.member_count,
-                    MEMORY_TAG_SHADER);
-                block_variable* c_block = &binding->block.members[0];
+            binding->descriptor_type = convert_spv_reflect_descriptor_type(spv_binding->descriptor_type);
+
+            if (is_descriptor_type_image(binding->descriptor_type)) {
+                binding->image.dim = spv_dim_to_image_dim(spv_binding->image.dim);
+                binding->image.depth = spv_binding->image.depth;
+                binding->image.array = spv_binding->image.arrayed;
+                binding->image.ms = spv_binding->image.ms;
+                binding->image.sampled = spv_binding->image.sampled;
+            } else {
+                reflect_block_variables(&binding->block, &spv_binding->block);
             }
+
+            binding->count = spv_binding->count;
+            binding->accessed = spv_binding->accessed;
         }
+    }
+
+    shader->push_block_count = push_block_count;
+    shader->push_blocks = etallocate(sizeof(block_variable) * push_block_count, MEMORY_TAG_SHADER);
+    for (u32 i = 0; i < push_block_count; ++i) {
+        reflect_block_variables(shader->push_blocks + i, push_blocks[i]);
     }
 
     etfree(push_blocks, sizeof(SpvReflectBlockVariable*) * push_block_count, MEMORY_TAG_SHADER);
@@ -242,15 +245,156 @@ b8 load_shader2_tests(const char* path, shader2* shader) {
 }
 
 void unload_shader(renderer_state* state, shader* shader) {
-    etfree(shader->outputs, sizeof(shader->outputs[0]) * shader->output_count, MEMORY_TAG_SHADER);
-    etfree(shader->inputs, sizeof(shader->inputs[0]) * shader->input_count, MEMORY_TAG_SHADER);
-    etfree(shader->push_constants, sizeof(shader->push_constants[0]) * shader->push_constant_count, MEMORY_TAG_SHADER);
+    for (u32 i = 0; i < shader->push_block_count; ++i)
+        free_block_variables(shader->push_blocks + i);
+    etfree(shader->push_blocks, sizeof(block_variable) * shader->push_block_count, MEMORY_TAG_SHADER);
+
     for (u32 i = 0; i < shader->set_count; ++i) {
-        etfree(shader->_sets[i]._bindings, sizeof(binding) * shader->_sets[i].binding_count, MEMORY_TAG_SHADER);
+        set_layout* set = &shader->sets[i];
+        for (u32 j = 0; j < set->binding_count; ++j) {
+            binding_layout* binding = &set->bindings[j];
+            
+            str_duplicate_free(binding->name);
+            if (!is_descriptor_type_image(binding->descriptor_type))
+                free_block_variables(&binding->block);
+        }
+        etfree(set->bindings, sizeof(binding_layout) * set->binding_count, MEMORY_TAG_SHADER);
     }
-    etfree(shader->_sets, sizeof(set) * shader->set_count, MEMORY_TAG_SHADER);
+    etfree(shader->sets, sizeof(set_layout) * shader->set_count, MEMORY_TAG_SHADER2);
     str_duplicate_free(shader->entry_point);
     vkDestroyShaderModule(state->device.handle, shader->module, state->allocator);
+}
+
+// TODO: Get type from type flags function to return the type from type flags
+void reflect_block_variables(block_variable* block, SpvReflectBlockVariable* spv_block) {
+    block->name = str_duplicate_allocate(spv_block->name);
+    block->offset = spv_block->offset;
+    block->absolute_offset = spv_block->absolute_offset;
+    block->size = spv_block->size;
+    block->padded_size = spv_block->padded_size;
+
+    block->numeric.signedness = spv_block->numeric.scalar.signedness;
+
+    block->vector.component_count = spv_block->numeric.vector.component_count;
+
+    block->matrix.column_count = spv_block->numeric.matrix.column_count;
+    block->matrix.row_count = spv_block->numeric.matrix.row_count;
+    block->matrix.stride = spv_block->numeric.matrix.stride;
+
+    block->array.dim_count = spv_block->array.dims_count;
+    etcopy_memory(block->array.dim_lengths, spv_block->array.dims, sizeof(u32) * spv_block->array.dims_count);
+
+    block->flags = convert_spv_reflect_type_flags(spv_block->type_description->type_flags);
+    
+    block->member_count = spv_block->member_count;
+
+    if (!spv_block->member_count) return;
+    block->members = etallocate(sizeof(block_variable) * spv_block->member_count, MEMORY_TAG_SHADER);
+    for (u32 i = 0; i < spv_block->member_count; ++i) {
+        reflect_block_variables(block->members + i, spv_block->members + i);
+    }
+}
+
+void free_block_variables(block_variable* block) {
+    str_duplicate_free(block->name);
+    if (!block->member_count) return;
+    for (u32 i = 0; i < block->member_count; ++i)
+        free_block_variables(block->members + i);
+    etfree(block->members, sizeof(block_variable) * block->member_count, MEMORY_TAG_SHADER);
+}
+
+void print_shader_info(shader* shader) {
+    for (u32 i = 0; i < shader->set_count; ++i) {
+        print_set_layout(shader->sets + i);
+    }
+
+    ETINFO("Push constant info: ");
+    for (u32 i = 0; i < shader->push_block_count; ++i) {
+        print_block_variables(shader->push_blocks + i);
+    }
+}
+
+void print_push_constants(shader* shader) {
+    ETINFO("Push constant info: ");
+    for (u32 i = 0; i < shader->push_block_count; ++i) {
+        print_block_variables(shader->push_blocks + i);
+    }
+
+}
+
+void print_block_variables(block_variable* block) {
+    ETINFO("");
+    ETINFO("Block Variable: %s", block->name);
+    ETINFO("Offset: %lu", block->offset);
+    ETINFO("Absolute offset %lu", block->absolute_offset);
+    ETINFO("Size: %lu", block->size);
+    ETINFO("Padded size: %lu", block->padded_size);
+
+    ETINFO("Signedness: %lu", block->numeric.signedness);
+
+    ETINFO("Component count: %lu", block->vector.component_count);
+
+    ETINFO("Column count: %lu", block->matrix.column_count);
+    ETINFO("Row count: %lu", block->matrix.row_count);
+    ETINFO("Stride: %lu", block->matrix.stride);
+
+    for (u32 i = 0; i < block->member_count; ++i) {
+        print_block_variables(block->members + i);
+    }
+}
+
+void print_set_layout(set_layout* set) {
+    ETINFO("Set %lu", set->index);
+    for (u32 i = 0; i < set->binding_count; ++i) {
+        print_binding_layout(set->bindings + i);
+    }
+    ETINFO("");
+}
+
+void print_binding_layout(binding_layout* binding) {
+    ETINFO("");
+    ETINFO("Binding %lu: ", binding->index);
+    ETINFO("Binding Name: %s", binding->name);
+    
+    if (is_descriptor_type_image(binding->descriptor_type)) {
+        ETINFO("Image depth: %lu", binding->image.depth);
+        ETINFO("Image array: %lu", binding->image.array);
+        ETINFO("Image multi sampled: %lu", binding->image.ms);
+        ETINFO("Image sampled: %lu", binding->image.sampled);
+    } else {
+        print_block_variables(&binding->block);
+    }
+
+    ETINFO("Count: %lu", binding->count);
+    ETINFO("Accessed: %lu", binding->accessed);
+}
+
+b8 is_descriptor_type_image(descriptor_type type) {
+    switch (type)
+    {
+    case DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+        return true;        
+    case DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+        return true;
+    case DESCRIPTOR_TYPE_STORAGE_IMAGE:
+        return true; 
+    }
+    return false;
+}
+
+// NOTE: As the enums have been stolen from spirv-reflect we just pass them as is
+descriptor_type convert_spv_reflect_descriptor_type(SpvReflectDescriptorType type) {
+    return (descriptor_type)type;
+}
+
+// NOTE: As the enums have been stolen from spirv-reflect we just pass them as is
+image_dim spv_dim_to_image_dim(SpvDim dim) {
+    return (image_dim)dim;
+}
+
+// NOTE: As the enums have been stolen from spirv-reflect we just pass them as is
+type_flags convert_spv_reflect_type_flags(SpvReflectTypeFlags typeFlags) {
+    return (type_flags)typeFlags;
 }
 
 VkDescriptorType spv_reflect_descriptor_to_vulkan_descriptor(SpvReflectDescriptorType descriptor_type) {

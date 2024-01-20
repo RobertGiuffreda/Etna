@@ -26,6 +26,7 @@ static const char* memory_strings[MEMORY_TAG_MAX] = {
     "Renderer:      ",
     "Renderable:    ",
     "Shader:        ",
+    "Shader 2:      ",
     "Resource:      ",
     "File System:   ",
     "Dynarray:      ",

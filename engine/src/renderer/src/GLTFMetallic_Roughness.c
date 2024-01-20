@@ -8,13 +8,13 @@
 #include "renderer/src/utilities/vkinit.h"
 
 void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
-    shader mesh_vert_shader = {0};
-    if (!load_shader(state, "build/assets/shaders/mesh_mat.vert.spv", &mesh_vert_shader)) {
+    shader1 mesh_vert_shader = {0};
+    if (!load_shader1(state, "build/assets/shaders/mesh_mat.vert.spv", &mesh_vert_shader)) {
         ETERROR("Unable to load mesh.vert.spv");
     }
 
-    shader mesh_frag_shader = {0};
-    if (!load_shader(state, "build/assets/shaders/mesh_mat.frag.spv", &mesh_frag_shader)) {
+    shader1 mesh_frag_shader = {0};
+    if (!load_shader1(state, "build/assets/shaders/mesh_mat.frag.spv", &mesh_frag_shader)) {
         ETERROR("Unable to load mesh.vert.spv");
     }
 
@@ -97,8 +97,8 @@ void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
 
     pipeline_builder_destroy(&pipeline_builder);
 
-    unload_shader(state, &mesh_vert_shader);
-    unload_shader(state, &mesh_frag_shader);
+    unload_shader1(state, &mesh_vert_shader);
+    unload_shader1(state, &mesh_frag_shader);
 }
 
 void GLTF_MR_destroy_pipelines(GLTF_MR* mat, renderer_state* state) {

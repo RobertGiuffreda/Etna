@@ -20,18 +20,19 @@ layout(set = 1, binding = 0) uniform material_data_block {
 layout(set = 1, binding = 1) uniform sampler2D color_tex;
 layout(set = 1, binding = 2) uniform sampler2D metal_rough_tex;
 
-layout(set = 1, binding = 3) uniform test_block {
-	ivec4 test_ivec[4];
-	uvec4 test_uvec[4];
-} test;
+// NOTE: Testing the reflection data and such
+// layout(set = 1, binding = 3) uniform test_block {
+// 	ivec4 test_ivec[4];
+// 	uvec4 test_uvec[4];
+// } test;
 
-layout (set = 1, binding = 4) uniform usampler2D test_tex[2];
-layout (rgba16f, set = 1, binding = 5) uniform image2D image;
+// layout (set = 1, binding = 4) uniform usampler2D test_tex[2];
+// layout (rgba16f, set = 1, binding = 5) uniform image2D image;
 
-layout (buffer_reference, std430) readonly buffer mat_buffer {
-    mat4 mats[];
-};
+// layout (buffer_reference, std430) readonly buffer mat_buffer {
+//     mat4 mats[];
+// };
 
-layout (set = 1, binding = 6) uniform ref_block {
-	mat_buffer mat_ref;
-} ref_test;
+// layout (set = 1, binding = 6) uniform ref_block {
+// 	mat_buffer mat_ref;
+// } ref_test;

@@ -270,29 +270,24 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     initialize_mesh_mat_pipeline(state);
     ETINFO("Initialized mesh mat pipeline");
 
-    shader2 test_vertex, test_fragment;
-    load_shader2_tests("build/assets/shaders/mesh_mat.vert.spv", &test_vertex);
-    load_shader2_tests("build/assets/shaders/mesh_mat.frag.spv", &test_fragment);
-
     camera_create(&state->main_camera);
     state->main_camera.position = (v3s){.raw = {0.f, 0.f, 5.f}};
     ETINFO("Renderer camera created");
 
-    // if (!initialize_default_data(state)) {
-    //     ETFATAL("Error intializing data.");
-    //     return false;
-    // }
+    if (!initialize_default_data(state)) {
+        ETFATAL("Error intializing data.");
+        return false;
+    }
 
     *out_state = state;
-    return false;
-    // return true;
+    return true;
 }
 
 void renderer_shutdown(renderer_state* state) {
     vkDeviceWaitIdle(state->device.handle);
     // Destroy reverse order of creation
 
-    // shutdown_default_data(state);
+    shutdown_default_data(state);
 
     camera_destroy(&state->main_camera);
 
@@ -747,7 +742,7 @@ static void destroy_scene_data_buffers(renderer_state* state) {
 }
 
 static void initialize_compute_effects(renderer_state* state) {
-    load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader);
+    load_shader1(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader);
 
     VkPipelineLayoutCreateInfo compute_effect_pipeline_layout_info = init_pipeline_layout_create_info();
     compute_effect_pipeline_layout_info.setLayoutCount = 1;
@@ -780,7 +775,7 @@ static void shutdown_compute_effects(renderer_state* state) {
     vkDestroyPipeline(state->device.handle, state->gradient_effect.pipeline, state->allocator);
     vkDestroyPipelineLayout(state->device.handle, state->gradient_effect.layout, state->allocator);
 
-    unload_shader(state, &state->gradient_shader);
+    unload_shader1(state, &state->gradient_shader);
 }
 
 static void initialize_mesh_mat_pipeline(renderer_state* state) {
