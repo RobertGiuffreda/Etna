@@ -8,6 +8,7 @@
 
 #include "renderer/src/vk_types.h"
 #include "renderer/src/renderables.h"
+#include "renderer/src/shader.h"
 
 // TODO: Move to loader folder
 typedef struct loaded_gltf {

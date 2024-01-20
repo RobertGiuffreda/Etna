@@ -1,6 +1,5 @@
 #include "shader.h"
 
-
 #include "core/etmemory.h"
 #include "core/logger.h"
 #include "core/etstring.h"
@@ -13,15 +12,11 @@
 
 #define SPIRV_REFLECT_CHECK(expr) { ETASSERT((expr) == SPV_REFLECT_RESULT_SUCCESS); }
 
-static VkDescriptorType reflect_descriptor_to_vulkan_descriptor(SpvReflectDescriptorType descriptor_type);
-static VkFormat reflect_format_to_vulkan_format(SpvReflectFormat format);
-static VkShaderStageFlagBits reflect_shader_stage_to_vulkan_shader_stage(SpvReflectShaderStageFlagBits stage);
+static VkDescriptorType spv_reflect_descriptor_to_vulkan_descriptor(SpvReflectDescriptorType descriptor_type);
+static VkFormat spv_reflect_format_to_vulkan_format(SpvReflectFormat format);
+static VkShaderStageFlagBits spv_reflect_shader_stage_to_vulkan_shader_stage(SpvReflectShaderStageFlagBits stage);
 
-// TODO: Push constant reflection data
-// TODO: Uniform buffer reflection data
-// TODO: Storage buffer data
 b8 load_shader(renderer_state* state, const char* path, shader* out_shader) {
-    // Load passed in shader file from config
     if (!file_exists(path)) {
         ETERROR("Unable to find shader file: '%s'.", path);
         return false;
@@ -62,17 +57,17 @@ b8 load_shader(renderer_state* state, const char* path, shader* out_shader) {
     file_close(shader_file);
 
     out_shader->entry_point = str_duplicate_allocate(spv_reflect_module.entry_point_name);
-    out_shader->stage = reflect_shader_stage_to_vulkan_shader_stage(spv_reflect_module.shader_stage);
+    out_shader->stage = spv_reflect_shader_stage_to_vulkan_shader_stage(spv_reflect_module.shader_stage);
 
     u32 set_count = 0;
     SPIRV_REFLECT_CHECK(spvReflectEnumerateDescriptorSets(&spv_reflect_module, &set_count, 0));
     SpvReflectDescriptorSet** descriptor_sets = etallocate(sizeof(SpvReflectDescriptorSet*) * set_count, MEMORY_TAG_SHADER);
     SPIRV_REFLECT_CHECK(spvReflectEnumerateDescriptorSets(&spv_reflect_module, &set_count, descriptor_sets));
  
-    u32 push_constant_count = 0;
-    SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstants(&spv_reflect_module, &push_constant_count, 0));
-    SpvReflectBlockVariable** pushs = etallocate(sizeof(SpvReflectBlockVariable*) * push_constant_count, MEMORY_TAG_SHADER);
-    SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstants(&spv_reflect_module, &push_constant_count, pushs));
+    u32 push_block_count = 0;
+    SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstantBlocks(&spv_reflect_module, &push_block_count, 0));
+    SpvReflectBlockVariable** push_blocks = etallocate(sizeof(SpvReflectBlockVariable*) * push_block_count, MEMORY_TAG_SHADER);
+    SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstantBlocks(&spv_reflect_module, &push_block_count, push_blocks));
 
     u32 input_variable_count = 0;
     SPIRV_REFLECT_CHECK(spvReflectEnumerateInputVariables(&spv_reflect_module, &input_variable_count, 0));
@@ -83,7 +78,6 @@ b8 load_shader(renderer_state* state, const char* path, shader* out_shader) {
     SPIRV_REFLECT_CHECK(spvReflectEnumerateOutputVariables(&spv_reflect_module, &output_variable_count, 0));
     SpvReflectInterfaceVariable** output_variables = etallocate(sizeof(SpvReflectInterfaceVariable*) * output_variable_count, MEMORY_TAG_SHADER);
     SPIRV_REFLECT_CHECK(spvReflectEnumerateOutputVariables(&spv_reflect_module, &output_variable_count, output_variables));
-
 
     // Enumerate set count but only enumerate the bindings
     out_shader->set_count = set_count;
@@ -99,44 +93,150 @@ b8 load_shader(renderer_state* state, const char* path, shader* out_shader) {
             // Pointer for easier to read code
             binding* curr_binding = &curr_set->_bindings[j];
             curr_binding->binding = descriptor_sets[i]->bindings[j]->binding;
-            curr_binding->descriptor_type = reflect_descriptor_to_vulkan_descriptor(descriptor_sets[i]->bindings[j]->descriptor_type);
+            curr_binding->descriptor_type = spv_reflect_descriptor_to_vulkan_descriptor(descriptor_sets[i]->bindings[j]->descriptor_type);
             curr_binding->count = descriptor_sets[i]->bindings[j]->count;
         }
     }
 
-    // TODO: Gather push count information
-    out_shader->push_constant_count = push_constant_count;
-    out_shader->push_constants = etallocate(sizeof(out_shader->push_constants[0]) * push_constant_count, MEMORY_TAG_SHADER);
+    out_shader->push_constant_count = push_block_count;
+    out_shader->push_constants = etallocate(sizeof(out_shader->push_constants[0]) * push_block_count, MEMORY_TAG_SHADER);
+    // TODO: Record push constant block information
 
     out_shader->input_count = input_variable_count;
     out_shader->inputs = etallocate(sizeof(out_shader->inputs[0]) * input_variable_count, MEMORY_TAG_SHADER);
     for (u32 i = 0; i < input_variable_count; ++i) {
-        out_shader->inputs[i].format = reflect_format_to_vulkan_format(input_variables[i]->format);
+        out_shader->inputs[i].format = spv_reflect_format_to_vulkan_format(input_variables[i]->format);
         out_shader->inputs[i].location = input_variables[i]->location;
     }
     
     out_shader->output_count = output_variable_count;
     out_shader->outputs = etallocate(sizeof(out_shader->outputs[0]) * output_variable_count, MEMORY_TAG_SHADER);
     for (u32 i = 0; i < output_variable_count; ++i) {
-        out_shader->outputs[i].format = reflect_format_to_vulkan_format(output_variables[i]->format);
+        out_shader->outputs[i].format = spv_reflect_format_to_vulkan_format(output_variables[i]->format);
         out_shader->outputs[i].location = output_variables[i]->location;
     }
-
-    // Store relevant descriptor set layout creation information in out_shader
-    // Iterate through and do not count builtin interface variables information
-
-    // See difference between push constant blocks and push constants
-    // u32 push_constant_block_count = 0;
-    // SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstantBlocks(&spv_reflect_module, &push_constant_block_count, 0));
-    // SpvReflectBlockVariable** push_blocks = etallocate(sizeof(SpvReflectBlockVariable*) * push_constant_block_count, MEMORY_TAG_SHADER);
-    // SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstantBlocks(&spv_reflect_module, &push_constant_block_count, push_blocks));
-    // etfree(push_blocks, sizeof(SpvReflectBlockVariable*) * push_constant_block_count, MEMORY_TAG_SHADER);
 
     // Clean up clean up everybody clean up
     etfree(output_variables, sizeof(SpvReflectInterfaceVariable*) * output_variable_count, MEMORY_TAG_SHADER);
     etfree(input_variables, sizeof(SpvReflectInterfaceVariable*) * input_variable_count, MEMORY_TAG_SHADER);
-    etfree(pushs, sizeof(SpvReflectBlockVariable*) * push_constant_count, MEMORY_TAG_SHADER);
+    etfree(push_blocks, sizeof(SpvReflectBlockVariable*) * push_block_count, MEMORY_TAG_SHADER);
     etfree(descriptor_sets, sizeof(SpvReflectDescriptorSet*) * set_count, MEMORY_TAG_SHADER);
+    spvReflectDestroyShaderModule(&spv_reflect_module);
+    return true;
+}
+
+b8 load_shader2_tests(const char* path, shader2* shader) {
+    if (!file_exists(path)) {
+        ETERROR("Unable to find shader file: '%s'.", path);
+        return false;
+    }
+
+    etfile* shader_file = 0;
+    if (!file_open(path, FILE_READ_FLAG | FILE_BINARY_FLAG, &shader_file)) {
+        ETERROR("Unable to open the shader file '%s'.", path);
+        return false;
+    }
+
+    u64 code_size = 0;
+    if (!file_size(shader_file, &code_size)) {
+        ETERROR("Unable to measure size of compute shader file: '%s'.", path);
+        file_close(shader_file);
+        return false;
+    }
+
+    void* shader_code = etallocate(code_size, MEMORY_TAG_RENDERER);
+    if (!file_read_bytes(shader_file, shader_code, &code_size)) {
+        etfree(shader_code, code_size, MEMORY_TAG_RENDERER);
+        file_close(shader_file);
+        ETERROR("Error reading bytes from shader code.");
+        return false;
+    }
+
+    // Shader byte code loaded from file
+    SpvReflectShaderModule spv_reflect_module = {0};
+    SPIRV_REFLECT_CHECK(spvReflectCreateShaderModule2(SPV_REFLECT_MODULE_FLAG_NONE, code_size, shader_code, &spv_reflect_module));
+
+    // Clean up memoory allocated for shader code and files
+    etfree(shader_code, code_size, MEMORY_TAG_RENDERER);
+    file_close(shader_file);
+
+    shader->entry_point = str_duplicate_allocate(spv_reflect_module.entry_point_name);
+    shader->stage = spv_reflect_shader_stage_to_vulkan_shader_stage(spv_reflect_module.shader_stage);
+
+    u32 set_count = 0;
+    SPIRV_REFLECT_CHECK(spvReflectEnumerateDescriptorSets(&spv_reflect_module, &set_count, 0));
+    SpvReflectDescriptorSet** sets = etallocate(sizeof(SpvReflectDescriptorSet*) * set_count, MEMORY_TAG_SHADER);
+    SPIRV_REFLECT_CHECK(spvReflectEnumerateDescriptorSets(&spv_reflect_module, &set_count, sets));
+ 
+    u32 push_block_count = 0;
+    SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstantBlocks(&spv_reflect_module, &push_block_count, 0));
+    SpvReflectBlockVariable** push_blocks = etallocate(sizeof(SpvReflectBlockVariable*) * push_block_count, MEMORY_TAG_SHADER);
+    SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstantBlocks(&spv_reflect_module, &push_block_count, push_blocks));
+
+    // u32 set = 0;
+    // while (set < set_count) {
+    //     ETINFO("Set: %lu", set);
+    //     u32 binding = 0;
+    //     while (binding < sets[set]->binding_count) {
+    //         SpvReflectDescriptorBinding* bind = sets[set]->bindings[binding];
+    //         ETINFO("Binding: %lu", binding);
+    //         ETINFO("  Binding Name: %s", bind->name);
+    //         ETINFO("  Block Name: %s", bind->block.name);
+    //         ETINFO("  Descriptor Type: %#010x", bind->descriptor_type);
+    //         ETINFO("  Descriptor Type Flags: %#010x", bind->type_description->type_flags);
+    //         ETINFO("  Descriptor Type name: %s", bind->type_description->type_name);
+    //         ETINFO("    Image dim: ");
+    //         for (u32 i = 0; i < bind->block.member_count; ++i) {
+    //             SpvReflectBlockVariable member = bind->block.members[i];
+    //             ETINFO("  Block member %lu", i);
+    //             ETINFO("    Member Name: %s", member.name);
+    //             ETINFO("    Member Type flags: %#010x", member.type_description->type_flags);
+    //             ETINFO("    Member Type name: %s", member.type_description->type_name);
+                
+    //             struct Traits* traits = &member.type_description->traits;
+    //             ETINFO("    Scalar width: %lu", traits->numeric.scalar.width);
+    //             ETINFO("    Scalar signedness: %lu", traits->numeric.scalar.signedness);
+    //         }
+    //         binding++;
+    //     }
+    //     set++;
+    // }
+
+    shader->set_count = set_count;
+    shader->sets = etallocate(sizeof(set_layout) * set_count, MEMORY_TAG_SHADER);
+    for (u32 i = 0; i < set_count; ++i) {
+        set_layout* set = &shader->sets[i];
+        SpvReflectDescriptorSet* spv_set = sets[i];
+
+        set->index = spv_set->set;
+        set->binding_count = spv_set->binding_count;
+        set->bindings = etallocate(sizeof(binding_layout) * spv_set->binding_count, MEMORY_TAG_SHADER);
+
+        for (u32 j = 0; j < set->binding_count; ++j) {
+            binding_layout* binding = &set->bindings[j];
+            SpvReflectDescriptorBinding* spv_binding = spv_set->bindings[j];
+            
+            binding->name = str_duplicate_allocate(spv_binding->name);
+            binding->index = spv_binding->binding;
+            
+            // If this descriptor is a block
+            if (spv_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER ||
+                spv_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC ||
+                spv_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+                spv_binding->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+            {
+                binding->has_block = true;
+                binding->block.member_count = spv_binding->block.member_count;
+                binding->block.members = etallocate(
+                    sizeof(block_variable) * spv_binding->block.member_count,
+                    MEMORY_TAG_SHADER);
+                block_variable* c_block = &binding->block.members[0];
+            }
+        }
+    }
+
+    etfree(push_blocks, sizeof(SpvReflectBlockVariable*) * push_block_count, MEMORY_TAG_SHADER);
+    etfree(sets, sizeof(SpvReflectDescriptorSet*) * set_count, MEMORY_TAG_SHADER);
     spvReflectDestroyShaderModule(&spv_reflect_module);
     return true;
 }
@@ -153,7 +253,7 @@ void unload_shader(renderer_state* state, shader* shader) {
     vkDestroyShaderModule(state->device.handle, shader->module, state->allocator);
 }
 
-VkDescriptorType reflect_descriptor_to_vulkan_descriptor(SpvReflectDescriptorType descriptor_type) {
+VkDescriptorType spv_reflect_descriptor_to_vulkan_descriptor(SpvReflectDescriptorType descriptor_type) {
     switch (descriptor_type)
     {
     case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
@@ -193,13 +293,13 @@ VkDescriptorType reflect_descriptor_to_vulkan_descriptor(SpvReflectDescriptorTyp
         return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
         break;
     default:
-        ETERROR("Unknown SpvReflectDescriptorType value passed to reflect_descriptor_to_vulkan_descriptor.");
+        ETERROR("Unknown SpvReflectDescriptorType value passed to spv_reflect_descriptor_to_vulkan_descriptor.");
         return 0;
         break;
     }
 }
 
-VkFormat reflect_format_to_vulkan_format(SpvReflectFormat format) {
+VkFormat spv_reflect_format_to_vulkan_format(SpvReflectFormat format) {
     switch (format)
     {
     case SPV_REFLECT_FORMAT_UNDEFINED:
@@ -314,13 +414,13 @@ VkFormat reflect_format_to_vulkan_format(SpvReflectFormat format) {
     return VK_FORMAT_R64G64B64A64_SFLOAT;
         break;
     default:
-        ETERROR("Unknown SpvReflectFormat value passed to reflect_format_to_vulkan_format.");
+        ETERROR("Unknown SpvReflectFormat value passed to spv_reflect_format_to_vulkan_format.");
         return VK_FORMAT_UNDEFINED;
         break;
     }
 }
 
-VkShaderStageFlagBits reflect_shader_stage_to_vulkan_shader_stage(SpvReflectShaderStageFlagBits stage) {
+VkShaderStageFlagBits spv_reflect_shader_stage_to_vulkan_shader_stage(SpvReflectShaderStageFlagBits stage) {
     switch (stage)
     {
     case SPV_REFLECT_SHADER_STAGE_VERTEX_BIT:
@@ -367,7 +467,7 @@ VkShaderStageFlagBits reflect_shader_stage_to_vulkan_shader_stage(SpvReflectShad
         break;
     
     default:
-        ETERROR("Unknown SpvReflectShaderStageFlagBits value passed to reflect_shader_stage_to_vulkan_shader_stage.");
+        ETERROR("Unknown SpvReflectShaderStageFlagBits value passed to spv_reflect_shader_stage_to_vulkan_shader_stage.");
         return 0;
         break;
     }

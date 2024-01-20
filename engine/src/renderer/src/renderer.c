@@ -270,24 +270,29 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     initialize_mesh_mat_pipeline(state);
     ETINFO("Initialized mesh mat pipeline");
 
+    shader2 test_vertex, test_fragment;
+    load_shader2_tests("build/assets/shaders/mesh_mat.vert.spv", &test_vertex);
+    load_shader2_tests("build/assets/shaders/mesh_mat.frag.spv", &test_fragment);
+
     camera_create(&state->main_camera);
     state->main_camera.position = (v3s){.raw = {0.f, 0.f, 5.f}};
     ETINFO("Renderer camera created");
 
-    if (!initialize_default_data(state)) {
-        ETFATAL("Error intializing data.");
-        return false;
-    }
+    // if (!initialize_default_data(state)) {
+    //     ETFATAL("Error intializing data.");
+    //     return false;
+    // }
 
     *out_state = state;
-    return true;
+    return false;
+    // return true;
 }
 
 void renderer_shutdown(renderer_state* state) {
     vkDeviceWaitIdle(state->device.handle);
     // Destroy reverse order of creation
 
-    shutdown_default_data(state);
+    // shutdown_default_data(state);
 
     camera_destroy(&state->main_camera);
 
@@ -352,12 +357,14 @@ void renderer_update_scene(renderer_state* state) {
     state->scene_data.viewproj = vp;
 
     v4s a_color = { .raw = {.1f, .1f, .1f, .1f}};
-    v4s s_color = { .raw = {1.f, 1.f, 1.f, 1.f}};
-    v4s sl_dir = { .raw = {0, 1.f, .5f, 1.f}};
+    v4s l_color = { .raw = {1.f, 1.f, 1.f, 1.f}};
+    v4s l_dir = { .raw = {0.f, 1.f, .5f, 1.f}};
+    v4s l_pos = { .raw = {0.f, 0.f, 0.f, 1.f}};
     
     state->scene_data.ambient_color = a_color;
-    state->scene_data.sunlight_color = s_color;
-    state->scene_data.sunlight_direction = sl_dir;
+    state->scene_data.light_color = l_color;
+    state->scene_data.light_direction = l_dir;
+    state->scene_data.light_position = l_pos;
 
     dynarray_clear(state->main_draw_context.opaque_surfaces);
     dynarray_clear(state->main_draw_context.transparent_surfaces);

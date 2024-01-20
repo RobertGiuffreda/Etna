@@ -62,6 +62,8 @@ void log_output(log_level level, const char* format, ...) {
 
     printf("%s\n", output);
 
+    // Change the null terminator to a newline character so that it is printed to the log file.
+    output[total_len - 1] = '\n';
     u64 log_bytes_written = 0;
     if (!file_write(logger->log_file, sizeof(char) * total_len, output, &log_bytes_written)) {
         ETWARN("Something went wrong when writing to the log file.");

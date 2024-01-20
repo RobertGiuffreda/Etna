@@ -92,9 +92,9 @@ typedef struct gpu_scene_data {
     m4s proj;
     m4s viewproj;
     v4s ambient_color;
-    v4s sunlight_direction; // w for sun power
-    v4s sunlight_color;
-    v4s padding;            // 256 byte minimum on my GPU
+    v4s light_direction; // w for sun power
+    v4s light_color;
+    v4s light_position;            // 256 byte minimum on my GPU
 } gpu_scene_data;
 
 typedef struct material_pipeline {
@@ -109,7 +109,7 @@ typedef struct material_instance {
 } material_instance;
 
 // TODO: Rename material_constants, material_resources, GLTFMetallic_Roughness
-// GLTFMetallic_Roughness is material format agnostic so the name does not make sense
+// GLTFMetallic_Roughness's contents are material format agnostic so the name does not make sense
 struct material_constants {
     v4s color_factors;
     v4s metal_rough_factors;
@@ -180,51 +180,6 @@ typedef struct draw_context {
     render_object* transparent_surfaces;
 } draw_context;
 // TODO: END
-
-// NOTE: Reflection info is unused at the moment 
-typedef struct binding {
-    u32 binding;
-    VkDescriptorType descriptor_type;
-    u32 count;
-    struct {
-        VkImageType dim;
-        VkFormat format;
-    } image;
-} binding;
-
-typedef struct set {
-    u32 set;
-    // Dynarray
-    u32 binding_count;
-    binding* _bindings;
-} set;
-
-// TODO: Reflection data used to create a material
-typedef struct shader {
-    VkShaderModule module;
-    VkShaderStageFlagBits stage;
-    char* entry_point;
-    u32 set_count;
-    set* _sets;
-
-    // TODO: Get information about push constants
-    u32 push_constant_count;
-    struct {
-        u32 temp;
-    }*push_constants;
-
-    u32 input_count;
-    struct {
-        u32 location;
-        VkFormat format;
-    }*inputs;
-
-    u32 output_count;
-    struct {
-        u32 location;
-        VkFormat format;
-    }*outputs;
-} shader;
 
 /** TEMP:TODO:
  * This section involving compute effects is a bit of a mess and
