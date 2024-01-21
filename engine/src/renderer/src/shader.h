@@ -140,6 +140,7 @@ void print_block_variables(block_variable* block);
 void print_set_layout(set_layout* set);
 void print_binding_layout(binding_layout* binding);
 
+void print_sets_and_bindings(shader* shader);
 
 // NOTE: OLD Structs and functions:
 typedef struct binding {

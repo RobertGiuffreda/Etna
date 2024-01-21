@@ -108,8 +108,7 @@ typedef struct material_instance {
     material_pass pass_type;
 } material_instance;
 
-// TODO: Rename material_constants, material_resources, GLTFMetallic_Roughness
-// GLTFMetallic_Roughness's contents are material format agnostic so the name does not make sense
+// TODO: Make material_resources generic
 struct material_constants {
     v4s color_factors;
     v4s metal_rough_factors;

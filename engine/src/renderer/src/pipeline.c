@@ -200,8 +200,8 @@ void pipeline_builder_enable_depthtest(pipeline_builder* builder, b8 depth_write
     builder->depth_stencil.depthWriteEnable = depth_write_enable;
     builder->depth_stencil.depthCompareOp = op;
     builder->depth_stencil.depthBoundsTestEnable = VK_FALSE;
-    // builder->depth_stencil.front = ;
-    // builder->depth_stencil.back = ;
+    // builder->depth_stencil.front = ; Unused at this time
+    // builder->depth_stencil.back = ;  Unused at this time
     builder->depth_stencil.minDepthBounds = 0.0f;
     builder->depth_stencil.maxDepthBounds = 1.0f;
 }

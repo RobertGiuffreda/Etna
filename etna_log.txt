@@ -64,8 +64,8 @@ UI:                 0.00B
 Renderer:           0.00B
 Renderable:         0.00B
 Shader:             0.00B
-Shader 2:           0.00B
 Resource:           0.00B
+Material:           0.00B
 File System:        8.00B
 Dynarray:           0.00B
 Descriptor Dyn:     0.00B

@@ -893,9 +893,6 @@ static b8 initialize_default_data(renderer_state* state) {
     mat_resources.metal_rough_image = state->white_image;
     mat_resources.metal_rough_sampler = state->default_sampler_linear;
 
-    // Initialize state->metal_rough_material.writer
-    descriptor_set_writer_initialize(&state->metal_rough_material.writer);
-
     // Create material_constants uniform buffer
     buffer_create(
         state,
@@ -942,8 +939,6 @@ static void shutdown_default_data(renderer_state* state) {
     ETINFO("Scene GLTF file unloaded");
 
     buffer_destroy(state, &state->default_material_constants);
-
-    descriptor_set_writer_shutdown(&state->metal_rough_material.writer);
 
     vkDestroySampler(state->device.handle, state->default_sampler_linear, state->allocator);
     vkDestroySampler(state->device.handle, state->default_sampler_nearest, state->allocator);

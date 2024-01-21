@@ -200,7 +200,7 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
     SPIRV_REFLECT_CHECK(spvReflectEnumeratePushConstantBlocks(&spv_reflect_module, &push_block_count, push_blocks));
 
     shader->set_count = set_count;
-    shader->sets = etallocate(sizeof(set_layout) * set_count, MEMORY_TAG_SHADER2);
+    shader->sets = etallocate(sizeof(set_layout) * set_count, MEMORY_TAG_SHADER);
     for (u32 i = 0; i < set_count; ++i) {
         set_layout* set = &shader->sets[i];
         SpvReflectDescriptorSet* spv_set = sets[i];
@@ -260,7 +260,7 @@ void unload_shader(renderer_state* state, shader* shader) {
         }
         etfree(set->bindings, sizeof(binding_layout) * set->binding_count, MEMORY_TAG_SHADER);
     }
-    etfree(shader->sets, sizeof(set_layout) * shader->set_count, MEMORY_TAG_SHADER2);
+    etfree(shader->sets, sizeof(set_layout) * shader->set_count, MEMORY_TAG_SHADER);
     str_duplicate_free(shader->entry_point);
     vkDestroyShaderModule(state->device.handle, shader->module, state->allocator);
 }
@@ -369,6 +369,15 @@ void print_binding_layout(binding_layout* binding) {
 
     ETINFO("Count: %lu", binding->count);
     ETINFO("Accessed: %lu", binding->accessed);
+}
+
+void print_sets_and_bindings(shader* shader) {
+    for (u32 i = 0; i < shader->set_count; ++i) {
+        ETINFO("i: %lu | index: %lu", i, shader->sets[i].index);
+        for (u32 j = 0; j < shader->sets[i].binding_count; ++j) {
+            ETINFO("    j: %lu | index: %lu", j, shader->sets[i].bindings[j].index);
+        }
+    }
 }
 
 b8 is_descriptor_type_image(descriptor_type type) {
