@@ -17,4 +17,11 @@ typedef struct material_config {
     struct material_resources* resources;
 } material_config;
 
-b8 material_submit(material_manager* manager, material_config* config, material** out_material_ref);
+b8 material_submit_ref(
+    material_manager* manager,
+    material_config* config,
+    material** out_material_ref);
+
+b8 material_submit(
+    material_manager* manager,
+    material_config* config);

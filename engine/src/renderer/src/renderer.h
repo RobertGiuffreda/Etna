@@ -10,6 +10,8 @@
 #include "renderer/src/renderables.h"
 #include "renderer/src/shader.h"
 
+#include "scene/scene_private.h"
+
 // TODO: Move to loader folder
 typedef struct loaded_gltf {
     char* name;
@@ -146,13 +148,11 @@ typedef struct renderer_state {
     // NOTE: END
 
     // Scene data.
-    gpu_scene_data scene_data;
     VkDescriptorSetLayout scene_data_descriptor_set_layout;
     
     draw_context main_draw_context;
 
-    loaded_gltf _gltf;
-    camera main_camera;
+    scene _scene;
 
     // TEMP: Here in case of testing
     mesh_buffers rectangle;

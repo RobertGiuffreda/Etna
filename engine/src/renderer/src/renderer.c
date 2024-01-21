@@ -12,6 +12,7 @@
 #include "renderer/src/shader.h"
 #include "renderer/src/descriptor.h"
 #include "renderer/src/GLTFMetallic_Roughness.h"
+#include "renderer/src/renderables.h"
 
 #include "window/renderer_window.h"
 
@@ -23,7 +24,7 @@
 
 #include "resources/loaders/gltfloader.h"
 
-#include "renderer/src/renderables.h"
+#include "scene/scene.h"
 
 // TEMP: Until a math library is situated
 #include <math.h>
@@ -270,10 +271,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     initialize_mesh_mat_pipeline(state);
     ETINFO("Initialized mesh mat pipeline");
 
-    camera_create(&state->main_camera);
-    state->main_camera.position = (v3s){.raw = {0.f, 0.f, 5.f}};
-    ETINFO("Renderer camera created");
-
     if (!initialize_default_data(state)) {
         ETFATAL("Error intializing data.");
         return false;
@@ -288,8 +285,6 @@ void renderer_shutdown(renderer_state* state) {
     // Destroy reverse order of creation
 
     shutdown_default_data(state);
-
-    camera_destroy(&state->main_camera);
 
     shutdown_mesh_mat_pipeline(state);
 
@@ -335,36 +330,13 @@ void renderer_shutdown(renderer_state* state) {
     etfree(state, sizeof(renderer_state), MEMORY_TAG_RENDERER);
 }
 
-void renderer_update_scene(renderer_state* state) {
-    camera_update(&state->main_camera);
-    
-    m4s view = camera_get_view_matrix(&state->main_camera);
-    m4s project = glms_perspective(glm_rad(70.f), ((f32)state->window_extent.width/(f32)state->window_extent.height), 10000.f, 0.1f);
-
-    // invert the Y direction on projection matrix so that we are more similar
-    // to opengl and gltf axis
-    project.raw[1][1] *= -1;
-
-    m4s vp = glms_mat4_mul(project, view);
-
-    state->scene_data.view = view;
-    state->scene_data.proj = project;
-    state->scene_data.viewproj = vp;
-
-    v4s a_color = { .raw = {.1f, .1f, .1f, .1f}};
-    v4s l_color = { .raw = {1.f, 1.f, 1.f, 1.f}};
-    v4s l_dir = { .raw = {0.f, 1.f, .5f, 1.f}};
-    v4s l_pos = { .raw = {0.f, 0.f, 0.f, 1.f}};
-    
-    state->scene_data.ambient_color = a_color;
-    state->scene_data.light_color = l_color;
-    state->scene_data.light_direction = l_dir;
-    state->scene_data.light_position = l_pos;
+void renderer_update_scene(renderer_state* state) {    
+    scene_update(&state->_scene);
 
     dynarray_clear(state->main_draw_context.opaque_surfaces);
     dynarray_clear(state->main_draw_context.transparent_surfaces);
+    scene_draw(&state->_scene, glms_mat4_identity(), &state->main_draw_context);
 
-    gltf_draw(&state->_gltf, glms_mat4_identity(), &state->main_draw_context);
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
@@ -688,7 +660,7 @@ static void initialize_descriptors(renderer_state* state) {
         { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
         { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3}};
     // pool_size_ratio* frame_ratios = dynarray_create_data(4, sizeof(pool_size_ratio), 4, ratios);
-    pool_size_ratio* frame_ratios = dynarray_create_data_tagged(4, sizeof(pool_size_ratio), 4, MEMORY_TAG_DESCRIPTOR_DYN, ratios);
+    pool_size_ratio* frame_ratios = dynarray_create_data(4, sizeof(pool_size_ratio), 4, ratios);
     state->frame_allocators = etallocate(sizeof(ds_allocator_growable) * state->image_count, MEMORY_TAG_RENDERER);
     for (u32 i = 0; i < state->image_count; ++i) {
         // Initialize growable allocator for the frames
@@ -713,7 +685,6 @@ static void shutdown_descriptors(renderer_state* state) {
 
     // Shutdown growable descriptor set allocators
     for (u32 i = 0; i < state->image_count; ++i) {
-        descriptor_set_allocator_growable_destroy_pools(&state->frame_allocators[i], state);
         descriptor_set_allocator_growable_shutdown(&state->frame_allocators[i], state);
     }
     etfree(state->frame_allocators, sizeof(ds_allocator_growable) * state->image_count, MEMORY_TAG_RENDERER);
@@ -920,7 +891,12 @@ static b8 initialize_default_data(renderer_state* state) {
     const char* path = "build/assets/gltf/structure.glb";
     
     // Load the chosen gltf into the _gltf
-    if (!load_gltf(&state->_gltf, path, state)) {
+    // if (!load_gltf(&state->_gltf, path, state)) {
+    //     ETFATAL("Error loading gltf %s.", path);
+    //     return false;
+    // }
+
+    if (!import_gltf(&state->_scene, path, state)) {
         ETFATAL("Error loading gltf %s.", path);
         return false;
     }
@@ -935,8 +911,10 @@ static void shutdown_default_data(renderer_state* state) {
     dynarray_destroy(state->main_draw_context.transparent_surfaces);
     dynarray_destroy(state->main_draw_context.opaque_surfaces);
 
-    unload_gltf(&state->_gltf);
-    ETINFO("Scene GLTF file unloaded");
+    // unload_gltf(&state->_gltf);
+    // ETINFO("Scene GLTF file unloaded");
+
+    scene_shutdown(&state->_scene);
 
     buffer_destroy(state, &state->default_material_constants);
 
@@ -996,7 +974,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 
     // Cast mapped memory to gpu_scene_data pointer to read and modify it
     gpu_scene_data* frame_scene_data = (gpu_scene_data*)mapped_scene_data;
-    *frame_scene_data = state->scene_data;
+    *frame_scene_data = state->_scene.data;
     vkUnmapMemory(
         state->device.handle,
         state->scene_data_buffers[state->current_frame].memory);

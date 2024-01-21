@@ -21,4 +21,6 @@ typedef struct mesh_config {
     u32 index_count;
 } mesh_config;
 
-b8 mesh_submit(mesh_manager* manager, mesh_config* config, mesh** out_mesh_ref);
+b8 mesh_submit_ref(mesh_manager* manager, mesh_config* config, mesh** out_mesh_ref);
+
+b8 mesh_submit(mesh_manager* manager, mesh_config* config);

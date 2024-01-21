@@ -31,12 +31,10 @@
 [INFO]:  Descriptors Initialized.
 [INFO]:  Intialized compute effects.
 [INFO]:  Initialized mesh mat pipeline
-[INFO]:  Renderer camera created
 [INFO]:  White default image created.
 [INFO]:  Grey default image created.
 [INFO]:  Black default image created.
 [INFO]:  Checkerboard default image created.
-[INFO]:  Scene GLTF file unloaded
 [INFO]:  Compute effects shutdown.
 [INFO]:  Scene data buffers destroyed.
 [INFO]:  Descriptor Set Allocator destroyed.
@@ -62,6 +60,7 @@ Input:              0.00B
 Window:             0.00B
 UI:                 0.00B
 Renderer:           0.00B
+Scene:              0.00B
 Renderable:         0.00B
 Shader:             0.00B
 Resource:           0.00B

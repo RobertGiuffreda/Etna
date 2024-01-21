@@ -94,7 +94,7 @@ typedef struct gpu_scene_data {
     v4s ambient_color;
     v4s light_direction; // w for sun power
     v4s light_color;
-    v4s light_position;            // 256 byte minimum on my GPU
+    v4s light_position;
 } gpu_scene_data;
 
 typedef struct material_pipeline {
@@ -146,7 +146,7 @@ typedef struct surface {
     u32 start_index;
     u32 index_count;
 
-    // Not responsible for freeing
+    // Reference
     material* material;
 } surface;
 
@@ -174,19 +174,18 @@ typedef struct render_object {
 } render_object;
 
 typedef struct draw_context {
-    // Dynarray
+    // Dynarrays
     render_object* opaque_surfaces;
     render_object* transparent_surfaces;
 } draw_context;
 // TODO: END
 
 /** TEMP:TODO:
- * This section involving compute effects is a bit of a mess and
- * is temporary. This will be here until a material system is thought out and 
- * implemented.
+ * This section involving compute effects is a bit of a mess and is temporary.
  * 
- * Compute push constants are TEMP: and will be replaced with more robust system I think:
- * Compute shader post processing effects for now all share compute push constants to simplify things
+ * The compute_push_constants struct is TEMP: and will be replaced with more robust system for 
+ * post processing. Compute shader post processing effects all share compute_push_constants structure 
+ * to simplify things at the moment. 
  */
 // NOTE: vkguide.dev structs
 typedef struct compute_push_constants {

@@ -3,11 +3,6 @@
 #include "renderer/src/vk_types.h"
 #include "renderer/src/shader.h"
 
-/** NOTE:
- * struct to hold the set_layout and the push constant layout of the material pipeline
- * 
- */
-
 typedef struct material_blueprint {
     shader vertex;
     shader fragment;
@@ -30,7 +25,6 @@ void material_blueprint_destroy(renderer_state* state, material_blueprint* bluep
  * These structs are hardcoded to match the values in 
  * the input_structures.glsl file that gets included 
  * into the current mesh_mat.vert and mesh_mat.frag files.
- * 
  */
 material_instance material_blueprint_create_instance(
     renderer_state* state,

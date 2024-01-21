@@ -4,9 +4,6 @@
 #include "renderer/src/renderer.h"
 
 // TODO: Add option to set the name of the pipeline & pipeline layout
-
-// TODO: Move from vkguide.dev to own architecture decisions and structs
-// TODO: Options to create from shaders & another pipeline_builder object
 typedef struct pipeline_builder {
     // Dynarray
     VkPipelineShaderStageCreateInfo* stages;

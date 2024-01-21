@@ -173,7 +173,10 @@
         "*.rh": "c",
         "xloctime": "c",
         "etfile.h": "c",
-        "material.h": "c"
+        "material.h": "c",
+        "material_manager.h": "c",
+        "scene_private.h": "c",
+        "sstream": "c"
     },
     "C_Cpp.dimInactiveRegions": false
 }

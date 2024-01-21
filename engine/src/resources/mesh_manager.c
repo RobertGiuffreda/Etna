@@ -13,7 +13,7 @@
 #include "renderer/src/utilities/vkutils.h"
 // TEMP: END
 
-#define MAX_MESH_COUNT 128
+#define MAX_MESH_COUNT 512
 
 struct mesh_manager {
     renderer_state* state;
@@ -50,7 +50,7 @@ mesh* mesh_get(mesh_manager* manager, u32 id) {
     return &manager->meshes[id];
 }
 
-b8 mesh_submit(mesh_manager* manager, mesh_config* config, mesh** out_mesh_ref) {
+b8 mesh_submit_ref(mesh_manager* manager, mesh_config* config, mesh** out_mesh_ref) {
     ETASSERT(out_mesh_ref);
     if (manager->mesh_count >= MAX_MESH_COUNT)
         return false;
@@ -75,5 +75,30 @@ b8 mesh_submit(mesh_manager* manager, mesh_config* config, mesh** out_mesh_ref) 
     manager->mesh_count++;
 
     *out_mesh_ref = new_mesh;
+    return true;
+}
+
+b8 mesh_submit(mesh_manager* manager, mesh_config* config) {
+    if (manager->mesh_count >= MAX_MESH_COUNT)
+        return false;
+
+    mesh* new_mesh = &manager->meshes[manager->mesh_count];
+    new_mesh->id = manager->mesh_count;
+    new_mesh->name = str_duplicate_allocate(config->name);
+
+    new_mesh->surfaces = dynarray_create_data(
+        config->surface_count,
+        sizeof(surface),
+        config->surface_count,
+        config->surfaces);
+
+    new_mesh->buffers = upload_mesh(
+        manager->state,
+        config->index_count,
+        config->indices,
+        config->vertex_count,
+        config->vertices
+    );
+    manager->mesh_count++;
     return true;
 }

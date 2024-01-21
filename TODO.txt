@@ -1,12 +1,7 @@
 ---------------------Code TODO: List
-NOTE: The there is not a vulkan agnostic representation of the renderer for now. 
-      So vulkan types may have to be exposed for the rest of the engine to use the
-      renderer. This will be temporary, until I abstract the renderer(I may not do this)
-
-TODO: Incorperate the new shader reflection data into creating the descriptor set layout for the material.
-      specify the material set to be 1 for now.
-
 TODO: Test image_manager, material_manager, mesh_manager
+TODO: load_gltf --> import_gltf. 
+TODO: Hook up scene class
 
 GOAL: Nothing hardcoded in renderer. Engine supplies renderables, Application code supplies what to load into engine.
 NOTE: Things hardcoded in engine. Goal does not mean serialization or GUI interaction

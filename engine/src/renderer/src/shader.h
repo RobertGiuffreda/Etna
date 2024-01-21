@@ -2,7 +2,7 @@
 
 #include "renderer/src/vk_types.h"
 
-// NOTE: Taken from SPIRV-Reflects
+// NOTE: Taken from SPIRV-Reflect
 typedef enum descriptor_type {
     DESCRIPTOR_TYPE_SAMPLER                    =  0,        // = VK_DESCRIPTOR_TYPE_SAMPLER
     DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER     =  1,        // = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
@@ -18,7 +18,7 @@ typedef enum descriptor_type {
     DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR = 1000150000 // = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR
 } descriptor_type;
 
-// NOTE: Taken from SPIRV-Reflects
+// NOTE: Taken from SPIRV-Reflect
 typedef enum type_flag_bits {
     TYPE_FLAG_UNDEFINED                       = 0x00000000,
     TYPE_FLAG_VOID                            = 0x00000001,
