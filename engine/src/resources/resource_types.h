@@ -6,11 +6,14 @@
 
 /** NOTE:
  * Functionality of the xxxx_manager objects is currently
- * very limited. They will be built upon.
+ * very limited. 
+ * They essentially function as linear allocators for each 
+ * kind of object they manage. So assets cannot be removed or
+ * released from the managers.
  * 
- * Currently assets cannot be removed or released from the managers.
  * Once I get a better handle of what will be required of the managers,
- * they will be built upon.
+ * they will be modified.
+ * 
  * 
  * NOTE: Managers currently untested
  */

@@ -10,11 +10,18 @@
 #include "renderer/src/vk_types.h"
 #include "renderer/src/descriptor.h"
 #include "renderer/src/GLTFMetallic_Roughness.h"
+#include "renderer/src/material.h"
 // TEMP: END
 
 /** NOTE:
  * This currently only works for the material blueprint:
- * GLTF_MR. TODO: Extend to handle different material blueprints
+ * GLTF_MR.
+ * 
+ * TODO: Extend to handle different material blueprints
+ * 
+ * TODO: Modify initialize to take the initial count
+ * for descriptor_set_allocator_growable_initialize 
+ * as a function parameter instead of using MAX_MATERIAL_COUNT
  * 
  * Eventually load & serialize blueprints
  */
@@ -24,7 +31,7 @@
 struct material_manager {
     renderer_state* state;
     ds_allocator_growable ds_allocator;
-    GLTF_MR blueprint;
+    material_blueprint blueprint;
     
     material materials[MAX_MATERIAL_COUNT];
     u32 material_count;
@@ -48,7 +55,12 @@ b8 material_manager_initialize(material_manager** manager, struct renderer_state
         dynarray_ratios,
         state);
     dynarray_destroy(dynarray_ratios);
-    GLTF_MR_build_pipelines(&new_manager->blueprint, state);
+
+    // Create
+    material_blueprint_create(state,
+        "build/assets/shaders/mesh_mat.vert.spv",
+        "build/assets/shaders/mesh_mat.frag.spv",
+        &new_manager->blueprint);
 
     for (u32 i = 0; i < MAX_MATERIAL_COUNT; ++i) {
         new_manager->materials[i].id = INVALID_ID;
@@ -59,7 +71,7 @@ b8 material_manager_initialize(material_manager** manager, struct renderer_state
 }
 
 void material_manager_shutdown(material_manager* manager) {
-    GLTF_MR_destroy_pipelines(&manager->blueprint, manager->state);
+    material_blueprint_destroy(manager->state, &manager->blueprint);
     descriptor_set_allocator_growable_shutdown(&manager->ds_allocator, manager->state);
     for (u32 i = 0; i < manager->material_count; ++i) {
         str_duplicate_free(manager->materials[i].name);
@@ -80,9 +92,9 @@ b8 material_submit_ref(material_manager* manager, material_config* config, mater
     new_material->id = manager->material_count;
     new_material->name = str_duplicate_allocate(config->name);
 
-    new_material->data = GLTF_MR_write_material(
-        &manager->blueprint,
+    new_material->data = material_blueprint_create_instance(
         manager->state,
+        &manager->blueprint,
         config->pass_type,
         config->resources,
         &manager->ds_allocator
@@ -104,9 +116,9 @@ b8 material_submit(
     new_material->id = manager->material_count;
     new_material->name = str_duplicate_allocate(config->name);
 
-    new_material->data = GLTF_MR_write_material(
-        &manager->blueprint,
+    new_material->data = material_blueprint_create_instance(
         manager->state,
+        &manager->blueprint,
         config->pass_type,
         config->resources,
         &manager->ds_allocator

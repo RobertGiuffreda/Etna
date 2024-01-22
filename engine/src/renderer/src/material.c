@@ -30,13 +30,13 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
     u32 v_set_count = blueprint->vertex.set_count;
     u32 v_i = 0;
     while (v_i < v_set_count && v_sets[v_i].index != MATERIAL_SET_INDEX) ++v_i;
-    b8 v_has_mat_set = (v_i == v_set_count);
+    b8 v_has_mat_set = (v_i != v_set_count);
 
     set_layout* f_sets = blueprint->fragment.sets;
     u32 f_set_count = blueprint->fragment.set_count;
     u32 f_i = 0;    
     while (f_i < f_set_count && f_sets[f_i].index != MATERIAL_SET_INDEX) ++f_i;
-    b8 f_has_mat_set = (f_i == f_set_count);
+    b8 f_has_mat_set = (f_i != f_set_count);
 
     u32 v_max_binding = 0;
     if (v_has_mat_set) {
@@ -64,14 +64,16 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
         VkShaderStageFlags stage_flags;
     }*binding_parameters;
 
-    binding_parameters = etallocate(sizeof(binding_parameters[0]) * max_binding + 1, MEMORY_TAG_MATERIAL);
-    etzero_memory(binding_parameters, sizeof(binding_parameters[0]) * max_binding + 1);
+    binding_parameters = etallocate(sizeof(binding_parameters[0]) * (max_binding + 1), MEMORY_TAG_MATERIAL);
+    etzero_memory(binding_parameters, sizeof(binding_parameters[0]) * (max_binding + 1));
 
-    for (u32 i = 0; i < max_binding; ++i) {
+    // NOTE: v_sets[v_i].bindings[i] & f_sets[f_i].bindings[i] is odd
+    for (u32 i = 0; i < (max_binding + 1); ++i) {
         if (v_has_mat_set && i < v_sets[v_i].binding_count) {
             binding_layout* binding = &v_sets[v_i].bindings[i];
             binding_parameters[binding->index].present = true;
             binding_parameters[binding->index].count = binding->count;
+            binding_parameters[binding->index].binding = binding->index;
             binding_parameters[binding->index].type = vk_descriptor_type_from_descriptor_type(binding->descriptor_type);
             binding_parameters[binding->index].stage_flags |= VK_SHADER_STAGE_VERTEX_BIT;
         }
@@ -79,6 +81,7 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
             binding_layout* binding = &f_sets[f_i].bindings[i];
             binding_parameters[binding->index].present = true;
             binding_parameters[binding->index].count = binding->count;
+            binding_parameters[binding->index].binding = binding->index;
             binding_parameters[binding->index].type = vk_descriptor_type_from_descriptor_type(binding->descriptor_type);
             binding_parameters[binding->index].stage_flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
         }
@@ -99,7 +102,7 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
 
     blueprint->ds_layout = descriptor_set_layout_builder_build(&layout_builder, state);
     descriptor_set_layout_builder_destroy(&layout_builder);
-    etfree(binding_parameters, sizeof(binding_parameters[0]) * max_binding + 1, MEMORY_TAG_MATERIAL);
+    etfree(binding_parameters, sizeof(binding_parameters[0]) * (max_binding + 1), MEMORY_TAG_MATERIAL);
 
     VkDescriptorSetLayout ds_layouts[] = {
         state->scene_data_descriptor_set_layout,
@@ -160,8 +163,13 @@ void material_blueprint_destroy(renderer_state* state, material_blueprint* bluep
     vkDestroyPipeline(state->device.handle, blueprint->opaque_pipeline.pipeline, state->allocator);
     vkDestroyPipelineLayout(state->device.handle, blueprint->opaque_pipeline.layout, state->allocator);
     vkDestroyDescriptorSetLayout(state->device.handle, blueprint->ds_layout, state->allocator);
+    unload_shader(state, &blueprint->fragment);
+    unload_shader(state, &blueprint->vertex);
 }
 
+/** NOTE:
+ * This function is meant to take generic 
+ */
 material_instance material_blueprint_create_instance(
     renderer_state* state,
     material_blueprint* blueprint,
@@ -182,6 +190,28 @@ material_instance material_blueprint_create_instance(
 
     descriptor_set_writer_clear(&blueprint->writer);
 
+    descriptor_set_writer_write_buffer(
+        &blueprint->writer,
+        /* Binding: */ 0,
+        resources->data_buffer,
+        sizeof(struct material_constants),
+        resources->data_buffer_offset,
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    descriptor_set_writer_write_image(
+        &blueprint->writer,
+        /* Binding: */ 1,
+        resources->color_image.view,
+        resources->color_sampler,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    descriptor_set_writer_write_image(
+        &blueprint->writer,
+        /* Binding: */ 2,
+        resources->metal_rough_image.view,
+        resources->metal_rough_sampler,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    descriptor_set_writer_update_set(&blueprint->writer, instance.material_set, state);
 
     return instance;
 }
