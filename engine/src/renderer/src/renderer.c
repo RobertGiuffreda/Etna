@@ -887,15 +887,8 @@ static b8 initialize_default_data(renderer_state* state) {
 
     state->default_material_instance = GLTF_MR_write_material(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
 
-    // const char* path = "build/assets/gltf/zda_test.glb";
     const char* path = "build/assets/gltf/structure.glb";
     
-    // Load the chosen gltf into the _gltf
-    // if (!load_gltf(&state->_gltf, path, state)) {
-    //     ETFATAL("Error loading gltf %s.", path);
-    //     return false;
-    // }
-
     if (!import_gltf(&state->_scene, path, state)) {
         ETFATAL("Error loading gltf %s.", path);
         return false;
@@ -910,9 +903,6 @@ static b8 initialize_default_data(renderer_state* state) {
 static void shutdown_default_data(renderer_state* state) {
     dynarray_destroy(state->main_draw_context.transparent_surfaces);
     dynarray_destroy(state->main_draw_context.opaque_surfaces);
-
-    // unload_gltf(&state->_gltf);
-    // ETINFO("Scene GLTF file unloaded");
 
     scene_shutdown(&state->_scene);
 
