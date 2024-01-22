@@ -24,8 +24,13 @@ typedef struct event_data {
     };
 } event_data;
 
+#define EVENT_DATA_MOUSE_X(edata) edata.i32[0]
+#define EVENT_DATA_MOUSE_Y(edata) edata.i32[1]
+#define EVENT_DATA_MOUSE_WHEEL(edata) edata.u8[0]
+#define EVENT_DATA_WIDTH(edata) edata.i32[0]
+#define EVENT_DATA_HEIGHT(edata) edata.i32[1]
+
 // Observer callback function
-// TODO: change event_code type to enum system_event.
 typedef b8 (*pfn_on_event)(u16 event_code, void* observer, event_data data);
 
 typedef struct events_state_t events_state;
@@ -43,35 +48,13 @@ b8 event_fire(u16 event_code, event_data data);
 // TODO: EVENT_CODE --> ETNA or EVENT
 typedef enum system_event {
     EVENT_CODE_ENGINE_SHUTDOWN = 0x01,
-
-    /* event_data data.u16[0] = key_code */
     EVENT_CODE_KEY_PRESS = 0x02,
-
-    /* event_data data.u16[0] = key_code */
     EVENT_CODE_KEY_REPEAT = 0x03,
-
-    /* event_data data.u16[0] = key_code */
     EVENT_CODE_KEY_RELEASE = 0x04,
-
-    /* event_data data.u16[0] = button_code */
     EVENT_CODE_BUTTON_PRESS = 0x05,
-
-    /* event_data data.u16[0] = button_code */
     EVENT_CODE_BUTTON_RELEASE = 0x06,
-
-    /**
-     * event_data data.i32[0] = x
-     * event_data data.i32[1] = y
-     */
     EVENT_CODE_MOUSE_MOVE = 0x07,
-
-    /* event_data data.u8[0] = z_delta */
     EVENT_CODE_MOUSE_WHEEL = 0x08,
-
-    /* event_data data.u32[0] = width
-     * event_data data.u32[1] = height
-     */
     EVENT_CODE_RESIZE = 0x09,
-
     EVENT_CODE_MAX = 0xFF
 } system_event;

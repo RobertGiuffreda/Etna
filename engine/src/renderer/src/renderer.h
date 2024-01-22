@@ -2,8 +2,58 @@
 
 #include "defines.h"
 
+// TEMP: Camera should belong to the scene being rendered. Have camera as a scene member
 #include "core/camera.h"
+// TEMP: END
+
 #include "renderer/src/vk_types.h"
+#include "renderer/src/renderables.h"
+#include "renderer/src/shader.h"
+
+#include "scene/scene_private.h"
+
+// TODO: Move to loader folder
+typedef struct loaded_gltf {
+    char* name;
+
+    // The loaded_gltf struct currently stores the backing memory for
+    // it's meshes, images, materials, and nodes.
+    mesh* meshes;
+    u32 mesh_count;
+    image* images;
+    u32 image_count;
+    material* materials;
+    u32 material_count;
+
+    mesh_node* mesh_nodes;
+    u32 mesh_node_count;
+    node* nodes;
+    u32 node_count;
+
+    VkSampler* samplers;
+    u32 sampler_count;
+
+    // Dynarray of top level node pointers/references
+    node** top_nodes;
+    u32 top_node_count;
+
+    ds_allocator_growable descriptor_allocator;
+
+    buffer material_data_buffer;
+
+    renderer_state* render_state;
+} loaded_gltf;
+
+// TODO: Have array of these instead of separate arrays
+typedef struct frame_data {
+    VkSemaphore swapchain_semaphore;
+    VkSemaphore render_semaphore;
+    VkFence render_fence;
+    VkCommandPool command_pool;
+    VkCommandBuffer command_buffer;
+    ds_allocator_growable ds_allocator;
+    buffer scene_data_buffer;
+} frame_data;
 
 typedef struct renderer_state {
     VkInstance instance;
@@ -25,7 +75,8 @@ typedef struct renderer_state {
     u32 image_count;
 
     VkSurfaceKHR surface;
-    // TODO: Rename swapchain extent??
+
+    // TODO: Rename to swapchain extent??
     VkExtent3D window_extent;
     
     // True if window was resized
@@ -52,9 +103,10 @@ typedef struct renderer_state {
     VkCommandPool* graphics_pools;
     VkCommandBuffer* main_graphics_command_buffers;
 
+    // Descriptor Set allocator for allocating per frame descriptors
     ds_allocator_growable* frame_allocators;
 
-    // Buffers for each frame to store scene data. Idk if this should be per frame
+    // Per frame scene buffers to avoid synchronization
     buffer* scene_data_buffers;
     // NOTE: Per frame END
 
@@ -95,17 +147,15 @@ typedef struct renderer_state {
     buffer default_material_constants;
     // NOTE: END
 
-    // Scene data. Per frame buffers for passing scene data to shaders above 
-    GPU_scene_data scene_data;
+    // Scene data.
     VkDescriptorSetLayout scene_data_descriptor_set_layout;
     
     draw_context main_draw_context;
 
-    loaded_gltf _gltf;
-    camera main_camera;
+    scene _scene;
 
     // TEMP: Here in case of testing
-    gpu_mesh_buffers rectangle;
+    mesh_buffers rectangle;
 } renderer_state;
 
 /** Takes a code block in the ... argument and begins recording of a command buffer before the 

@@ -3,17 +3,24 @@
 #include "defines.h"
 
 #include <GLFW/glfw3.h>
-// TODO: #ifdef here setting the key codes to windows keycodes if running on windows,
-// linux keycodes if running on linux, glfw key codes for glfw.
 
 typedef enum buttons {
-    BUTTON_LEFT,
-    BUTTON_RIGHT,
-    BUTTON_MIDDLE,
-    BUTTON_MAX
+    BUTTON_1 = 0,
+    BUTTON_2,
+    BUTTON_3,
+    BUTTON_4,
+    BUTTON_5,
+    BUTTON_6,
+    BUTTON_7,
+    BUTTON_8,
+    BUTTON_MAX,
+    BUTTON_LEFT = BUTTON_1,
+    BUTTON_RIGHT = BUTTON_2,
+    BUTTON_MIDDLE = BUTTON_3,
 } buttons;
 
-// TODO: Wrap in glfw ifdef cause they were taken from glfw's keycodes
+// TODO: #ifdef here setting the key codes to windows keycodes if running on windows,
+// linux keycodes if running on linux, glfw key codes for glfw.
 typedef enum keys {
     KEY_SPACE = 32,
     KEY_APOSTROPHE = 39, /* ' */
@@ -144,6 +151,9 @@ typedef enum key_state {
     KEY_PRESS = 0x01,
     KEY_REPEAT = 0x02
 } key_state;
+
+#define EVENT_DATA_KEY(edata) (keys)edata.u16[0]
+#define EVENT_DATA_BUTTON(edata) (buttons)edata.u16[0]
 
 typedef struct input_state input_state;
 

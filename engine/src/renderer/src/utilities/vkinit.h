@@ -2,8 +2,6 @@
 
 #include "renderer/src/vk_types.h"
 
-// TODO: Move non initializers to a vk_utils
-
 VkCommandPoolCreateInfo init_command_pool_create_info(
     VkCommandPoolCreateFlags flags,
     u32 queue_family_index);
@@ -46,14 +44,6 @@ VkImageViewCreateInfo init_image_view2D_create_info(
     VkImageAspectFlags aspect_flags);
 
 VkBufferCreateInfo init_buffer_create_info(VkBufferUsageFlags usage_flags, u64 size);
-
-/* Initializers TODO:
-VkBufferMemoryBarrier2
-VkImageMemoryBarrier2
-VkDependencyInfo
-
-VkSwapchainCreateInfoKHR
-*/
 
 VkMemoryRequirements2 init_memory_requirements2(void);
 
@@ -106,13 +96,3 @@ VkCopyBufferToImageInfo2 init_copy_buffer_to_image_info2(
     VkBuffer buffer,
     VkImage image,
     VkImageLayout layout);
-
-i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
-    u32 memory_type_bits_requirement, VkMemoryPropertyFlags required_properties);
-
-gpu_mesh_buffers upload_mesh(
-    renderer_state* state,
-    u32 index_count, u32* indices, 
-    u32 vertex_count, vertex* vertices);
-
-// TODO: Add immediate submit and begin into this class as well as macros

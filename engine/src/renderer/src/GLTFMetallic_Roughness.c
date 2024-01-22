@@ -18,11 +18,6 @@ void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
         ETERROR("Unable to load mesh.vert.spv");
     }
 
-    VkPushConstantRange matrix_range;
-    matrix_range.offset = 0;
-    matrix_range.size = sizeof(gpu_draw_push_constants);
-    matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
     dsl_builder layout_builder = descriptor_set_layout_builder_create();
     // Scene data binding
     descriptor_set_layout_builder_add_binding(
@@ -55,6 +50,11 @@ void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
     VkDescriptorSetLayout layouts[] = {
         state->scene_data_descriptor_set_layout,
         mat->material_layout};
+
+    VkPushConstantRange matrix_range;
+    matrix_range.offset = 0;
+    matrix_range.size = sizeof(gpu_draw_push_constants);
+    matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     VkPipelineLayoutCreateInfo mesh_layout_info = init_pipeline_layout_create_info();
     mesh_layout_info.pushConstantRangeCount = 1;
@@ -94,8 +94,9 @@ void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
     pipeline_builder_enable_depthtest(&pipeline_builder, false, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
     mat->transparent_pipeline.pipeline = pipeline_builder_build(&pipeline_builder, state);
-
     pipeline_builder_destroy(&pipeline_builder);
+
+    descriptor_set_writer_initialize(&mat->writer);
 
     unload_shader(state, &mesh_vert_shader);
     unload_shader(state, &mesh_frag_shader);
@@ -104,6 +105,7 @@ void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
 void GLTF_MR_destroy_pipelines(GLTF_MR* mat, renderer_state* state) {
     // NOTE: GLTF_MR opaque pipeline and transparent pipeline have the 
     // same layout so only one vkDestroyPipelineLayout call is used
+    descriptor_set_writer_shutdown(&mat->writer);
     vkDestroyPipeline(state->device.handle, mat->transparent_pipeline.pipeline, state->allocator);
     vkDestroyPipeline(state->device.handle, mat->opaque_pipeline.pipeline, state->allocator);
     vkDestroyPipelineLayout(state->device.handle, mat->opaque_pipeline.layout, state->allocator);

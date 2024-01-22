@@ -1,29 +1,20 @@
 #pragma once
 
-#include "vk_types.h"
+#include "renderer/src/vk_types.h"
 
-/** NOTE:
+/** NOTE: Renderables should be visible outside of the renderer
+ * struct scene
+ * struct node
+ * struct mesh
+ * struct mesh_node
+ * 
+ * 
  * Renderable is an interface/abstract class implementation
  * Node is a parent class of mesh_node
  * Mesh_node derives from node
- *
- * Instead of storing self I could use the passed in object address as the base class is
- * always the first element of the derived class 
  */
 
-// TODO: Current Issue: Copying the struct will create a shallow copy at the moment, 
-// which means that the void* self pointers stored to pass to the function will be pointing
-// to the wrong memory.
-
-// Solutions:
-// Opt 1: Copy constructor function
-// Could have a specific copy function for copying the object that would also set the self 
-// pointer to the new correct location. But that would restrict using the dynarray which
-// just copies the struct over into the array using void* and a memcpy.
-// Have a version of dynarray that takes a copy constructor function argument on creation
-// and uses that to move memory over to the dynarray.
-
-// Opt 2: Singular inheritance
+// Singular inheritance -- Chosen
 // Use the fact that the base struct is stored first in the derived struct.
 // The address of a derived struct given a base struct address is just the 
 // address of the base struct because we have stored the base struct as the
@@ -34,15 +25,37 @@
 // TODO: Create a container_of macro for multiple inheritance?? (Curiosity not need)
 // if I want the derived struct to inherit multiple things.
 
-/** TODO: Functions to add
- * xxxx* xxxx_allocate()
- * xxxx* xxxx_deallocate()
- * 
- * These would allocate the memory and return a pointer to the allocated memory
- * Deallocate would be virtual
- * 
- * Function to add any kind of node to a scene graph
+/** NOTE: Hacky c code mimicking C++ OOP inheritance of node classes from vkguide.dev.
+ * TODO: Move this into the renderables section
  */
+typedef struct renderable_virtual_table renderable_vt;
+typedef struct renderable {
+    renderable_vt* vt;
+} renderable;
+
+typedef struct node_virtual_table node_vt;
+typedef struct node {
+    // Extends renderable
+    renderable renderable;
+
+    // Polymorphism data
+    node_vt* vt;
+
+    // Actual struct node data
+    char* name;
+    struct node* parent;
+    struct node** children;
+    m4s local_transform;
+    m4s world_transform;
+} node;
+
+typedef struct mesh_node {
+    // Extends node
+    struct node base;
+
+    // Pointer as mesh can be shared between multiple nodes
+    mesh* mesh;
+} mesh_node;
 
 void renderable_destroy(renderable* renderable);
 void renderable_draw(renderable* renderable, const m4s top_matrix, draw_context* ctx);

@@ -18,6 +18,8 @@ typedef enum log_level {
     LOG_LEVEL_MAX
 } log_level;
 
+typedef struct logger_state logger_state; 
+
 b8 logger_initialize(void);
 void logger_shutdown(void);
 

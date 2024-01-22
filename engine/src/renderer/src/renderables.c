@@ -7,6 +7,18 @@
 #include "core/etmemory.h"
 #include "core/logger.h"
 
+#include "renderer/src/renderer.h"
+
+struct renderable_virtual_table {
+    void (*draw)(void* self, const m4s top_matrix, draw_context* ctx);
+    void (*destroy)(void* self);
+};
+
+struct node_virtual_table {
+    void (*draw)(void* self, const m4s top_matrix, draw_context* ctx);
+    void (*destroy)(void* self);
+};
+
 // Internal static functions
 static inline void _renderable_destroy(renderable* renderable);
 
@@ -28,23 +40,23 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
 
 // Renderable functions:
 void renderable_destroy(renderable* renderable) {
-    renderable->vt->destroy(renderable->self);
+    renderable->vt->destroy(renderable);
 }
 static inline void _renderable_destroy(renderable* renderable) {
     etfree(renderable->vt, sizeof(renderable_vt), MEMORY_TAG_RENDERABLE);
 }
 
 void renderable_draw(renderable* renderable, const m4s top_matrix, draw_context* ctx) {
-    renderable->vt->draw(renderable->self, top_matrix, ctx);
+    renderable->vt->draw(renderable, top_matrix, ctx);
 }
 
 // Node functions:
 void node_create(node* out_node) {
-    renderable_vt* r_vt = (renderable_vt*)etallocate(sizeof(renderable_vt), MEMORY_TAG_RENDERABLE);
+    struct renderable_virtual_table* r_vt = etallocate(sizeof(renderable_vt), MEMORY_TAG_RENDERABLE);
     r_vt->draw = _node_draw_vt;
     r_vt->destroy = _node_destroy_vt;
 
-    node_vt* n_vt = (node_vt*)etallocate(sizeof(node_vt), MEMORY_TAG_RENDERABLE);
+    struct node_virtual_table* n_vt = etallocate(sizeof(node_vt), MEMORY_TAG_RENDERABLE);
     n_vt->draw = _node_draw_vt;
     n_vt->destroy = _node_destroy_vt;
 
@@ -53,13 +65,10 @@ void node_create(node* out_node) {
         .vt = n_vt,
         .children = dynarray_create(0, sizeof(struct node*))};
     *out_node = new_node;
-
-    out_node->self = out_node;
-    out_node->renderable.self = out_node;
 }
 
 void node_destroy(node* node) {
-    node->vt->destroy(node->self);
+    node->vt->destroy(node);
 }
 static inline void _node_destroy_vt(void* self) {
     _node_destroy(self);
@@ -78,25 +87,25 @@ void node_refresh_transform(node* node, const m4s parent_matrix) {
 }
 
 void node_draw(node* node, const m4s top_matrix, draw_context* ctx) {
-    node->vt->draw(node->self, top_matrix, ctx);
+    node->vt->draw(node, top_matrix, ctx);
 }
 static inline void _node_draw_vt(void* self, const m4s top_matrix, draw_context* ctx) {
     _node_draw(self, top_matrix, ctx);
 }
 static inline void _node_draw(node* node, const m4s top_matrix, draw_context* ctx) {
     for (u32 i = 0; i < dynarray_length(node->children); ++i) {
-        node->children[i]->vt->draw(node->children[i]->self, top_matrix, ctx);
+        node->children[i]->vt->draw(node->children[i], top_matrix, ctx);
     }
 }
 
 // Mesh node functions:
 void mesh_node_create(mesh_node* out_node) {
     // Set up virtual tables
-    renderable_vt* r_vt = (renderable_vt*)etallocate(sizeof(renderable_vt), MEMORY_TAG_RENDERABLE);
+    struct renderable_virtual_table* r_vt = etallocate(sizeof(renderable_vt), MEMORY_TAG_RENDERABLE);
     r_vt->draw = _mesh_node_draw_vt;
     r_vt->destroy = _mesh_node_destroy_vt;
 
-    node_vt* n_vt = (node_vt*)etallocate(sizeof(node_vt), MEMORY_TAG_RENDERABLE);
+    struct node_virtual_table* n_vt = etallocate(sizeof(node_vt), MEMORY_TAG_RENDERABLE);
     n_vt->draw = _mesh_node_draw_vt;
     n_vt->destroy = _mesh_node_destroy_vt;
 
@@ -110,9 +119,6 @@ void mesh_node_create(mesh_node* out_node) {
         }
     };
     *out_node = new_node;
-
-    out_node->base.renderable.self = out_node;
-    out_node->base.self = out_node;
 }
 
 void mesh_node_destroy(mesh_node* node) {
@@ -137,14 +143,14 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
 
     u32 surface_count = dynarray_length(node->mesh->surfaces);
     for (u32 i = 0; i < surface_count; ++i) {
-        geo_surface* s = &node->mesh->surfaces[i];
+        surface* s = &node->mesh->surfaces[i];
         render_object def = {
-            .index_count = s->count,
+            .index_count = s->index_count,
             .first_index = s->start_index,
-            .index_buffer = node->mesh->mesh_buffers.index_buffer.handle,
+            .index_buffer = node->mesh->buffers.index_buffer.handle,
             .material = &s->material->data,
             .transform = node_matrix,
-            .vertex_buffer_address = node->mesh->mesh_buffers.vertex_buffer_address,
+            .vertex_buffer_address = node->mesh->buffers.vertex_buffer_address,
 
             .mesh_name = node->base.name,
             .material_name = s->material->name
@@ -171,13 +177,13 @@ void gltf_draw(struct loaded_gltf* gltf, const m4s top_matrix, struct draw_conte
     }
 }
 
-void mesh_asset_print(mesh_asset* m_asset) {
+void mesh_asset_print(mesh* m_asset) {
     ETINFO("Mesh asset %s data:", m_asset->name);
     for (u32 i = 0; i < dynarray_length(m_asset->surfaces); ++i) {
-        geo_surface* surface = &m_asset->surfaces[i];
+        surface* surface = &m_asset->surfaces[i];
         ETINFO(
             "Surface %lu: Start index: %lu | index_count: %lu", 
-            i, surface->start_index, surface->count
+            i, surface->start_index, surface->index_count
         );
     }
 }

@@ -7,6 +7,16 @@
 #include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/renderer.h"
 
+// TODO: These function are a bit of a mess right now. Clean them up, make more configurable
+
+// NOTE: Descriptor binding count more than one is unsupported at the moment.
+// layout (set = 1, binding = 4) uniform usampler2D test_tex[2];
+// layout(set = 1, binding = 3) uniform test_block {
+// 	ivec4 test_ivec[4];
+// 	uvec4 test_uvec[4];
+// } test[2];
+// NOTE: END
+
 /* NOTE: Functions for: Descriptor Set Layout Builder */
 dsl_builder descriptor_set_layout_builder_create(void) {
     dsl_builder builder;
@@ -68,6 +78,7 @@ void descriptor_set_writer_shutdown(ds_writer* writer) {
     dynarray_destroy(writer->writes);
 }
 
+// TODO: Add descriptor count to function parameters
 void descriptor_set_writer_write_image(
     ds_writer* writer,
     u32 binding,
@@ -97,6 +108,7 @@ void descriptor_set_writer_write_image(
     dynarray_push((void**)&writer->writes, &write);
 }
 
+// TODO: Add descriptor count to function parameters
 void descriptor_set_writer_write_buffer(
     ds_writer* writer,
     u32 binding,
@@ -136,8 +148,6 @@ void descriptor_set_writer_update_set(ds_writer* writer, VkDescriptorSet set, re
 }
 
 /* NOTE: Functions for: Descriptor Set Allocator */
-// TODO: These function are a bit of a mess right now. 
-
 // pool_sizes is a dynamic array
 void descriptor_set_allocator_initialize(ds_allocator* allocator, u32 max_sets, VkDescriptorPoolSize* pool_sizes, renderer_state* state) {
     allocator->pool_sizes = dynarray_copy(pool_sizes);

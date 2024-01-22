@@ -11,7 +11,7 @@
             }
         ]
     },
-
+    "editor.fontSize": 12,
     "todohighlight.isEnable": true,
     "todohighlight.keywords": [
         {
@@ -147,7 +147,36 @@
         "set": "c",
         "unordered_map": "c",
         "unordered_set": "c",
-        "stb_image.h": "c"
+        "stb_image.h": "c",
+        "vcruntime.h": "c",
+        "atomic": "c",
+        "bit": "c",
+        "compare": "c",
+        "concepts": "c",
+        "exception": "c",
+        "fstream": "c",
+        "limits": "c",
+        "locale": "c",
+        "string": "c",
+        "tuple": "c",
+        "utility": "c",
+        "xlocinfo": "c",
+        "xstddef": "c",
+        "xtr1common": "c",
+        "nuklear.h": "c",
+        "platform.h": "c",
+        "vk_platform.h": "c",
+        "image_manager.h": "c",
+        "mesh_manager.h": "c",
+        "resource_types.h": "c",
+        "node.h": "c",
+        "*.rh": "c",
+        "xloctime": "c",
+        "etfile.h": "c",
+        "material.h": "c",
+        "material_manager.h": "c",
+        "scene_private.h": "c",
+        "sstream": "c"
     },
     "C_Cpp.dimInactiveRegions": false
 }

@@ -4,23 +4,9 @@
 #include "core/asserts.h"
 
 #include "math/math_types.h"
+#include "resources/resource_types.h"
 
 #include <vulkan/vulkan.h>
-
-/**
- * TODO: These should have renderer agnostic represenations for the engine:
- * struct image
- * struct buffer
- * struct GPU_scene_data
- * struct material_instance
- * struct geo_surface
- * struct mesh_asset
- * 
- * Not renderer specific:
- * struct renderable
- * struct node
- * struct mesh_node
- */
 
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
 
@@ -62,55 +48,54 @@ typedef struct descriptor_set_allocator_growable {
 // TEMP: Until my vulkan memory management is implemented
 // TODO: Store memory information for when implementing memory management
 typedef struct image {
+    u32 id;
+    char* name;
     VkImage handle;
     VkImageView view;
+
+    // TODO: Store memory requirements for mem management
     VkDeviceMemory memory;
 
-    VkImageType type;
     VkExtent3D extent;
+    VkImageType type;
     VkFormat format;
     VkImageAspectFlags aspects;
 
-    // For use in transfer system.
-    VkPipelineStageFlags2 stages;
+    // For use in transfer system. 
+    VkPipelineStageFlags2 stages; // NOTE: Unused
 } image;
 
 typedef struct buffer {
+    char* name;
     VkBuffer handle;
     VkDeviceMemory memory;
     u64 size;
 
     // For use in transfer system.
-    VkPipelineStageFlags2 stages;
+    VkPipelineStageFlags2 stages; // NOTE: Unused
 } buffer;
 // TEMP: END
 
-typedef struct gpu_mesh_buffers {
+typedef struct mesh_buffers {
     buffer index_buffer;
     buffer vertex_buffer;
     VkDeviceAddress vertex_buffer_address;
-} gpu_mesh_buffers;
+} mesh_buffers;
 
 typedef struct gpu_draw_push_constants {
     m4s world_matrix;
     VkDeviceAddress vertex_buffer;
 } gpu_draw_push_constants;
 
-typedef struct GPU_scene_data {
+typedef struct gpu_scene_data {
     m4s view;
     m4s proj;
     m4s viewproj;
     v4s ambient_color;
-    v4s sunlight_direction; // w for sun power
-    v4s sunlight_color;
-    v4s padding;            // 256 byte minimum on my GPU
-} GPU_scene_data;
-
-typedef enum material_pass {
-    MATERIAL_PASS_MAIN_COLOR,
-    MATERIAL_PASS_TRANSPARENT,
-    MATERIAL_PASS_OTHER
-} material_pass;
+    v4s light_direction; // w for sun power
+    v4s light_color;
+    v4s light_position;
+} gpu_scene_data;
 
 typedef struct material_pipeline {
     VkPipeline pipeline;
@@ -123,10 +108,23 @@ typedef struct material_instance {
     material_pass pass_type;
 } material_instance;
 
-typedef struct GLTF_material {
-    char* name;
-    material_instance data;
-} GLTF_material;
+// TODO: Make material_resources generic
+struct material_constants {
+    v4s color_factors;
+    v4s metal_rough_factors;
+    v4s padding[14];
+};
+
+struct material_resources {
+    image color_image;
+    VkSampler color_sampler;
+
+    image metal_rough_image;
+    VkSampler metal_rough_sampler;
+
+    VkBuffer data_buffer;
+    u32 data_buffer_offset;
+};
 
 typedef struct GLTFMetallic_Roughness {
     material_pipeline opaque_pipeline;
@@ -134,41 +132,32 @@ typedef struct GLTFMetallic_Roughness {
 
     VkDescriptorSetLayout material_layout;
 
-    struct material_constants {
-        v4s color_factors;
-        v4s metal_rough_factors;
-        v4s padding[14];
-    };
-
-    struct material_resources {
-        image color_image;
-        VkSampler color_sampler;
-
-        image metal_rough_image;
-        VkSampler metal_rough_sampler;
-
-        VkBuffer data_buffer;
-        u32 data_buffer_offset;
-    };
-
     ds_writer writer;
 } GLTF_MR;
+// TODO: END
 
-typedef struct geo_surface {
+typedef struct material {
+    u32 id;
+    char* name;
+    material_instance data;
+} material;
+
+typedef struct surface {
     u32 start_index;
-    u32 count;
+    u32 index_count;
 
-    // Not responsible for freeing
-    GLTF_material* material;
-} geo_surface;
+    // Reference
+    material* material;
+} surface;
 
-typedef struct mesh_asset {
+typedef struct mesh {
+    u32 id;
     char* name;
 
     // Dynarray
-    geo_surface* surfaces;
-    gpu_mesh_buffers mesh_buffers;
-} mesh_asset;
+    surface* surfaces;
+    mesh_buffers buffers;
+} mesh;
 
 typedef struct render_object {
     char* mesh_name;
@@ -185,138 +174,18 @@ typedef struct render_object {
 } render_object;
 
 typedef struct draw_context {
-    // Dynarray
+    // Dynarrays
     render_object* opaque_surfaces;
     render_object* transparent_surfaces;
 } draw_context;
-
-/** NOTE: Hacky c code mimicking C++ OOP inheritance of node classes from vkguide.dev.
- * TODO: Move this into the renderables section
- */
-typedef struct renderable_virtual_table {
-    void (*draw)(void* self, const m4s top_matrix, draw_context* ctx);
-    void (*destroy)(void* self);
-} renderable_vt;
-
-typedef struct renderable {
-    void* self;
-    renderable_vt* vt;
-} renderable;
-
-typedef struct node_virtual_table {
-    void (*draw)(void* self, const m4s top_matrix, draw_context* ctx);
-    void (*destroy)(void* self);
-} node_vt;
-
-typedef struct node {
-    // Extends renderable
-    renderable renderable;
-
-    // Polymorphism data
-    void* self;
-    node_vt* vt;
-
-    // Actual struct node data
-    char* name;
-    struct node* parent;
-    struct node** children;
-    m4s local_transform;
-    m4s world_transform;
-} node;
-
-typedef struct mesh_node {
-    // Extends node
-    struct node base;
-
-    // Pointer as mesh can be shared between multiple nodes
-    mesh_asset* mesh;
-} mesh_node;
-
-typedef struct loaded_gltf {
-    // TODO: Have this extend renderable
-    char* name;
-
-    // The loaded_gltf struct currently stores the backing memory for 
-    // it's meshes, images, materials, and nodes.
-    mesh_asset* meshes;
-    u32 mesh_count;
-    image* images;
-    u32 image_count;
-    GLTF_material* materials;
-    u32 material_count;
-
-    mesh_node* mesh_nodes;
-    u32 mesh_node_count;
-    node* nodes;
-    u32 node_count;
-
-    VkSampler* samplers;
-    u32 sampler_count;
-
-    // Dynarray of top level node pointers/references
-    node** top_nodes;
-    u32 top_node_count;
-
-    ds_allocator_growable descriptor_allocator;
-
-    buffer material_data_buffer;
-
-    renderer_state* render_state;
-} loaded_gltf;
 // TODO: END
 
-// NOTE: Reflection info is unused at the moment 
-typedef struct binding {
-    u32 binding;
-    VkDescriptorType descriptor_type;
-    u32 count;
-    struct {
-        VkImageType dim;
-        VkFormat format;
-    } image;
-} binding;
-
-typedef struct set {
-    u32 set;
-    // Dynarray
-    u32 binding_count;
-    binding* _bindings;
-} set;
-
-// TODO: Reflection data used to create a material
-typedef struct shader {
-    VkShaderModule module;
-    VkShaderStageFlagBits stage;
-    char* entry_point;
-    u32 set_count;
-    set* _sets;
-
-    // TODO: Get information about push constants
-    u32 push_constant_count;
-    struct {
-        u32 temp;
-    }*push_constants;
-
-    u32 input_count;
-    struct {
-        u32 location;
-        VkFormat format;
-    }*inputs;
-
-    u32 output_count;
-    struct {
-        u32 location;
-        VkFormat format;
-    }*outputs;
-} shader;
-
 /** TEMP:TODO:
- * This section involving compute effects is a bit of a mess and
- * is temporary. This will be here until a material system is thought out and 
- * implemented.
+ * This section involving compute effects is a bit of a mess and is temporary.
  * 
- * Compute push constants are TEMP: and will be replaced with more robust system I think:
- * Compute shader post processing effects for now all share compute push constants to simplify things
+ * The compute_push_constants struct is TEMP: and will be replaced with more robust system for 
+ * post processing. Compute shader post processing effects all share compute_push_constants structure 
+ * to simplify things at the moment. 
  */
 // NOTE: vkguide.dev structs
 typedef struct compute_push_constants {

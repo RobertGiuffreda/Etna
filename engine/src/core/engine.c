@@ -7,8 +7,6 @@
 #include "core/input.h"
 #include "core/clock.h"
 
-#include "loaders/gltfloader.h"
-
 #include "platform/platform.h"
 #include "platform/etwindow.h"
 
@@ -19,12 +17,6 @@
 // TODO: Add application name to config
 
 typedef struct engine_state {
-    // TODO: Transfer these to a visible window_state_struct or something
-    // i32 x_pos;
-    // i32 y_pos;
-    // i32 width;
-    // i32 height;
-
     b8 is_running;
 
     // Application data
@@ -35,17 +27,9 @@ typedef struct engine_state {
 
     u64 app_state_size;
     application_state* app_state;
-
-    // TODO: u64 etwindow_state_size for when engine will allocate the memory
     etwindow_state* window_state;
-
-    // TODO: u64 events_state_size for when engine will allocate the memory
     events_state* events_state;
-
-    // TODO: u64 input_state_size for when engine will allocate the memory
     input_state* input_state;
-
-    // TODO: u64 input_state_size for when engine will allocate the memory
     renderer_state* renderer_state;
 } engine_state;
 
@@ -178,6 +162,8 @@ void engine_shutdown(void) {
     events_shutdown(state->events_state);
 
     // Shutdown log file
+    log_memory_allocations();
+    
     logger_shutdown();
     
     // Free memory used for the state
@@ -189,13 +175,13 @@ void engine_shutdown(void) {
 
 b8 engine_on_resize(u16 event_code, void* engine_state, event_data data) {
     // TODO: Register renderer for resizes in the renderer and not here
-    renderer_on_resize(state->renderer_state, data.i32[0], data.i32[1]);
+    renderer_on_resize(state->renderer_state, EVENT_DATA_WIDTH(data), EVENT_DATA_HEIGHT(data));
     // Other events should handle this event code as well, so false
     return false;
 }
 
 b8 engine_on_key_event(u16 event_code, void* engine_state, event_data data) {
-    keys key = (keys)data.u16[0];
+    keys key = EVENT_DATA_KEY(data);
     switch (event_code)
     {
     case EVENT_CODE_KEY_RELEASE:

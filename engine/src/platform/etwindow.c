@@ -7,8 +7,6 @@
 
 #include "renderer/src/renderer.h"
 
-#include <vulkan/vulkan.h>
-#include <vulkan/vulkan_core.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -78,7 +76,7 @@ void etwindow_pump_messages(void) {
 
 static b8 etwindow_on_key_event(u16 code, void* window, event_data data) {
     struct etwindow_state* win = (struct etwindow_state*)window;
-    keys key = (keys)data.u16[0];
+    keys key = EVENT_DATA_KEY(data);
     
     if (key == KEY_P) {
         win->cursor_captured = !win->cursor_captured;
@@ -101,7 +99,7 @@ void cursor_position_callback(GLFWwindow* window, f64 xpos, f64 ypos) {
     input_process_mouse_move((i32)xpos, (i32)ypos);
 }
 
-// TODO: This is wrong; fix it
+// TODO: Improve the input handling of mouse wheel moving
 void scroll_callback(GLFWwindow* window, f64 xoffset, f64 yoffset) {
     input_process_mouse_wheel((u8)yoffset);
 }
@@ -111,17 +109,4 @@ void resize_callback(GLFWwindow* window, i32 width, i32 height) {
     e.i32[0] = width;
     e.i32[1] = height;
     event_fire(EVENT_CODE_RESIZE, e);
-}
-
-b8 window_create_vulkan_surface(struct renderer_state* renderer_state, etwindow_state* window_state) {
-    VkResult result = glfwCreateWindowSurface(
-        renderer_state->instance,
-        window_state->impl_window,
-        renderer_state->allocator,
-        &renderer_state->surface);
-    return result == VK_SUCCESS;
-}
-
-const char** window_get_required_extension_names(i32* count) {
-    return glfwGetRequiredInstanceExtensions(count);
 }

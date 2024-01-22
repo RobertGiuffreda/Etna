@@ -227,7 +227,7 @@ b8 device_create(renderer_state* state, device* out_device) {
     return true;
 }
 
-void device_destory(renderer_state* state, device* device) {
+void device_destroy(renderer_state* state, device* device) {
     device->graphics_queue = 0;
     device->present_queue = 0;
     device->compute_queue = 0;
