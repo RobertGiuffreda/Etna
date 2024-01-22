@@ -4,7 +4,7 @@ A small vulkan renderer written using the C programming language. This is writte
 
 ## Features
 * Window handling done using the [glfw](https://github.com/glfw/glfw) library.
-* Shader Reflection data gotten using the [SPIRV-Reflect](https://github.com/KhronosGroup/SPIRV-Reflect) library.
+* Shader Reflection data retrieved using the [SPIRV-Reflect](https://github.com/KhronosGroup/SPIRV-Reflect) library.
 * GLTF & GLB loading with the [cgltf](https://github.com/jkuhlmann/cgltf) GLTF loading library.
 * Image loading using [stb_image](https://github.com/nothings/stb/blob/master/stb_image.h).
 * Vector & Matrix math done using the [cglm](https://github.com/recp/cglm) math libary.
