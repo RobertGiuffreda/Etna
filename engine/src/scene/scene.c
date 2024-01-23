@@ -71,8 +71,8 @@ void scene_shutdown(scene* scene) {
     //     descriptor_set_allocator_growable_shutdown(&scene->ds_allocators[i], state);
     //     buffer_destroy(state, &scene->scene_data_buffers[i]);
     // }
-    // etfree(scene->ds_allocators, sizeof(ds_allocator_growable) * state->image_count, MEMORY_TAG_SCENE);
-    // etfree(scene->scene_data_buffers, sizeof(buffer) * state->image_count, MEMORY_TAG_SCENE);
+    // etfree(scene->ds_allocators);
+    // etfree(scene->scene_data_buffers);
 
     str_duplicate_free(scene->name);
     

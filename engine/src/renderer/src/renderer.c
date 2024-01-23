@@ -887,7 +887,7 @@ static b8 initialize_default_data(renderer_state* state) {
 
     state->default_material_instance = GLTF_MR_write_material(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
 
-    const char* path = "build/assets/gltf/structure.glb";
+    const char* path = "build/assets/gltf/zda_test.glb";
     
     if (!import_gltf(&state->_scene, path, state)) {
         ETFATAL("Error loading gltf %s.", path);

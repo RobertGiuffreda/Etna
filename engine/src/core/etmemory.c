@@ -64,6 +64,35 @@ void etfree(void* block, u64 size, memory_tag tag) {
     free(block);
 }
 
+typedef struct mem_alloc {
+    u64 size;
+    memory_tag tag;
+} mem_alloc;
+
+// void* etallocate(u64 size, memory_tag tag) {
+//     if (tag == MEMORY_TAG_UNKNOWN) {
+//         ETWARN("Memory allocated with MEMORY_TAG_UNKNOWN.");
+//     }
+    
+//     // Record the allocation's info
+//     mem_alloc* alloc = malloc(sizeof(mem_alloc) + size);
+//     alloc->size = size;
+//     alloc->tag = tag;
+
+//     state.total_allocated += size;
+//     state.allocated[tag] += size;
+
+//     return (void*)(alloc + 1);
+// }
+
+// void etfree(void* block) {
+//     mem_alloc* alloc = (mem_alloc*)block - 1;
+//     state.total_allocated -= alloc->size;
+//     state.allocated[alloc->tag] -= alloc->tag;
+
+//     free(alloc);
+// }
+
 void* etzero_memory(void* block, u64 size) {
     return memset(block, 0, size);
 }

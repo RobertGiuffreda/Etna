@@ -2,4 +2,6 @@ build
 plans
 tests
 
+assets/gltf/zda_test.glb
+
 glb_json.json

@@ -31,6 +31,7 @@ file(MAKE_DIRECTORY ${GLTF_DIRECTORY})
 # Copy over the gltf files
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/structure.glb ${GLTF_DIRECTORY}/structure.glb COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/house2.glb ${GLTF_DIRECTORY}/house2.glb COPYONLY)
+# configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/zda_test.glb ${GLTF_DIRECTORY}/zda_test.glb COPYONLY)
 
 #NOTE: External dependencies
 #Add glfw as a dependency to be built alongside the engine
@@ -100,14 +101,14 @@ target_link_libraries(sandbox
 #Build unit tests
 #HACK: Glob_recurse for now as structure is uncertain.
 #Get unit test source files:
-file(GLOB_RECURSE TEST_SRC_FILES "tests/src/*.c")
-file(GLOB_RECURSE TEST_HEADER_FILES "tests/src/*.h")
+# file(GLOB_RECURSE TEST_SRC_FILES "tests/src/*.c")
+# file(GLOB_RECURSE TEST_HEADER_FILES "tests/src/*.h")
 
-add_executable(tests ${TEST_SRC_FILES} ${TEST_HEADER_FILES})
+# add_executable(tests ${TEST_SRC_FILES} ${TEST_HEADER_FILES})
 
-target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
+# target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
 
-target_link_directories(tests PRIVATE $ENV{VULKAN_SDK}/Lib)
-target_link_libraries(tests
-    PRIVATE engine
-    PRIVATE vulkan-1)
+# target_link_directories(tests PRIVATE $ENV{VULKAN_SDK}/Lib)
+# target_link_libraries(tests
+#     PRIVATE engine
+#     PRIVATE vulkan-1)
