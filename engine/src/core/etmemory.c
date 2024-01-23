@@ -7,12 +7,12 @@
 // NOTE: string.h included for memset & memcpy
 #include <string.h>
 
-struct memory_state {
+struct memory_metrics {
     u64 total_allocated;
     u64 allocated[MEMORY_TAG_MAX];
 };
 
-static struct memory_state state;
+static struct memory_metrics metrics;
 
 static const char* memory_strings[MEMORY_TAG_MAX] = {
     "Unknown:       ",
@@ -39,7 +39,7 @@ static const char* memory_strings[MEMORY_TAG_MAX] = {
 static const u32 mem_tag_str_len = 16;
 
 b8 memory_initialize(void) {
-    memset((void*)&state, 0, sizeof(struct memory_state));
+    memset((void*)&metrics, 0, sizeof(struct memory_metrics));
     return true;
 }
 
@@ -50,8 +50,8 @@ void* etallocate(u64 size, memory_tag tag) {
     if (tag == MEMORY_TAG_UNKNOWN) {
         ETWARN("Memory allocated with MEMORY_TAG_UNKNOWN.");
     }
-    state.total_allocated += size; 
-    state.allocated[tag] += size;
+    metrics.total_allocated += size; 
+    metrics.allocated[tag] += size;
     return malloc(size);
 }
 
@@ -59,39 +59,10 @@ void etfree(void* block, u64 size, memory_tag tag) {
     if (tag == MEMORY_TAG_UNKNOWN) {
         ETWARN("Memory freed with MEMORY_TAG_UNKNOWN.");
     }
-    state.total_allocated -= size;
-    state.allocated[tag] -= size;
+    metrics.total_allocated -= size;
+    metrics.allocated[tag] -= size;
     free(block);
 }
-
-typedef struct mem_alloc {
-    u64 size;
-    memory_tag tag;
-} mem_alloc;
-
-// void* etallocate(u64 size, memory_tag tag) {
-//     if (tag == MEMORY_TAG_UNKNOWN) {
-//         ETWARN("Memory allocated with MEMORY_TAG_UNKNOWN.");
-//     }
-    
-//     // Record the allocation's info
-//     mem_alloc* alloc = malloc(sizeof(mem_alloc) + size);
-//     alloc->size = size;
-//     alloc->tag = tag;
-
-//     state.total_allocated += size;
-//     state.allocated[tag] += size;
-
-//     return (void*)(alloc + 1);
-// }
-
-// void etfree(void* block) {
-//     mem_alloc* alloc = (mem_alloc*)block - 1;
-//     state.total_allocated -= alloc->size;
-//     state.allocated[alloc->tag] -= alloc->tag;
-
-//     free(alloc);
-// }
 
 void* etzero_memory(void* block, u64 size) {
     return memset(block, 0, size);
@@ -140,19 +111,19 @@ void log_memory_allocations(void) {
     for (u32 i = 0; i < MEMORY_TAG_MAX; ++i) {
         char xiB[4] = "XiB";
         f32 amount = 1.0f;
-        if (state.allocated[i] >= gib) {
+        if (metrics.allocated[i] >= gib) {
             xiB[0] = 'G';
-            amount = state.allocated[i] / (f32)gib;
-        } else if (state.allocated[i] >= mib) {
+            amount = metrics.allocated[i] / (f32)gib;
+        } else if (metrics.allocated[i] >= mib) {
             xiB[0] = 'M';
-            amount = state.allocated[i] / (f32)mib;
-        } else if (state.allocated[i] >= kib) {
+            amount = metrics.allocated[i] / (f32)mib;
+        } else if (metrics.allocated[i] >= kib) {
             xiB[0] = 'K';
-            amount = state.allocated[i] / (f32)kib;
+            amount = metrics.allocated[i] / (f32)kib;
         } else {
             xiB[0] = 'B';
             xiB[1] = '\0';
-            amount = (f32)state.allocated[i];
+            amount = (f32)metrics.allocated[i];
         }
         i32 len = snprintf(output + offset, output_size - offset, "%s%*.2f%s\n", memory_strings[i], mem_num_len, amount, xiB);
         offset += len;

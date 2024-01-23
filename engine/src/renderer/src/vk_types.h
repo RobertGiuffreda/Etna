@@ -92,9 +92,9 @@ typedef struct gpu_scene_data {
     m4s proj;
     m4s viewproj;
     v4s ambient_color;
-    v4s light_direction; // w for sun power
     v4s light_color;
     v4s light_position;
+    v4s padding; // w for sun power
 } gpu_scene_data;
 
 typedef struct material_pipeline {
@@ -108,7 +108,7 @@ typedef struct material_instance {
     material_pass pass_type;
 } material_instance;
 
-// TODO: Make material_resources generic
+// TODO: Make material_resources & material_constants generic structs to poss generic information
 struct material_constants {
     v4s color_factors;
     v4s metal_rough_factors;

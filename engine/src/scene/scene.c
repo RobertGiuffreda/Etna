@@ -102,12 +102,13 @@ void scene_update(scene* scene) {
 
     v4s a_color = { .raw = {.1f, .1f, .1f, .1f}};
     v4s l_color = { .raw = {1.f, 1.f, 1.f, 1.f}};
-    v4s l_dir = { .raw = {0.f, 1.f, .5f, 1.f}};
-    v4s l_pos = { .raw = {0.f, 0.f, 0.f, 1.f}};
+
+    // Manipulate this vector
+    v4s l_pos = glms_vec4(scene->cam.position, 1.0f);
+    l_pos.y += 2.0f;
     
     scene->data.ambient_color = a_color;
     scene->data.light_color = l_color;
-    scene->data.light_direction = l_dir;
     scene->data.light_position = l_pos;
 }
 

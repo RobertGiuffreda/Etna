@@ -176,7 +176,8 @@
         "material.h": "c",
         "material_manager.h": "c",
         "scene_private.h": "c",
-        "sstream": "c"
+        "sstream": "c",
+        "mat4.h": "c"
     },
     "C_Cpp.dimInactiveRegions": false
 }

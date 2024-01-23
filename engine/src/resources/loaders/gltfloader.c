@@ -573,6 +573,7 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
     // dynarray_destroy(frame_ratios);
 
     camera_create(&scene->cam);
+    scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
 
     // Descriptor Allocator for materials
     pool_size_ratio mps_ratios[] = {
