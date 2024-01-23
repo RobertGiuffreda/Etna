@@ -41,5 +41,3 @@ void* etzero_memory(void* block, u64 size);
 void* etmove_memory(void* dest, const void* source, u64 size);
 
 void* etcopy_memory(void* dest, const void* source, u64 size);
-
-u64 get_total_allocs(void);

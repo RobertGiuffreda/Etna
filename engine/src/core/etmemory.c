@@ -106,10 +106,6 @@ void* etcopy_memory(void* dest, const void* source, u64 size) {
     return memcpy(dest, source, size);
 }
 
-u64 get_total_allocs(void) {
-    return state.total_allocated;
-}
-
 // TODO: Specific allocation function for memory allocated before memory_intialize() is called
 // TODO: Linear allocator for this purpose??
 void log_memory_allocations(void) {

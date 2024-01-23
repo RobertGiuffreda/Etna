@@ -2,7 +2,7 @@
 
 #include "containers/dynarray.h"
 
-#include "math/etmath.h"
+#include "math/math_types.h"
 
 #include "core/etmemory.h"
 #include "core/logger.h"

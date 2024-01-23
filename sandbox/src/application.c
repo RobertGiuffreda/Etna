@@ -3,7 +3,7 @@
 
 #include <core/etmemory.h>
 #include <core/logger.h>
-#include <math/etmath.h>
+#include <math/math_types.h>
 #include <core/etfile.h>
 
 struct application_state_t {
