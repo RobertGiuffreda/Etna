@@ -12,16 +12,5 @@
             "environment": [],
             "console": "integratedTerminal"
         },
-        {
-            "name": "(Windows) Launch Tests",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/debug/tests.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "console": "integratedTerminal"
-        }
     ]
 }

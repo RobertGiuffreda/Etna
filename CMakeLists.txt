@@ -56,6 +56,8 @@ add_library(engine ${ENGINE_SRC_FILES} ${ENGINE_HEADER_FILES})
 
 #Compiler defines for engine
 target_compile_definitions(engine PRIVATE _DEBUG)
+# target_compile_options(engine PRIVATE /fsanitize=address)
+# target_link_options(engine PRIVATE /INFERASANLIBS:NO)
 
 #Include directories for engine library
 target_include_directories(engine
@@ -68,6 +70,7 @@ target_include_directories(engine
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/Nuklear/
     PRIVATE $ENV{VULKAN_SDK}/include/)
 
+# Link directories for engine library
 target_link_directories(engine PRIVATE $ENV{VULKAN_SDK}/Lib)
 
 # Link libraries to engine
@@ -84,8 +87,10 @@ file(GLOB_RECURSE SANDBOX_HEADER_FILES "sandbox/src/*.h")
 #Specify executable
 add_executable(sandbox ${SANDBOX_SRC_FILES} ${SANDBOX_HEADER_FILES})
 
-#Compiler defines for sandbox
+# Compiler defines for sandbox
 target_compile_definitions(sandbox PRIVATE _DEBUG)
+# target_compile_options(sandbox PRIVATE /fsanitize=address)
+# target_link_options(sandbox PRIVATE /INFERASANLIBS:NO)
 
 #Include directories for sandbox
 target_include_directories(sandbox
@@ -97,18 +102,3 @@ target_link_directories(sandbox PRIVATE $ENV{VULKAN_SDK}/Lib)
 target_link_libraries(sandbox
     PRIVATE engine
     PRIVATE vulkan-1)
-
-#Build unit tests
-#HACK: Glob_recurse for now as structure is uncertain.
-#Get unit test source files:
-# file(GLOB_RECURSE TEST_SRC_FILES "tests/src/*.c")
-# file(GLOB_RECURSE TEST_HEADER_FILES "tests/src/*.h")
-
-# add_executable(tests ${TEST_SRC_FILES} ${TEST_HEADER_FILES})
-
-# target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/engine/src)
-
-# target_link_directories(tests PRIVATE $ENV{VULKAN_SDK}/Lib)
-# target_link_libraries(tests
-#     PRIVATE engine
-#     PRIVATE vulkan-1)
