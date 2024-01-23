@@ -15,7 +15,7 @@ A small `vulkan` renderer written using the `C` programming language. This is wr
 * Depth buffering done using reverse-Z.
 * Mesh vertices passed using buffer device address.
 * Shader compilation to SPV bytecode at project **compile time** using [glslang](https://github.com/KhronosGroup/glslang).
-* Vulkan 1.3's dynamic rendering feature.
+* `Vulkan 1.3`'s dynamic rendering feature.
 * Multiple frames in flight
 ## Planned
 * Custom material shader support
