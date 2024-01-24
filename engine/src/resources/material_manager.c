@@ -9,7 +9,7 @@
 // TEMP: This should be made renderer implementation agnostic
 #include "renderer/src/vk_types.h"
 #include "renderer/src/descriptor.h"
-#include "renderer/src/GLTFMetallic_Roughness.h"
+#include "renderer/src/GLTF_MR.h"
 #include "renderer/src/material.h"
 // TEMP: END
 

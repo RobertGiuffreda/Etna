@@ -28,7 +28,7 @@
 #include "renderer/src/buffer.h"
 #include "renderer/src/image.h"
 
-#include "renderer/src/GLTFMetallic_Roughness.h"
+#include "renderer/src/GLTF_MR.h"
 
 #include "renderer/src/renderables.h"
 // TEMP: END
@@ -215,7 +215,7 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
         }
         
         // Write the material instance
-        gltf->materials[i].data = GLTF_MR_write_material(
+        gltf->materials[i].data = GLTF_MR_create_instance(
             &state->metal_rough_material,
             state,
             pass_type,

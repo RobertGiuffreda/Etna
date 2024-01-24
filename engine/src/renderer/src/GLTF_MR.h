@@ -1,10 +1,10 @@
 #pragma once
 #include "renderer/src/vk_types.h"
 
-void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state);
-void GLTF_MR_destroy_pipelines(GLTF_MR* mat, renderer_state* state);
+b8 GLTF_MR_build_blueprint(GLTF_MR* mat, renderer_state* state);
+void GLTF_MR_destroy_blueprint(GLTF_MR* mat, renderer_state* state);
 
-material_instance GLTF_MR_write_material(
+material_instance GLTF_MR_create_instance(
     GLTF_MR* mat,
     renderer_state* state,
     material_pass pass,

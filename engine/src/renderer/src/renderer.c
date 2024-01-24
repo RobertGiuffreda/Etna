@@ -4,6 +4,7 @@
 #include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/utilities/vkutils.h"
 
+#include "renderer/src/vk_types.h"
 #include "renderer/src/device.h"
 #include "renderer/src/swapchain.h"
 #include "renderer/src/image.h"
@@ -11,7 +12,7 @@
 #include "renderer/src/pipeline.h"
 #include "renderer/src/shader.h"
 #include "renderer/src/descriptor.h"
-#include "renderer/src/GLTFMetallic_Roughness.h"
+#include "renderer/src/GLTF_MR.h"
 #include "renderer/src/renderables.h"
 
 #include "window/renderer_window.h"
@@ -44,13 +45,13 @@ static void create_scene_data_buffers(renderer_state* state);
 static void destroy_scene_data_buffers(renderer_state* state);
 
 // TEMP: Until Compute effects framework. Meaning post processing effect
-static void initialize_compute_effects(renderer_state* state);
+static b8 initialize_compute_effects(renderer_state* state);
 static void shutdown_compute_effects(renderer_state* state);
 // TEMP: END
 
 // TEMP: Until material framework is stood up
-static void initialize_mesh_mat_pipeline(renderer_state* state);
-static void shutdown_mesh_mat_pipeline(renderer_state* state);
+static b8 initialize_default_material(renderer_state* state);
+static void shutdown_default_material(renderer_state* state);
 // TEMP: END
 
 static b8 initialize_default_data(renderer_state* state);
@@ -266,10 +267,15 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     state->immediate_begin = immediate_begin;
     state->immediate_end = immediate_end;
 
-    initialize_compute_effects(state);
-    ETINFO("Intialized compute effects.");
-    initialize_mesh_mat_pipeline(state);
-    ETINFO("Initialized mesh mat pipeline");
+    if (!initialize_compute_effects(state)) {
+        ETERROR("Could not initialize compute effects.");
+        return false;
+    }
+
+    if (initialize_default_material(state)) {
+        ETERROR("Could not initialize default material.");
+        return false;
+    }
 
     if (!initialize_default_data(state)) {
         ETFATAL("Error intializing data.");
@@ -286,7 +292,7 @@ void renderer_shutdown(renderer_state* state) {
 
     shutdown_default_data(state);
 
-    shutdown_mesh_mat_pipeline(state);
+    shutdown_default_material(state);
 
     shutdown_compute_effects(state);
     ETINFO("Compute effects shutdown.");
@@ -711,8 +717,10 @@ static void destroy_scene_data_buffers(renderer_state* state) {
     etfree(state->scene_data_buffers, sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
 }
 
-static void initialize_compute_effects(renderer_state* state) {
-    load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader);
+static b8 initialize_compute_effects(renderer_state* state) {
+    if (!load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader)) {
+
+    }
 
     VkPipelineLayoutCreateInfo compute_effect_pipeline_layout_info = init_pipeline_layout_create_info();
     compute_effect_pipeline_layout_info.setLayoutCount = 1;
@@ -748,12 +756,12 @@ static void shutdown_compute_effects(renderer_state* state) {
     unload_shader(state, &state->gradient_shader);
 }
 
-static void initialize_mesh_mat_pipeline(renderer_state* state) {
-    GLTF_MR_build_pipelines(&state->metal_rough_material, state);
+static b8 initialize_default_material(renderer_state* state) {
+    return GLTF_MR_build_blueprint(&state->metal_rough_material, state);
 }
 
-static void shutdown_mesh_mat_pipeline(renderer_state* state) {
-    GLTF_MR_destroy_pipelines(&state->metal_rough_material, state);
+static void shutdown_default_material(renderer_state* state) {
+    GLTF_MR_destroy_blueprint(&state->metal_rough_material, state);
 }
 
 static b8 initialize_default_data(renderer_state* state) {
@@ -885,7 +893,7 @@ static b8 initialize_default_data(renderer_state* state) {
     mat_resources.data_buffer = state->default_material_constants.handle;
     mat_resources.data_buffer_offset = 0;
 
-    state->default_material_instance = GLTF_MR_write_material(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
+    state->default_material_instance = GLTF_MR_create_instance(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
 
     const char* path = "build/assets/gltf/structure.glb";
     

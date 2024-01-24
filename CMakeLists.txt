@@ -56,8 +56,8 @@ add_library(engine ${ENGINE_SRC_FILES} ${ENGINE_HEADER_FILES})
 
 #Compiler defines for engine
 target_compile_definitions(engine PRIVATE _DEBUG)
-# target_compile_options(engine PRIVATE /fsanitize=address)
-# target_link_options(engine PRIVATE /INFERASANLIBS:NO)
+target_compile_options(engine PRIVATE /fsanitize=address)
+target_link_options(engine PRIVATE /INFERASANLIBS)
 
 #Include directories for engine library
 target_include_directories(engine
@@ -89,8 +89,8 @@ add_executable(sandbox ${SANDBOX_SRC_FILES} ${SANDBOX_HEADER_FILES})
 
 # Compiler defines for sandbox
 target_compile_definitions(sandbox PRIVATE _DEBUG)
-# target_compile_options(sandbox PRIVATE /fsanitize=address)
-# target_link_options(sandbox PRIVATE /INFERASANLIBS:NO)
+target_compile_options(sandbox PRIVATE /fsanitize=address)
+target_link_options(sandbox PRIVATE /INFERASANLIBS)
 
 #Include directories for sandbox
 target_include_directories(sandbox

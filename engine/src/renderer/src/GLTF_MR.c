@@ -1,4 +1,4 @@
-#include "GLTFMetallic_Roughness.h"
+#include "GLTF_MR.h"
 
 #include "core/logger.h"
 
@@ -7,15 +7,18 @@
 #include "renderer/src/pipeline.h"
 #include "renderer/src/utilities/vkinit.h"
 
-void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
+b8 GLTF_MR_build_blueprint(GLTF_MR* mat, renderer_state* state) {
     shader mesh_vert_shader = {0};
     if (!load_shader(state, "build/assets/shaders/mesh_mat.vert.spv", &mesh_vert_shader)) {
-        ETERROR("Unable to load mesh.vert.spv");
+        ETERROR("Unable to load mesh_mat.vert.spv");
+        return false;
     }
 
     shader mesh_frag_shader = {0};
     if (!load_shader(state, "build/assets/shaders/mesh_mat.frag.spv", &mesh_frag_shader)) {
-        ETERROR("Unable to load mesh.vert.spv");
+        unload_shader(state, &mesh_vert_shader);
+        ETERROR("Unable to load mesh_mat.frag.spv");
+        return false;
     }
 
     dsl_builder layout_builder = descriptor_set_layout_builder_create();
@@ -102,7 +105,7 @@ void GLTF_MR_build_pipelines(GLTF_MR* mat, renderer_state* state) {
     unload_shader(state, &mesh_frag_shader);
 }
 
-void GLTF_MR_destroy_pipelines(GLTF_MR* mat, renderer_state* state) {
+void GLTF_MR_destroy_blueprint(GLTF_MR* mat, renderer_state* state) {
     // NOTE: GLTF_MR opaque pipeline and transparent pipeline have the 
     // same layout so only one vkDestroyPipelineLayout call is used
     descriptor_set_writer_shutdown(&mat->writer);
@@ -112,7 +115,7 @@ void GLTF_MR_destroy_pipelines(GLTF_MR* mat, renderer_state* state) {
     vkDestroyDescriptorSetLayout(state->device.handle, mat->material_layout, state->allocator);
 }
 
-material_instance GLTF_MR_write_material(
+material_instance GLTF_MR_create_instance(
     GLTF_MR* mat,
     renderer_state* state,
     material_pass pass,

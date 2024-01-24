@@ -126,7 +126,10 @@ struct material_resources {
     u32 data_buffer_offset;
 };
 
-typedef struct GLTFMetallic_Roughness {
+// GLTF Metallic Roughness
+// Default material type as importing GLTF file's is 
+// the only thing supported at the moment
+typedef struct GLTF_MR {
     material_pipeline opaque_pipeline;
     material_pipeline transparent_pipeline;
 
