@@ -1,6 +1,6 @@
 # TestEtna
 ## Overview
-A small vulkan renderer written using the C programming language. This is written for the `c17` standard and `Vulkan 1.3`. The code has only been tested on windows and compiled using the MSVC compiler. The project uses CMake as the build system which compiles the project as well as runs the commands to compile the shaders using glslang at the moment.
+A small `vulkan` renderer written using the `C` programming language. This is written for the `c17` standard and `Vulkan 1.3`. The code has only been tested on windows and compiled using the MSVC compiler. The project uses CMake as the build system which compiles the project as well as runs the commands to compile the shaders using glslang at the moment.
 
 ## Features
 * Window handling done using the [glfw](https://github.com/glfw/glfw) library.
@@ -15,7 +15,7 @@ A small vulkan renderer written using the C programming language. This is writte
 * Depth buffering done using reverse-Z.
 * Mesh vertices passed using buffer device address.
 * Shader compilation to SPV bytecode at project **compile time** using [glslang](https://github.com/KhronosGroup/glslang).
-* Vulkan 1.3's dynamic rendering feature.
+* `Vulkan 1.3`'s dynamic rendering feature.
 * Multiple frames in flight
 ## Planned
 * Custom material shader support
