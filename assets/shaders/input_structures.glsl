@@ -9,7 +9,7 @@ layout(set = 0, binding = 0) uniform scene_data_block {
 	vec4 ambient_color;
 	vec4 light_color;
     vec4 light_position;
-	vec4 padding;
+	vec4 view_pos;
 } scene_data;
 
 layout(set = 1, binding = 0) uniform material_data_block {

@@ -5,6 +5,7 @@
 
 #include "core/etmemory.h"
 #include "core/etstring.h"
+#include "core/logger.h"
 
 #include "resources/mesh_manager.h"
 #include "resources/image_manager.h"
@@ -110,6 +111,8 @@ void scene_update(scene* scene) {
     scene->data.ambient_color = a_color;
     scene->data.light_color = l_color;
     scene->data.light_position = l_pos;
+    
+    scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
 }
 
 void scene_draw(struct scene* scene, const m4s top_matrix, struct draw_context* ctx) {

@@ -94,7 +94,7 @@ typedef struct gpu_scene_data {
     v4s ambient_color;
     v4s light_color;
     v4s light_position;
-    v4s padding; // w for sun power
+    v4s view_pos;
 } gpu_scene_data;
 
 typedef struct material_pipeline {

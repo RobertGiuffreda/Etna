@@ -17,13 +17,13 @@ void main() {
 
     vec3 light_dir = normalize(scene_data.light_position - vec4(in_position, 0.0f)).xyz;
     
-    // TODO: normalize needed??
     vec3 normal = normalize(in_normal);
 
     float diff = max(dot(light_dir, normal), 0.0f);
     vec3 diffuse = diff * color;
 
-    vec3 view_pos = -vec3(scene_data.view[0][3], scene_data.view[1][3], scene_data.view[2][3]);
+    vec3 view_pos = scene_data.view_pos.xyz;
+
     vec3 view_dir = normalize(view_pos - in_position);
     vec3 reflect_dir = reflect(-light_dir, normal);
 

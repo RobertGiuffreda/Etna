@@ -35,6 +35,7 @@
 [INFO]:  Grey default image created.
 [INFO]:  Black default image created.
 [INFO]:  Checkerboard default image created.
+[INFO]:  Has normal.
 [INFO]:  Compute effects shutdown.
 [INFO]:  Scene data buffers destroyed.
 [INFO]:  Descriptor Set Allocator destroyed.
