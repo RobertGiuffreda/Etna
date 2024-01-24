@@ -86,11 +86,8 @@ void* dynarray_copy(void* src) {
 
 void dynarray_destroy(void* array)
 {
-    if (array)
-    {
-        dynarray* to_free = (dynarray*)array - 1;
-        etfree(to_free, header_size + to_free->capacity * to_free->stride, to_free->tag);
-    }
+    dynarray* to_free = (dynarray*)array - 1;
+    etfree(to_free, header_size + to_free->capacity * to_free->stride, to_free->tag);
 }
 
 // TODO: Take a value to copy into the array for uninitialized memory??
@@ -232,7 +229,6 @@ static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity)
 
     // Free old memory staring from header of dynarray
     etfree(header, header_size + header->capacity * header->stride, header->tag);
-
     return resized_array;
 }
 
@@ -258,6 +254,7 @@ static inline dynarray* _dynarray_resize_index(dynarray* header, u64 capacity, u
 
     resized_array->capacity = capacity;
 
+    // Free old memory staring from header of dynarray
     etfree(header, header_size + header->capacity * header->stride, header->tag);
     return resized_array;
 }
