@@ -18,6 +18,7 @@
 
 typedef struct engine_state {
     b8 is_running;
+    b8 minimized;
 
     // Application data
     b8 (*app_initialize)(application_state* app_state);
@@ -94,6 +95,8 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
+    state->minimized = false;
+
     // Initialize renderer
     if (!renderer_initialize(&state->renderer_state, state->window_state, "App")) {
         ETFATAL("Renderer failed to initialize.");
@@ -122,19 +125,19 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
 b8 engine_run(void) {
     state->is_running = true;
 
-    state->app_update(state->app_state);
-
     while (state->is_running && !etwindow_should_close(state->window_state)) {
-        // TODO: renderer_update_scene should not be a renderer function
-        // Renderer should have a draw scene function that takes a scene
-        renderer_update_scene(state->renderer_state);
-        renderer_draw_frame(state->renderer_state);
+        // Application per frame update
+        state->app_update(state->app_state);
 
+        if (!state->minimized) {
+            // TODO: Remove scene from renderer 
+            renderer_update_scene(state->renderer_state);
+            renderer_draw_frame(state->renderer_state);
+        }
         input_update(state->input_state);
-        etwindow_pump_messages(); // glfwPollEvents()
+        etwindow_poll_events(); // glfwPollEvents() called
     }
     
-    // dump_gltf_json("build/assets/gltf/zda_test.glb", "glb_json.json");
     return true;
 }
 
@@ -174,7 +177,13 @@ void engine_shutdown(void) {
 }
 
 b8 engine_on_resize(u16 event_code, void* engine_state, event_data data) {
-    // TODO: Register renderer for resizes in the renderer and not here
+    if (EVENT_DATA_WIDTH(data) == 0 || EVENT_DATA_HEIGHT(data) == 0) {
+        state->minimized = true;
+    } else {
+        state->minimized = false;
+    }
+
+    // TODO: Register renderer for resizes using events
     renderer_on_resize(state->renderer_state, EVENT_DATA_WIDTH(data), EVENT_DATA_HEIGHT(data));
     // Other events should handle this event code as well, so false
     return false;

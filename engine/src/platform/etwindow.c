@@ -26,11 +26,9 @@ static void resize_callback(GLFWwindow* window, i32 width, i32 height);
 b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_state) {
     // Setup window using GLFW_NO_API as per glfw vulkan guide
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-    // TEMP: Temporary until swappchain recreation implemented
-    // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    // TEMP: END
+    // So the window moving to the starting coordinates is not visible
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     GLFWwindow* window = glfwCreateWindow(config->width, config->height, config->name, 0, 0);
     if (!window) {
@@ -46,6 +44,8 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_stat
     glfwSetWindowSizeCallback(window, resize_callback);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    
+    // Move the window then show it, hiding the movement
     glfwSetWindowPos(window, config->x_start_pos, config->y_start_pos);
     glfwShowWindow(window);
 
@@ -69,7 +69,7 @@ b8 etwindow_should_close(etwindow_state* window_state) {
     return glfwWindowShouldClose(window_state->impl_window);
 }
 
-void etwindow_pump_messages(void) {
+void etwindow_poll_events(void) {
     glfwPollEvents();
 }
 

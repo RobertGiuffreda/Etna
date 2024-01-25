@@ -17,4 +17,4 @@ void etwindow_shutdown(etwindow_state* window_state);
 
 b8 etwindow_should_close(etwindow_state* window_state);
 
-void etwindow_pump_messages(void);
+void etwindow_poll_events(void);
