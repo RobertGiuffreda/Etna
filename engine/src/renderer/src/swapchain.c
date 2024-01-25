@@ -207,7 +207,6 @@ void shutdown_swapchain(renderer_state* state) {
         MEMORY_TAG_RENDERER);
 }
 
-// TODO: This could be moved into a separate function to be called from create and recreate_swapchain
 // TODO: Linear allocator for the swapchain images and views equal to the max number of images
 b8 recreate_swapchain(renderer_state* state) {
     // Destroy the old swapchains image views

@@ -45,7 +45,7 @@ STATIC_ASSERT(sizeof(b8) == 1, "Expected b8 to be 1 byte.");
 #define true 1
 #define false 0
 
-// TODO: More readable Platform 
+// TODO: More readable Platform detection code
 // Platform detection
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
 #define ETPLATFORM_WINDOWS 1

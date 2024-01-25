@@ -3,10 +3,9 @@
 #include "renderer/src/buffer.h"
 
 /** TODO:
- * Move this to a utilities file
  * Documentation explaining what this does and how it works
- * NOTE: Improvement??: Cache/store the indices of known memory usage bit indices and 
- * start traversing from that index
+ * NOTE: Cache/store the indices of known memory usage bit indices and 
+ * start traversing from that index for improvement
  */
 i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
     u32 memory_type_bits_requirement, VkMemoryPropertyFlags required_properties)
@@ -22,9 +21,8 @@ i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
     return -1;
 }
 
-// TODO: Move to another separate file for handling utility functions
 // TODO: Remove the VK_MEMORY_PROPERTY_HOST_COHERENT_BIT bit from the staging buffer and flush manually
-// TODO:GOAL: Use queue from dedicated transfer queue family(state->device.transfer_queue) to do the transfer
+// TODO: Use queue from dedicated transfer queue family(state->device.transfer_queue) to do transfers
 mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
     const u64 vertex_buffer_size = vertex_count * sizeof(vertex);
     const u64 index_buffer_size = index_count * sizeof(u32);

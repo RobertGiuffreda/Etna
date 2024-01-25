@@ -15,7 +15,7 @@ void image_manager_increment(image_manager* manager);
 
 image* image_get(image_manager* manager, u32 id);
 
-// TODO: Configurable format
+// TODO: Configurable format here
 typedef struct image_config {
     char* name;
     u32 width;
@@ -23,14 +23,11 @@ typedef struct image_config {
     void* data;
 } image_config;
 
-// TODO: Configure memory usage flags in image_config
 b8 image2D_submit_ref(
     image_manager* manager,
     image_config* config,
     image** out_image_ref);
 
-// TEMP: Until scene from config file is implemented. Proper ID management
 b8 image2D_submit(
     image_manager* manager,
     image_config* config);
-// TEMP: END

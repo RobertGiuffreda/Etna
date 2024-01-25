@@ -12,7 +12,7 @@
 
 #include "scene/scene_private.h"
 
-// TODO: Move to loader folder
+// TODO: Remove, this is deprecated
 typedef struct loaded_gltf {
     char* name;
 
@@ -76,7 +76,6 @@ typedef struct renderer_state {
 
     VkSurfaceKHR surface;
 
-    // TODO: Rename to swapchain extent??
     VkExtent3D window_extent;
     
     // True if window was resized
@@ -89,8 +88,7 @@ typedef struct renderer_state {
     image depth_image;
     // NOTE: END
 
-    // TODO: Rename to frame_index maybe??
-    u32 current_frame;
+    u32 frame_index;
     
     // NOTE: Per frame structures/data. Add to separate struct??
     VkSemaphore* swapchain_semaphores;
@@ -111,12 +109,11 @@ typedef struct renderer_state {
     // NOTE: Per frame END
 
     // NOTE: Immediate command pool & buffer
-    // TODO: How does this fit into place with with queues 
-    // and multiple queue families 
     VkCommandPool imm_pool;
     VkCommandBuffer imm_buffer;
     VkFence imm_fence;
 
+    // TODO: Change these from function pointers
     void (*immediate_begin)(struct renderer_state* state);
     void (*immediate_end)(struct renderer_state* state);
     // NOTE: END
@@ -174,6 +171,7 @@ do {                                            \
     state->immediate_end(state);                \
 } while(0);                                     \
 
+// TODO: Setup debug names for vulkan objects
 #ifdef _DEBUG
 b8 renderer_set_debug_object_name(renderer_state* state, VkObjectType object_type, u64 object_handle, const char* object_name);
 #define SET_DEBUG_NAME(render_state, object_type, object_handle, object_name) renderer_set_debug_object_name(render_state, object_type, (u64)(object_handle), object_name)

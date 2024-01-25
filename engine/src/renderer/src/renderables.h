@@ -25,9 +25,8 @@
 // TODO: Create a container_of macro for multiple inheritance?? (Curiosity not need)
 // if I want the derived struct to inherit multiple things.
 
-/** NOTE: Hacky c code mimicking C++ OOP inheritance of node classes from vkguide.dev.
- * TODO: Move this into the renderables section
- */
+// NOTE: Hacky c code mimicking C++ OOP inheritance of node classes from vkguide.dev.
+
 typedef struct renderable_virtual_table renderable_vt;
 typedef struct renderable {
     renderable_vt* vt;

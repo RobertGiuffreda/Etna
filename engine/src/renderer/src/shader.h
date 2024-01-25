@@ -169,7 +169,6 @@ typedef struct shader1 {
     u32 set_count;
     set* _sets;
 
-    // TODO: Get information about push constants
     u32 push_constant_count;
     struct {
         u32 temp;
@@ -190,3 +189,4 @@ typedef struct shader1 {
 
 b8 load_shader1(renderer_state* state, const char* path, shader1* out_shader);
 void unload_shader1(renderer_state* state, shader1* shader);
+// NOTE: END

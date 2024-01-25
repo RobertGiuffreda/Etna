@@ -12,7 +12,6 @@ b8 platform_initialize(void) {
         ETFATAL("Function glfwInit returned false.");
         return false;
     }
-    // TODO: Platform should not be aware of vulkan
     if (!glfwVulkanSupported()) {
         ETFATAL("Function glfwVulkanSupported returned false.");
         glfwTerminate();

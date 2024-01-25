@@ -2,8 +2,6 @@
 
 #include "defines.h"
 
-// TODO: Macros for grabbing data out of event_data
-// to make it more readable
 typedef struct event_data {
     union {
         i64 i64[2];

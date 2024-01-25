@@ -104,8 +104,7 @@ void log_memory_allocations(void) {
     char* output = (char*)malloc(output_size);
     u32 offset = 0;
 
-    // TODO: etmemory specific function??
-    memcpy(output, init, init_len);
+    etcopy_memory(output, init, init_len);
     offset += init_len;
 
     for (u32 i = 0; i < MEMORY_TAG_MAX; ++i) {

@@ -12,9 +12,6 @@
 #define DYNARRAY_RESIZE_FACTOR 2
 #define RESIZE_CAPACITY(curr_capacity) ((curr_capacity + 1) * DYNARRAY_RESIZE_FACTOR)
 
-// TODO: Change index & length names to reflect role better.
-// length --> capacity
-// index --> end_index || index --> length
 typedef struct dynarray {
     u64 capacity;
     u64 length;
@@ -28,7 +25,6 @@ static inline dynarray* _dynarray_create(u64 capacity, u64 stride, memory_tag ta
 static inline dynarray* _dynarray_create_data(u64 capacity, u64 stride, u64 length, memory_tag tag, const void* data);
 static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity);
 
-// TODO: Test and ensure correct behavoir
 static inline dynarray* _dynarray_resize_index(dynarray* header, u64 length, u64 index);
 static inline void _dynarray_shift_index(dynarray* header, u64 index);
 
@@ -150,32 +146,25 @@ void dynarray_clear(void* array) {
     ((dynarray*)array - 1)->length = 0;
 }
 
-//TODO: Decide behavoir when index == header->index
+//NOTE: this function cannot insert at the end of an array.
 void dynarray_insert(void** array_ptr, void* element, u64 index)
 {
     dynarray* header = (dynarray*)(*array_ptr) - 1;
-    if (index <= header->length) {
-        // Resize array. Below resize function shifts the memory 
-        // to the right in anticipation of the insertion at array[index].
-        if (header->length >= header->capacity) // header->length should never be larger but just in case
-        {
-            header = _dynarray_resize_index(header, RESIZE_CAPACITY(header->capacity), index);
-            (*array_ptr) = (void*)(header + 1);
-        }
-        // The insertion index is not the end of the array
-        // shift array elements to the right starting at index
-        else if (index != header->length)
-        {
-            _dynarray_shift_index(header, index);
-        }
-        // Copy the element into array[index]
-        etcopy_memory((u8*)(*array_ptr) + index * header->stride, element, header->stride);
-
-        // Increment ending index as an element has been added
-        header->length++;
-    } else {
+    if (index >= header->length) {
         ETERROR("Index not in bounds of dynamic array.");
+        return;
     }
+    if (header->length == header->capacity) {
+        // _dynarray_resize_index also shifts the memory to make room for
+        //  the new element when copying for the resize
+        header = _dynarray_resize_index(header, RESIZE_CAPACITY(header->capacity), index);
+        (*array_ptr) = (void*)(header + 1);
+    } else {
+        // Shifts the memory to make room for the new element
+        _dynarray_shift_index(header, index);
+    }
+    etcopy_memory((u8*)(*array_ptr) + index * header->stride, element, header->stride);
+    header->length++;
 }
 
 void dynarray_remove(void* array, void* dest, u64 index)
@@ -232,8 +221,6 @@ static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity)
     return resized_array;
 }
 
-// As resize is occuring we do not have to check if shifting data to the right
-// one block is going to access memory not in the array.
 static inline dynarray* _dynarray_resize_index(dynarray* header, u64 capacity, u64 index)
 {
     dynarray* resized_array = _dynarray_create(capacity, header->stride, header->tag);

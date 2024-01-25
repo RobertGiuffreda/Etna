@@ -14,7 +14,7 @@
 #include "core/etfile.h"
 
 // NOTE: Currenly leaks memory on failure to load gltf file
-// TODO: Create a function to call when loading a file fails
+// TODO: Create a function to call when importing a file fails
 // that checks for memory allocations and frees them before returning
 
 // TODO: Handle cases where parts of the gltf are missing/not present
@@ -60,6 +60,7 @@ static void gltf_combine_paths(char* path, const char* base, const char* uri);
 static VkFilter gltf_filter_to_vk_filter(cgltf_int filter);
 static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter);
 
+// TODO: Remove this code. It is old
 b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* state) {
     gltf->render_state = state;
     
@@ -1105,7 +1106,7 @@ static void* load_image_data(
     return NULL;
 }
 
-// TODO: Call on errors loading the gltf file and freeing memory
+// TODO: Implement this function to call on errors loading the gltf file and freeing memory
 static void load_gltf_failure(struct loaded_gltf* gltf) {
     
 }

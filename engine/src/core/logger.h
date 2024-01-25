@@ -2,7 +2,7 @@
 
 #include "defines.h"
 
-// TODO: Disable & enable based on build configuration
+// TODO: Defined by build config
 #define LOG_WARN_ENABLED
 #define LOG_INFO_ENABLED
 #define LOG_DEBUG_ENABLED
@@ -25,7 +25,6 @@ void logger_shutdown(void);
 
 void log_output(log_level level, const char* message, ...);
 
-// TODO: Remove ; from the end of log macros
 #define ETFATAL(message, ...) log_output(LOG_FATAL, message, ##__VA_ARGS__)
 
 #define ETERROR(message, ...) log_output(LOG_ERROR, message, ##__VA_ARGS__)

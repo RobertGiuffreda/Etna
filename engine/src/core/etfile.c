@@ -7,6 +7,7 @@
 #include <stdio.h>
 
 //TODO: Platform specific code for filesytem
+
 //TODO: Replace if checks with asserts to pass responsibility to the caller
 
 struct etfile {
@@ -50,7 +51,6 @@ b8 file_open(const char* path, etfile_flags flags, etfile** out_file) {
     return true;
 }
 
-// TODO: Warning for if statement failure
 void file_close(etfile* file) {
     if (file && file->handle) {
         fclose(file->handle);

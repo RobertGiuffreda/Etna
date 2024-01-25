@@ -7,7 +7,10 @@
 #include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/renderer.h"
 
-// TODO: These function are a bit of a mess right now. Clean them up, make more configurable
+/** TODO: All three objects
+ * Support for descriptor count greater than one
+ * Less unwieldy function & object names 
+*/
 
 // NOTE: Descriptor binding count more than one is unsupported at the moment.
 // layout (set = 1, binding = 4) uniform usampler2D test_tex[2];
@@ -87,7 +90,6 @@ void descriptor_set_writer_write_image(
     VkImageLayout layout,
     VkDescriptorType type)
 {
-    // TODO: Clean up getting image_info address in dynamic array 
     // NOTE: The destination set value is not set in this function
     // NOTE: Descriptor count is hard coded to one in this function
     VkDescriptorImageInfo image_info = {
@@ -108,7 +110,6 @@ void descriptor_set_writer_write_image(
     dynarray_push((void**)&writer->writes, &write);
 }
 
-// TODO: Add descriptor count to function parameters
 void descriptor_set_writer_write_buffer(
     ds_writer* writer,
     u32 binding,
@@ -154,7 +155,6 @@ void descriptor_set_allocator_initialize(ds_allocator* allocator, u32 max_sets, 
     descriptor_set_allocator_create_pool(allocator, max_sets, state);
 }
 
-// TODO: Look into creation flags for VkDescriptorPool
 void descriptor_set_allocator_create_pool(ds_allocator* allocator, u32 max_sets, renderer_state* state) {
     VkDescriptorPoolCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -167,7 +167,6 @@ void descriptor_set_allocator_create_pool(ds_allocator* allocator, u32 max_sets,
     vkCreateDescriptorPool(state->device.handle, &info, state->allocator, &allocator->pool);
 }
 
-// TODO:NOTE: Check into reset_flags for reseting descriptor pool 
 void descriptor_set_allocator_clear_descriptor_sets(ds_allocator* allocator, renderer_state* state) {
     vkResetDescriptorPool(state->device.handle, allocator->pool, 0);
 }

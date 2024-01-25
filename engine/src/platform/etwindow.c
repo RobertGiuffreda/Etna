@@ -23,7 +23,6 @@ static void cursor_position_callback(GLFWwindow* window, f64 xpos, f64 ypos);
 static void scroll_callback(GLFWwindow* window, f64 xoffset, f64 yoffset);
 static void resize_callback(GLFWwindow* window, i32 width, i32 height);
 
-// TODO: Window user pointer concept from glfw sounds great
 b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_state) {
     // Setup window using GLFW_NO_API as per glfw vulkan guide
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);

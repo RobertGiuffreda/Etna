@@ -2,6 +2,8 @@
 
 #include "renderer/src/vk_types.h"
 
+// TODO: Make these inline
+
 VkCommandPoolCreateInfo init_command_pool_create_info(
     VkCommandPoolCreateFlags flags,
     u32 queue_family_index);
@@ -69,7 +71,7 @@ VkPhysicalDeviceMemoryProperties2 init_physical_device_memory_properties2(void);
 
 VkShaderModuleCreateInfo init_shader_module_create_info(void);
 
-// TODO: Determine parameters to pass
+// TODO: Implement this function
 VkPipelineLayoutCreateInfo init_pipline_layout_create_info(void);
 
 VkDescriptorSetLayoutCreateInfo init_descriptor_set_layout_create_info(void);

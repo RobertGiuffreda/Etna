@@ -46,14 +46,12 @@ typedef struct descriptor_set_allocator_growable {
 } ds_allocator_growable;
 
 // TEMP: Until my vulkan memory management is implemented
-// TODO: Store memory information for when implementing memory management
 typedef struct image {
     u32 id;
     char* name;
     VkImage handle;
     VkImageView view;
 
-    // TODO: Store memory requirements for mem management
     VkDeviceMemory memory;
 
     VkExtent3D extent;
@@ -181,14 +179,13 @@ typedef struct draw_context {
     render_object* opaque_surfaces;
     render_object* transparent_surfaces;
 } draw_context;
-// TODO: END
 
 /** TEMP:TODO:
  * This section involving compute effects is a bit of a mess and is temporary.
  * 
  * The compute_push_constants struct is TEMP: and will be replaced with more robust system for 
  * post processing. Compute shader post processing effects all share compute_push_constants structure 
- * to simplify things at the moment. 
+ * to simplify things at the moment.
  */
 // NOTE: vkguide.dev structs
 typedef struct compute_push_constants {

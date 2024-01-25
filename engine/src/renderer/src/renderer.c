@@ -81,7 +81,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     state->allocator = 0;
     state->swapchain_dirty = false;
     state->swapchain = VK_NULL_HANDLE;
-    state->current_frame = 0;
+    state->frame_index = 0;
 
     VkApplicationInfo app_cinfo = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -215,7 +215,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     // control of the size 
     initialize_swapchain(state);
 
-    // TEMP: HACK: TODO: Make render image resolution configurable from engine & not the original swapchain bounds
+    // TEMP: HACK: TODO: Make render image resolution configurable from engine & not the window_extent
     VkExtent3D render_resolution = {
         .width = state->window_extent.width,
         .height = state->window_extent.height,
@@ -272,7 +272,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
         return false;
     }
 
-    if (initialize_default_material(state)) {
+    if (!initialize_default_material(state)) {
         ETERROR("Could not initialize default material.");
         return false;
     }
@@ -351,20 +351,18 @@ b8 renderer_draw_frame(renderer_state* state) {
     VK_CHECK(vkWaitForFences(
         state->device.handle,
         1,
-        &state->render_fences[state->current_frame],
+        &state->render_fences[state->frame_index],
         VK_TRUE,
         1000000000));
     
-    // TODO: Determine if this is the proper place among my code for
-    // clearing the pools
-    descriptor_set_allocator_growable_clear_pools(&state->frame_allocators[state->current_frame], state);
+    descriptor_set_allocator_growable_clear_pools(&state->frame_allocators[state->frame_index], state);
 
     u32 swapchain_index;
     VkResult result = vkAcquireNextImageKHR(
         state->device.handle,
         state->swapchain,
         0xFFFFFFFFFFFFFFFF,
-        state->swapchain_semaphores[state->current_frame],
+        state->swapchain_semaphores[state->frame_index],
         VK_NULL_HANDLE,
         &swapchain_index);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -378,11 +376,11 @@ b8 renderer_draw_frame(renderer_state* state) {
     VK_CHECK(vkResetFences(
         state->device.handle,
         1,
-        &state->render_fences[state->current_frame]));
+        &state->render_fences[state->frame_index]));
 
-    VK_CHECK(vkResetCommandBuffer(state->main_graphics_command_buffers[state->current_frame], 0));
+    VK_CHECK(vkResetCommandBuffer(state->main_graphics_command_buffers[state->frame_index], 0));
 
-    VkCommandBuffer frame_cmd = state->main_graphics_command_buffers[state->current_frame];
+    VkCommandBuffer frame_cmd = state->main_graphics_command_buffers[state->frame_index];
     
     VkCommandBufferBeginInfo begin_info = init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VK_CHECK(vkBeginCommandBuffer(frame_cmd, &begin_info));
@@ -451,13 +449,13 @@ b8 renderer_draw_frame(renderer_state* state) {
 
     // Begin command buffer submission
     VkSemaphoreSubmitInfo wait_submit = init_semaphore_submit_info(
-        state->swapchain_semaphores[state->current_frame],
+        state->swapchain_semaphores[state->frame_index],
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
     VkCommandBufferSubmitInfo cmd_submit = init_command_buffer_submit_info(frame_cmd);
     
     VkSemaphoreSubmitInfo signal_submit = init_semaphore_submit_info(
-        state->render_semaphores[state->current_frame],
+        state->render_semaphores[state->frame_index],
         VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT);
 
     VkSubmitInfo2 submit_info = init_submit_info2(
@@ -470,7 +468,7 @@ b8 renderer_draw_frame(renderer_state* state) {
         state->device.graphics_queue, 
         /* submitCount */ 1,
         &submit_info,
-        state->render_fences[state->current_frame]);
+        state->render_fences[state->frame_index]);
     VK_CHECK(queue_result);
 
     // Present the image
@@ -480,7 +478,7 @@ b8 renderer_draw_frame(renderer_state* state) {
         .swapchainCount = 1,
         .pSwapchains = &state->swapchain,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &state->render_semaphores[state->current_frame],
+        .pWaitSemaphores = &state->render_semaphores[state->frame_index],
         .pImageIndices = &swapchain_index};
     result = vkQueuePresentKHR(state->device.present_queue, &present_info);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || state->swapchain_dirty) {
@@ -491,7 +489,7 @@ b8 renderer_draw_frame(renderer_state* state) {
     }
 
     // Move to the next frame
-    state->current_frame = (state->current_frame + 1) % state->image_count;
+    state->frame_index = (state->frame_index + 1) % state->image_count;
     return true;
 }
 
@@ -747,6 +745,7 @@ static b8 initialize_compute_effects(renderer_state* state) {
     compute_effect_info.stage = compute_effect_pipeline_shader_stage_info;
 
     VK_CHECK(vkCreateComputePipelines(state->device.handle, VK_NULL_HANDLE, 1, &compute_effect_info, state->allocator, &state->gradient_effect.pipeline));
+    return true;
 }
 
 static void shutdown_compute_effects(renderer_state* state) {
@@ -935,7 +934,6 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     VkRenderingAttachmentInfo depth_attachment = init_depth_attachment_info(
         state->depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    // TODO: Use window extent instead of render_extent ????
     VkExtent2D render_extent = {.width = state->render_extent.width, .height = state->render_extent.height};
     VkRenderingInfo render_info = init_rendering_info(render_extent, &color_attachment, &depth_attachment);
 
@@ -960,11 +958,11 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     // Set the per frame scene data in state->scene_data_buffers[frame_index]
-    // TODO: Keep this persistently mapped
+    // TODO: Keep scene_data_buffers persistently mapped
     void* mapped_scene_data;
     vkMapMemory(
         state->device.handle,
-        state->scene_data_buffers[state->current_frame].memory,
+        state->scene_data_buffers[state->frame_index].memory,
         /* Offset: */ 0,
         sizeof(gpu_scene_data),
         /* Flags: */ 0,
@@ -975,10 +973,10 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     *frame_scene_data = state->_scene.data;
     vkUnmapMemory(
         state->device.handle,
-        state->scene_data_buffers[state->current_frame].memory);
+        state->scene_data_buffers[state->frame_index].memory);
 
     VkDescriptorSet scene_descriptor_set = descriptor_set_allocator_growable_allocate(
-        &state->frame_allocators[state->current_frame],
+        &state->frame_allocators[state->frame_index],
         state->scene_data_descriptor_set_layout,
         state);
     
@@ -986,7 +984,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     descriptor_set_writer_write_buffer(
         &writer,
         /* Binding: */ 0,
-        state->scene_data_buffers[state->current_frame].handle,
+        state->scene_data_buffers[state->frame_index].handle,
         sizeof(gpu_scene_data),
         /* Offset: */ 0,
         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
@@ -1050,7 +1048,6 @@ b8 rebuild_swapchain(renderer_state* state) {
     return true;
 }
 
-// TODO: Determine if these should be function pointers or not
 static void immediate_begin(struct renderer_state* state) {
     VK_CHECK(vkResetFences(state->device.handle, 1, &state->imm_fence));
     VK_CHECK(vkResetCommandBuffer(state->imm_buffer, 0));
@@ -1102,7 +1099,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 }
 
 #ifdef _DEBUG
-// TODO: Setup naming for each vulkan object
 b8 renderer_set_debug_object_name(renderer_state* state, VkObjectType object_type, u64 object_handle, const char* object_name) {
     const VkDebugUtilsObjectNameInfoEXT name_info = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,

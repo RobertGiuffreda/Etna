@@ -7,8 +7,16 @@
 #include "renderer/src/renderer.h"
 #include "renderer/src/buffer.h"
 
-// TODO: Multisampling bits in ImageCreateInfo
-// TODO: Check if tiling and sample settings are supported for the specific image format
+/** TODO:
+ * Check if tiling and sample settings are supported for the specific image format
+ * Implement support for multisampling using multisampling bits specified in ImageCreateInfo
+ * Image data size is calculated assuming each image element (texel) is 32 bits (4 Bytes). 
+ *     Change to get byte count from the format entered or just pass it along
+ * blit & image barrier function currently take VkImages as parameters and not images
+ *     as they are used on swapchain images that are not encapsulated in the image struct.
+ *     I would like to work out something better so an image struct can be passed
+ */
+
 void image2D_create(
     renderer_state* state,
     VkExtent3D extent,
@@ -62,8 +70,6 @@ void image2D_create_data(
     image* out_image)
 {
     // Create staging buffer and upload data to it
-
-    // TODO: Change 4 to a get element size from vkformat utility function
     u64 data_size = extent.width * extent.height * extent.depth * 4;
     buffer staging = {0};
     buffer_create(
@@ -149,7 +155,6 @@ void image_destroy(renderer_state* state, image* image) {
     image->handle = 0;
 }
 
-// TODO: Have this function take struct image instead of parameters 
 void blit_image2D_to_image2D(
     VkCommandBuffer cmd,
     VkImage src, VkImage dst,
@@ -191,7 +196,6 @@ void blit_image2D_to_image2D(
     vkCmdBlitImage2(cmd, &blit_info);
 }
 
-// TODO: Aspect flags passed as parameter || When Changing VkImage to (struct image). Using stored value
 void image_barrier(
     VkCommandBuffer cmd,
     VkImage image,

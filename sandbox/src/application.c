@@ -8,7 +8,6 @@
 
 struct application_state_t {
     f32 delta_time;
-    
 };
 
 b8 application_initialize(struct application_state_t* state) {

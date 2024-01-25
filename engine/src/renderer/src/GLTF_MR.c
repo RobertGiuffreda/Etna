@@ -103,6 +103,7 @@ b8 GLTF_MR_build_blueprint(GLTF_MR* mat, renderer_state* state) {
 
     unload_shader(state, &mesh_vert_shader);
     unload_shader(state, &mesh_frag_shader);
+    return true;
 }
 
 void GLTF_MR_destroy_blueprint(GLTF_MR* mat, renderer_state* state) {

@@ -24,6 +24,7 @@ static VkDescriptorType spv_reflect_descriptor_to_vulkan_descriptor(SpvReflectDe
 static VkFormat spv_reflect_format_to_vulkan_format(SpvReflectFormat format);
 static VkShaderStageFlagBits spv_reflect_shader_stage_to_vulkan_shader_stage(SpvReflectShaderStageFlagBits stage);
 
+// NOTE: This is old
 b8 load_shader1(renderer_state* state, const char* path, shader1* out_shader) {
     if (!file_exists(path)) {
         ETERROR("Unable to find shader file: '%s'.", path);
@@ -133,6 +134,7 @@ b8 load_shader1(renderer_state* state, const char* path, shader1* out_shader) {
     return true;
 }
 
+// NOTE: This is old
 void unload_shader1(renderer_state* state, shader1* shader) {
     etfree(shader->outputs, sizeof(shader->outputs[0]) * shader->output_count, MEMORY_TAG_SHADER);
     etfree(shader->inputs, sizeof(shader->inputs[0]) * shader->input_count, MEMORY_TAG_SHADER);
@@ -265,7 +267,6 @@ void unload_shader(renderer_state* state, shader* shader) {
     vkDestroyShaderModule(state->device.handle, shader->module, state->allocator);
 }
 
-// TODO: Get type from type flags function to return the type from type flags
 void reflect_block_variables(block_variable* block, SpvReflectBlockVariable* spv_block) {
     block->name = str_duplicate_allocate(spv_block->name);
     block->offset = spv_block->offset;

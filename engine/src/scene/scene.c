@@ -24,8 +24,6 @@
 /** NOTE: Implementation details
  * Currently the scene descriptor set is hardcoded as a singular
  * uniform buffer that matches struct gpu_scene_data.
- * TODO: Support for variable scene descriptor set data through
- * "shader.h"'s shader_descriptor_set_layout structure.
  */
 
 b8 scene_initalize(scene* scene, struct renderer_state* state) {

@@ -25,7 +25,7 @@ typedef struct scene {
     camera cam;
     gpu_scene_data data;
 
-    // TEMP: START. Leftovers from loaded_gltf not refactored yet
+    // TEMP: Leftovers from loaded_gltf not refactored yet
     mesh_node* mesh_nodes;
     u32 mesh_node_count;
     node* nodes;

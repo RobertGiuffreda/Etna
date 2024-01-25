@@ -11,8 +11,6 @@
 #include <string.h>
 //TEMP: end
 
-// TODO: Linear allocator for this
-
 struct logger_state {
     etfile* log_file;
 };
@@ -35,7 +33,6 @@ void logger_shutdown(void) {
 
 // TODO: Use etstring for string manipulation for the sake of it
 void log_output(log_level level, const char* format, ...) {
-    // TODO: Write message to log file
     const u32 log_str_len = 9;
     const char* log_level_strings[LOG_LEVEL_MAX] = {
         "[FATAL]: ", "[ERROR]: ", "[WARN]:  ", "[INFO]:  ", "[DEBUG]: ", "[TRACE]: ",

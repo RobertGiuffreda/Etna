@@ -49,8 +49,6 @@ typedef struct physical_device_requirements {
     // The spec guarantees at least one of each
 } gpu_reqs;
 
-// TODO: Choose between i32 & u32 for queue family indices
-
 static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, device* out_device);
 
 static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surface, gpu_reqs* requirements);
@@ -58,7 +56,7 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
 static u32 hamming_weight(u32 x);
 
 b8 device_create(renderer_state* state, device* out_device) {
-    // TODO: Refactor this to be configurable
+    // TODO: Make configurable from outside renderer
     u32 required_extension_count = 1;
     const char* required_extensions = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
     gpu_reqs requirements = {
@@ -85,10 +83,6 @@ b8 device_create(renderer_state* state, device* out_device) {
     VkPhysicalDeviceMemoryProperties2 props = init_physical_device_memory_properties2();
     vkGetPhysicalDeviceMemoryProperties2(out_device->gpu, &props);
     out_device->gpu_memory_props = props.memoryProperties;
-
-
-    // TODO: Rework when multithreading to take into account the posibility
-    // that the graphics, presentation, compute, transfer queues can be the same queue 
 
     u32 queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties2(out_device->gpu, &queue_family_count, 0);
@@ -375,7 +369,8 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
         if ((g_index == -1) && (q_props->queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
             g_index = i;
 
-            // TODO: Instead of this consider the compute queue that can present
+            // TODO: Consider using compute present queue when available
+            // instead of just checking the graphics queue
             VkBool32 can_present = false;
             vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &can_present);
             if (can_present) {
@@ -428,7 +423,6 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
     }
     // If dedicated transfer queue family absent 
     if (t_index == -1) {
-        // TODO: Improve this scenario
         // NOTE: Queue with graphics bit is guaranteed to support transfer
         t_index = g_index;
     }

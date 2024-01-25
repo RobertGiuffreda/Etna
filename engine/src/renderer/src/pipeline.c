@@ -9,6 +9,8 @@
 
 #define DEFAULT_PIPELINE_STAGE_COUNT 2
 
+// TODO: Expand to support multiple color attachments
+
 pipeline_builder pipeline_builder_create(void) {
     pipeline_builder builder = {0};
     builder.stages = dynarray_create(
@@ -103,8 +105,6 @@ VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* sta
 }
 
 void pipeline_builder_set_shaders(pipeline_builder* builder, shader vertex, shader fragment) {
-    // TODO: Set the pipeline layout information in here by creating descriptor set layout from shaders
-
     // TODO: Loop & input an array & count or dynarray
     VkPipelineShaderStageCreateInfo vertex_stage = init_pipeline_shader_stage_create_info();
     vertex_stage.stage = vertex.stage;
@@ -122,7 +122,6 @@ void pipeline_builder_set_shaders(pipeline_builder* builder, shader vertex, shad
 
 void pipeline_builder_set_input_topology(pipeline_builder* builder, VkPrimitiveTopology topology) {
     builder->input_assembly.topology = topology;
-    // TODO: Look into primitive restart & see use cases
     builder->input_assembly.primitiveRestartEnable = VK_FALSE;
 }
 
@@ -173,7 +172,6 @@ void pipeline_builder_enable_blending_alphablend(pipeline_builder* builder) {
     builder->color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
 }
 
-// TODO: Expand to support multiple color attachments
 void pipeline_builder_set_color_attachment_format(pipeline_builder* builder, VkFormat format) {
     builder->color_attachment_format = format;
     builder->render_info.colorAttachmentCount = 1;

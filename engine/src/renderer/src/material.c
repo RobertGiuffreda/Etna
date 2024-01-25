@@ -24,7 +24,6 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
         return false;
     }
 
-    // TODO: Calculate and store some of this information while getting reflection data
     // Find the material set within the shaders
     set_layout* v_sets = blueprint->vertex.sets;
     u32 v_set_count = blueprint->vertex.set_count;
