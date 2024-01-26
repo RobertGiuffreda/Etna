@@ -47,11 +47,10 @@ void main() {
     vec3 specular = specular_color * spec; // assuming bright white light color
 
     vec3 color_linear = (ambient * attenuation) + 
-        (diffuse * scene_data.light_color.rbg * scene_data.light_color.w * attenuation) +
-        (specular * scene_data.light_color.rbg * scene_data.light_color.w * attenuation);
+        (diffuse * scene_data.light_color.rgb * scene_data.light_color.w * attenuation) +
+        (specular * scene_data.light_color.rgb * scene_data.light_color.w * attenuation);
 
     vec3 gamma_corrected = pow(color_linear, vec3(1.0f / screen_gamma));
 
     out_frag_color = vec4(gamma_corrected, 1.0f);
-    // out_frag_color = vec4(color_linear, 1.0f);
 }

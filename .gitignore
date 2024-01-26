@@ -1,6 +1,7 @@
 build
 plans
 tests
+demonstration/*.mp4
 
 assets/gltf/zda_test.glb
 assets/gltf/house2.glb
