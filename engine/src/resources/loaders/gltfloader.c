@@ -541,6 +541,8 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
         return false;
     }
 
+    scene_initalize(scene, state);
+
     scene->name = str_duplicate_allocate(path);
 
     scene->state = state;
@@ -808,6 +810,8 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
                     v->uv_x = uvs.x;
                     v->uv_y = uvs.y;
                 }
+            } else {
+                ETWARN("Loading mesh %s primitive %lu without vertex coordinates.", gltf_mesh->name, j);
             }
 
             // Load vertex color information
@@ -822,6 +826,8 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
                         return false;
                     }
                 }
+            } else {
+                ETWARN("Loading mesh %s primitive %lu without vertex colors.", gltf_mesh->name, j);
             }
 
             // Set material

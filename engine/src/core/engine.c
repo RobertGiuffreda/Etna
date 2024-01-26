@@ -85,8 +85,8 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     // Create window
     etwindow_config window_config = {
         .name = "Etna Window",
-        .x_start_pos = 100,
-        .y_start_pos = 100,
+        .x_start_pos = engine_details.x_start_pos,
+        .y_start_pos = engine_details.y_start_pos,
         .width = engine_details.width,
         .height = engine_details.height
     };

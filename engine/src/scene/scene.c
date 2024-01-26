@@ -7,6 +7,11 @@
 #include "core/etstring.h"
 #include "core/logger.h"
 
+// TEMP: Until events refactor
+#include "core/events.h"
+#include "core/input.h"
+// TEMP: END
+
 #include "resources/mesh_manager.h"
 #include "resources/image_manager.h"
 #include "resources/material_manager.h"
@@ -21,14 +26,23 @@
 #include "resources/loaders/gltfloader.h"
 // TEMP: END
 
+// TEMP: Until events refactor
+static b8 scene_on_key_event(u16 code, void* scne, event_data data);
+// TEMP: END
+
 /** NOTE: Implementation details
  * Currently the scene descriptor set is hardcoded as a singular
  * uniform buffer that matches struct gpu_scene_data.
  */
-
 b8 scene_initalize(scene* scene, struct renderer_state* state) {
-    // NOTE: Will be implemented when serialization is 
-    // implemented and we read a scene config file
+    // NOTE: This will be passed a config when serialization is implemented
+    v4s a_color = { .raw = {.1f, .0f, .0f, 3.f}};
+    v4s l_color = { .raw = {1.f, 1.f, 1.f, 50.f}};
+    
+    scene->data.ambient_color = a_color;
+    scene->data.light_color = l_color;
+
+    event_observer_register(EVENT_CODE_KEY_RELEASE, scene, scene_on_key_event);
     return true;
 }
 
@@ -37,6 +51,8 @@ b8 scene_initalize(scene* scene, struct renderer_state* state) {
 // The samplers will have some kind of system as well to manage them
 void scene_shutdown(scene* scene) {
     renderer_state* state = scene->state;
+
+    event_observer_deregister(EVENT_CODE_KEY_RELEASE, scene, scene_on_key_event);
 
     dynarray_destroy(scene->top_nodes);
 
@@ -78,6 +94,9 @@ void scene_shutdown(scene* scene) {
     scene->state = 0;
 }
 
+// TEMP: For testing and debugging
+static f32 light_offset = 2.0f;
+
 void scene_update(scene* scene) {
     renderer_state* state = scene->state;
 
@@ -97,21 +116,15 @@ void scene_update(scene* scene) {
     // to opengl and gltf axis
     project.raw[1][1] *= -1;
 
+    v4s l_pos = glms_vec4(scene->cam.position, 1.0f);
+    l_pos.y += light_offset;
+    scene->data.light_position = l_pos;
+
+
     m4s vp = glms_mat4_mul(project, view);
     scene->data.view = view;
     scene->data.proj = project;
     scene->data.viewproj = vp;
-
-    v4s a_color = { .raw = {.1f, .1f, .1f, .1f}};
-    v4s l_color = { .raw = {1.f, 1.f, 1.f, 1.f}};
-
-    // Manipulate this vector
-    v4s l_pos = glms_vec4(scene->cam.position, 1.0f);
-    l_pos.y += 2.0f;
-    
-    scene->data.ambient_color = a_color;
-    scene->data.light_color = l_color;
-    scene->data.light_position = l_pos;
     
     scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
 }
@@ -120,4 +133,19 @@ void scene_draw(struct scene* scene, const m4s top_matrix, struct draw_context* 
     for (u32 i = 0; i < scene->top_node_count; ++i) {
         node_draw(scene->top_nodes[i], top_matrix, ctx);
     }
+}
+
+static b8 scene_on_key_event(u16 code, void* scne, event_data data) {
+    scene* s = (scene*)scne;
+    keys key = EVENT_DATA_KEY(data);
+    switch (key)
+    {
+    case KEY_L:
+        light_offset += 2.0f;
+        break;
+    case KEY_K:
+        light_offset -= 2.0f; 
+        break;
+    }
+    return false;
 }
