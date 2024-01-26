@@ -54,5 +54,5 @@ typedef enum system_event {
     EVENT_CODE_MOUSE_MOVE = 0x07,
     EVENT_CODE_MOUSE_WHEEL = 0x08,
     EVENT_CODE_RESIZE = 0x09,
-    EVENT_CODE_MAX = 0xFF
+    EVENT_CODE_MAX = 0xFF,
 } system_event;

@@ -165,7 +165,7 @@ void engine_shutdown(void) {
     events_shutdown(state->events_state);
 
     // Shutdown log file
-    log_memory_allocations();
+    log_memory_metrics();
     
     logger_shutdown();
     

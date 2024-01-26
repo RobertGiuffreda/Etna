@@ -3,7 +3,6 @@
 #include "defines.h"
 
 typedef enum memory_tag {
-    MEMORY_TAG_UNKNOWN,
     MEMORY_TAG_ENGINE,
     MEMORY_TAG_APPLICATION,
     MEMORY_TAG_LOGGER,
@@ -17,7 +16,7 @@ typedef enum memory_tag {
     MEMORY_TAG_SHADER,
     MEMORY_TAG_RESOURCE,
     MEMORY_TAG_MATERIAL,
-    MEMORY_TAG_FILESYSTEM,
+    MEMORY_TAG_FILE,
     MEMORY_TAG_DYNARRAY,
     MEMORY_TAG_DESCRIPTOR_DYN,
     MEMORY_TAG_PIPELINE_DYN,
@@ -30,7 +29,7 @@ b8 memory_initialize(void);
 
 void memory_shutdown(void);
 
-void log_memory_allocations(void);
+void log_memory_metrics(void);
 
 void* etallocate(u64 size, memory_tag tag);
 
@@ -38,6 +37,6 @@ void etfree(void* block, u64 size, memory_tag tag);
 
 void* etzero_memory(void* block, u64 size);
 
-void* etmove_memory(void* dest, const void* source, u64 size);
-
 void* etcopy_memory(void* dest, const void* source, u64 size);
+
+void* etmove_memory(void* dest, const void* source, u64 size);

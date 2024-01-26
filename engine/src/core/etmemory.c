@@ -7,15 +7,19 @@
 // NOTE: string.h included for memset & memcpy
 #include <string.h>
 
+typedef struct memory_metric {
+    u64 allocated;
+    u64 allocations;
+} memory_metric;
+
 struct memory_metrics {
-    u64 total_allocated;
-    u64 allocated[MEMORY_TAG_MAX];
+    memory_metric total_metrics;
+    memory_metric tag_metrics[MEMORY_TAG_MAX];
 };
 
 static struct memory_metrics metrics;
 
 static const char* memory_strings[MEMORY_TAG_MAX] = {
-    "Unknown:       ",
     "Engine:        ",
     "Application:   ",
     "Logger:        ",
@@ -29,7 +33,7 @@ static const char* memory_strings[MEMORY_TAG_MAX] = {
     "Shader:        ",
     "Resource:      ",
     "Material:      ",
-    "File System:   ",
+    "File:          ",
     "Dynarray:      ",
     "Descriptor Dyn:",
     "Pipeline Dyn:  ",
@@ -43,24 +47,23 @@ b8 memory_initialize(void) {
     return true;
 }
 
-// Should be zero across the board
 void memory_shutdown(void) { }
 
 void* etallocate(u64 size, memory_tag tag) {
-    if (tag == MEMORY_TAG_UNKNOWN) {
-        ETWARN("Memory allocated with MEMORY_TAG_UNKNOWN.");
-    }
-    metrics.total_allocated += size; 
-    metrics.allocated[tag] += size;
+    metrics.total_metrics.allocated += size;
+    metrics.total_metrics.allocations++;
+    
+    metrics.tag_metrics[tag].allocated += size;
+    metrics.tag_metrics[tag].allocations++;
     return malloc(size);
 }
 
 void etfree(void* block, u64 size, memory_tag tag) {
-    if (tag == MEMORY_TAG_UNKNOWN) {
-        ETWARN("Memory freed with MEMORY_TAG_UNKNOWN.");
-    }
-    metrics.total_allocated -= size;
-    metrics.allocated[tag] -= size;
+    metrics.total_metrics.allocated -= size;
+    metrics.total_metrics.allocations--;
+
+    metrics.tag_metrics[tag].allocated -= size;
+    metrics.tag_metrics[tag].allocations--;
     free(block);
 }
 
@@ -79,7 +82,7 @@ void* etcopy_memory(void* dest, const void* source, u64 size) {
 
 // TODO: Specific allocation function for memory allocated before memory_intialize() is called
 // TODO: Linear allocator for this purpose??
-void log_memory_allocations(void) {
+void log_memory_metrics(void) {
     const u64 gib = 1024 * 1024 * 1024;
     const u64 mib = 1024 * 1024;
     const u64 kib = 1024;
@@ -108,21 +111,23 @@ void log_memory_allocations(void) {
     offset += init_len;
 
     for (u32 i = 0; i < MEMORY_TAG_MAX; ++i) {
+        memory_metric tag_metric = metrics.tag_metrics[i];
+
         char xiB[4] = "XiB";
         f32 amount = 1.0f;
-        if (metrics.allocated[i] >= gib) {
+        if (tag_metric.allocated >= gib) {
             xiB[0] = 'G';
-            amount = metrics.allocated[i] / (f32)gib;
-        } else if (metrics.allocated[i] >= mib) {
+            amount = tag_metric.allocated / (f32)gib;
+        } else if (tag_metric.allocated >= mib) {
             xiB[0] = 'M';
-            amount = metrics.allocated[i] / (f32)mib;
-        } else if (metrics.allocated[i] >= kib) {
+            amount = tag_metric.allocated / (f32)mib;
+        } else if (tag_metric.allocated >= kib) {
             xiB[0] = 'K';
-            amount = metrics.allocated[i] / (f32)kib;
+            amount = tag_metric.allocated / (f32)kib;
         } else {
             xiB[0] = 'B';
             xiB[1] = '\0';
-            amount = (f32)metrics.allocated[i];
+            amount = (f32)tag_metric.allocated;
         }
         i32 len = snprintf(output + offset, output_size - offset, "%s%*.2f%s\n", memory_strings[i], mem_num_len, amount, xiB);
         offset += len;

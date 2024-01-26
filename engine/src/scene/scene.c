@@ -84,6 +84,9 @@ void scene_update(scene* scene) {
     camera_update(&scene->cam);
 
     m4s view = camera_get_view_matrix(&scene->cam);
+
+    // TODO: Camera should store near and far values & perspective matrix
+    // TODO: Scene should register its camera with the event system, 
     m4s project = glms_perspective(
         /* fovy */ glm_rad(70.f),
         ((f32)state->window_extent.width/(f32)state->window_extent.height), 

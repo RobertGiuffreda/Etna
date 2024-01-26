@@ -179,7 +179,8 @@
         "sstream": "c",
         "mat4.h": "c",
         "gltf_mr.h": "c",
-        "swapchain.h": "c"
+        "swapchain.h": "c",
+        "stdalign.h": "c"
     },
     "C_Cpp.dimInactiveRegions": false
 }

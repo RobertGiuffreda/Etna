@@ -46,7 +46,7 @@ b8 file_open(const char* path, etfile_flags flags, etfile** out_file) {
         return false;
     }
 
-    *out_file = etallocate(sizeof(struct etfile), MEMORY_TAG_FILESYSTEM);
+    *out_file = etallocate(sizeof(struct etfile), MEMORY_TAG_FILE);
     (*out_file)->handle = file;
     return true;
 }
@@ -54,7 +54,7 @@ b8 file_open(const char* path, etfile_flags flags, etfile** out_file) {
 void file_close(etfile* file) {
     if (file && file->handle) {
         fclose(file->handle);
-        etfree(file, sizeof(struct etfile), MEMORY_TAG_FILESYSTEM);
+        etfree(file, sizeof(struct etfile), MEMORY_TAG_FILE);
     }
 }
 
