@@ -155,6 +155,7 @@ typedef struct mesh {
     u32 id;
     char* name;
 
+    // TODO: Stop using dynamic array here
     // Dynarray
     surface* surfaces;
     mesh_buffers buffers;
@@ -211,13 +212,13 @@ typedef struct device {
     VkPhysicalDeviceLimits gpu_limits;
     VkPhysicalDeviceMemoryProperties gpu_memory_props;
 
-    // TODO: _queue_index --> _qfi
-    // Not just a queue index
-    i32 graphics_queue_index;
-    i32 compute_queue_index;
-    i32 transfer_queue_index;
-    i32 present_queue_index;
+    // NOTE: _qfi - queue family index
+    i32 graphics_qfi;
+    i32 compute_qfi;
+    i32 transfer_qfi;
+    i32 present_qfi;
 
+    // Single queue per family for now
     VkQueue graphics_queue;
     VkQueue compute_queue;
     VkQueue transfer_queue;

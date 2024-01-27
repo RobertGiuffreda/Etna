@@ -102,14 +102,14 @@ b8 device_create(renderer_state* state, device* out_device) {
 
     // TODO: Perform these OR opertations only if the capability is asked for.
     // Only really relevant when the renderer will act different based on gpu capability
-    if ((qfi_bitmasks[out_device->graphics_queue_index] |= QFI_GRAPHICS) == QFI_GRAPHICS)
-        indices[index_count++] = (i32)out_device->graphics_queue_index;
-    if ((qfi_bitmasks[out_device->transfer_queue_index] |= QFI_TRANSFER) == QFI_TRANSFER)
-        indices[index_count++] = (i32)out_device->transfer_queue_index;
-    if ((qfi_bitmasks[out_device->compute_queue_index] |= QFI_COMPUTE) == QFI_COMPUTE)
-        indices[index_count++] = (i32)out_device->compute_queue_index;
-    if ((qfi_bitmasks[out_device->present_queue_index] |= QFI_PRESENTATION) == QFI_PRESENTATION)
-        indices[index_count++] = (i32)out_device->present_queue_index;
+    if ((qfi_bitmasks[out_device->graphics_qfi] |= QFI_GRAPHICS) == QFI_GRAPHICS)
+        indices[index_count++] = (i32)out_device->graphics_qfi;
+    if ((qfi_bitmasks[out_device->transfer_qfi] |= QFI_TRANSFER) == QFI_TRANSFER)
+        indices[index_count++] = (i32)out_device->transfer_qfi;
+    if ((qfi_bitmasks[out_device->compute_qfi] |= QFI_COMPUTE) == QFI_COMPUTE)
+        indices[index_count++] = (i32)out_device->compute_qfi;
+    if ((qfi_bitmasks[out_device->present_qfi] |= QFI_PRESENTATION) == QFI_PRESENTATION)
+        indices[index_count++] = (i32)out_device->present_qfi;
 
     // For retrieving the amount of queue families
     u32* queue_counts = (u32*)etallocate(sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
@@ -183,30 +183,30 @@ b8 device_create(renderer_state* state, device* out_device) {
     // Graphics
     vkGetDeviceQueue(
         out_device->handle,
-        out_device->graphics_queue_index,
-        curr_queue_indices[out_device->graphics_queue_index]++,
+        out_device->graphics_qfi,
+        curr_queue_indices[out_device->graphics_qfi]++,
         &out_device->graphics_queue);
     
     // Presentation
-    b8 p_max_queues = (curr_queue_indices[out_device->present_queue_index] == queue_counts[out_device->present_queue_index]);
+    b8 p_max_queues = (curr_queue_indices[out_device->present_qfi] == queue_counts[out_device->present_qfi]);
     vkGetDeviceQueue(
         out_device->handle,
-        out_device->present_queue_index,
-        (p_max_queues) ? curr_queue_indices[out_device->present_queue_index]++ : 0,
+        out_device->present_qfi,
+        (p_max_queues) ? curr_queue_indices[out_device->present_qfi]++ : 0,
         &out_device->present_queue);
 
-    b8 c_max_queues = (curr_queue_indices[out_device->compute_queue_index] == queue_counts[out_device->compute_queue_index]);
+    b8 c_max_queues = (curr_queue_indices[out_device->compute_qfi] == queue_counts[out_device->compute_qfi]);
     vkGetDeviceQueue(
         out_device->handle,
-        out_device->present_queue_index,
-        (c_max_queues) ? curr_queue_indices[out_device->compute_queue_index]++ : 0,
+        out_device->present_qfi,
+        (c_max_queues) ? curr_queue_indices[out_device->compute_qfi]++ : 0,
         &out_device->compute_queue);
 
-    b8 t_max_queues = (curr_queue_indices[out_device->transfer_queue_index] == queue_counts[out_device->transfer_queue_index]);
+    b8 t_max_queues = (curr_queue_indices[out_device->transfer_qfi] == queue_counts[out_device->transfer_qfi]);
     vkGetDeviceQueue(
         out_device->handle,
-        out_device->transfer_queue_index,
-        (t_max_queues) ? curr_queue_indices[out_device->transfer_queue_index]++ : 0,
+        out_device->transfer_qfi,
+        (t_max_queues) ? curr_queue_indices[out_device->transfer_qfi]++ : 0,
         &out_device->transfer_queue);
 
     ETINFO("Queues Obtained.");
@@ -227,10 +227,10 @@ void device_destroy(renderer_state* state, device* device) {
     device->compute_queue = 0;
     device->transfer_queue = 0;
 
-    device->graphics_queue_index = -1;
-    device->present_queue_index = -1;
-    device->compute_queue_index = -1;
-    device->transfer_queue_index = -1;
+    device->graphics_qfi = -1;
+    device->present_qfi = -1;
+    device->compute_qfi = -1;
+    device->transfer_qfi = -1;
 
     vkDestroyDevice(device->handle, state->allocator);
 }
@@ -265,10 +265,10 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
         // Requirements met so all good
         out_device->gpu = physical_devices[i];
         out_device->gpu_limits = properties->limits;
-        out_device->graphics_queue_index = requirements->g_index;
-        out_device->compute_queue_index = requirements->c_index;
-        out_device->transfer_queue_index = requirements->t_index;
-        out_device->present_queue_index = requirements->p_index;
+        out_device->graphics_qfi = requirements->g_index;
+        out_device->compute_qfi = requirements->c_index;
+        out_device->transfer_qfi = requirements->t_index;
+        out_device->present_qfi = requirements->p_index;
 
         ETINFO("Device: %s", properties->deviceName);
         ETINFO(

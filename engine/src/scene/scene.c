@@ -36,7 +36,7 @@ static b8 scene_on_key_event(u16 code, void* scne, event_data data);
  */
 b8 scene_initalize(scene* scene, struct renderer_state* state) {
     // NOTE: This will be passed a config when serialization is implemented
-    v4s a_color = { .raw = {.1f, .0f, .0f, 3.f}};
+    v4s a_color = { .raw = {.1f, .1f, .1f, 3.f}};
     v4s l_color = { .raw = {1.f, 1.f, 1.f, 50.f}};
     
     scene->data.ambient_color = a_color;

@@ -122,9 +122,9 @@ b8 initialize_swapchain(renderer_state* state) {
     };
 
     u32 queue_family_indices[] = {
-        (u32)state->device.graphics_queue_index,
-        (u32)state->device.present_queue_index};
-    if (state->device.graphics_queue_index != state->device.present_queue_index) {
+        (u32)state->device.graphics_qfi,
+        (u32)state->device.present_qfi};
+    if (state->device.graphics_qfi != state->device.present_qfi) {
         swapchain_cinfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         swapchain_cinfo.queueFamilyIndexCount = 2;
         swapchain_cinfo.pQueueFamilyIndices = queue_family_indices;
@@ -334,9 +334,9 @@ b8 recreate_swapchain(renderer_state* state) {
     };
 
     u32 queue_family_indices[] = {
-        (u32)state->device.graphics_queue_index,
-        (u32)state->device.present_queue_index};
-    if (state->device.graphics_queue_index != state->device.present_queue_index) {
+        (u32)state->device.graphics_qfi,
+        (u32)state->device.present_qfi};
+    if (state->device.graphics_qfi != state->device.present_qfi) {
         swapchain_cinfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         swapchain_cinfo.queueFamilyIndexCount = 2;
         swapchain_cinfo.pQueueFamilyIndices = queue_family_indices;

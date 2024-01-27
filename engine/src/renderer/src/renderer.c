@@ -348,17 +348,19 @@ void renderer_update_scene(renderer_state* state) {
 b8 renderer_draw_frame(renderer_state* state) {
     // Wait for the current frame to end rendering by waiting on its render fence
     // Reset the render fence for reuse
-    VK_CHECK(vkWaitForFences(
+
+    VkResult result = vkWaitForFences(
         state->device.handle,
-        1,
+        /* Fence count: */ 1,
         &state->render_fences[state->frame_index],
         VK_TRUE,
-        1000000000));
+        1000000000);
+    VK_CHECK(result);
     
     descriptor_set_allocator_growable_clear_pools(&state->frame_allocators[state->frame_index], state);
 
     u32 swapchain_index;
-    VkResult result = vkAcquireNextImageKHR(
+    result = vkAcquireNextImageKHR(
         state->device.handle,
         state->swapchain,
         0xFFFFFFFFFFFFFFFF,
@@ -464,12 +466,12 @@ b8 renderer_draw_frame(renderer_state* state) {
         1, &signal_submit);
     
     // Submit commands
-    VkResult queue_result = vkQueueSubmit2(
+    result = vkQueueSubmit2(
         state->device.graphics_queue, 
         /* submitCount */ 1,
         &submit_info,
         state->render_fences[state->frame_index]);
-    VK_CHECK(queue_result);
+    VK_CHECK(result);
 
     // Present the image
     VkPresentInfoKHR present_info = {
@@ -503,7 +505,7 @@ static void create_frame_command_structures(renderer_state* state) {
     for (u32 i= 0; i < state->image_count; ++i) {
         VkCommandPoolCreateInfo gpool_info = init_command_pool_create_info(
             VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            state->device.graphics_queue_index);
+            state->device.graphics_qfi);
         VK_CHECK(vkCreateCommandPool(state->device.handle,
             &gpool_info,
             state->allocator,
@@ -520,7 +522,7 @@ static void create_frame_command_structures(renderer_state* state) {
     // Immediate command pool & buffer
     VkCommandPoolCreateInfo imm_pool_info = init_command_pool_create_info(
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        state->device.graphics_queue_index);
+        state->device.graphics_qfi);
     VK_CHECK(vkCreateCommandPool(
         state->device.handle,
         &imm_pool_info,
@@ -764,41 +766,6 @@ static void shutdown_default_material(renderer_state* state) {
 }
 
 static b8 initialize_default_data(renderer_state* state) {
-    vertex* vertices = etallocate(sizeof(vertex) * 4, MEMORY_TAG_RENDERER);
-
-    vertices[0].position = (v3s){.raw = { 0.5f, -0.5f, 0.0f}};
-    vertices[1].position = (v3s){.raw = { 0.5f,  0.5f, 0.0f}};
-    vertices[2].position = (v3s){.raw = {-0.5f, -0.5f, 0.0f}};
-    vertices[3].position = (v3s){.raw = {-0.5f,  0.5f, 0.0f}};
-
-    vertices[0].color = (v4s){.raw = {0.0f, 0.0f, 0.0f, 1.0f}};
-    vertices[1].color = (v4s){.raw = {0.9f, 0.9f, 0.9f, 1.0f}};
-    vertices[2].color = (v4s){.raw = {1.0f, 0.0f, 0.0f, 1.0f}};
-    vertices[3].color = (v4s){.raw = {0.0f, 1.0f, 0.0f, 1.0f}};
-
-    vertices[0].uv_x = 1;
-    vertices[0].uv_y = 0;
-    vertices[1].uv_x = 0;
-    vertices[1].uv_y = 0;
-    vertices[2].uv_x = 1;
-    vertices[2].uv_y = 1;
-    vertices[3].uv_x = 0;
-    vertices[3].uv_y = 1;
-
-    u32* indices = etallocate(sizeof(u32) * 6, MEMORY_TAG_RENDERER);
-    indices[0] = 0;
-    indices[1] = 1;
-    indices[2] = 2;
-    
-    indices[3] = 2;
-    indices[4] = 1;
-    indices[5] = 3;
-
-    state->rectangle = upload_mesh(state, 6, indices, 4, vertices);
-    
-    etfree(vertices, sizeof(vertex) * 4, MEMORY_TAG_RENDERER);
-    etfree(indices, sizeof(u32) * 6, MEMORY_TAG_RENDERER);
-
     // NOTE: For some reason the u32 is being interpreted as 
     // 0xFFFFFFFF -- aabbggrr. Maybe gpu or computer specific
     u32 white = 0xFFFFFFFF;
@@ -922,10 +889,6 @@ static void shutdown_default_data(renderer_state* state) {
     image_destroy(state, &state->black_image);
     image_destroy(state, &state->grey_image);
     image_destroy(state, &state->white_image);
-
-    buffer_destroy(state, &state->rectangle.vertex_buffer);
-    buffer_destroy(state, &state->rectangle.index_buffer);
-    state->rectangle.vertex_buffer_address = 0;
 }
 
 static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
@@ -1066,7 +1029,7 @@ static void immediate_end(struct renderer_state* state) {
 
     VK_CHECK(vkQueueSubmit2(state->device.graphics_queue, 1, &submit, state->imm_fence));
 
-    VK_CHECK(vkWaitForFences(state->device.handle, 1, &state->imm_fence, VK_TRUE, 9999999999));
+    VK_CHECK(vkWaitForFences(state->device.handle, 1, &state->imm_fence, VK_TRUE, 0xFFFFFFFFFFFFFFFF));
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

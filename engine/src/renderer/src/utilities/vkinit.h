@@ -6,7 +6,7 @@
 
 VkCommandPoolCreateInfo init_command_pool_create_info(
     VkCommandPoolCreateFlags flags,
-    u32 queue_family_index);
+    i32 queue_family_index);
 
 VkCommandBufferAllocateInfo init_command_buffer_allocate_info(
     VkCommandPool command_pool,

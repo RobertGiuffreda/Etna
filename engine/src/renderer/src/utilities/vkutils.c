@@ -23,7 +23,7 @@ i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
 
 // TODO: Remove the VK_MEMORY_PROPERTY_HOST_COHERENT_BIT bit from the staging buffer and flush manually
 // TODO: Use queue from dedicated transfer queue family(state->device.transfer_queue) to do transfers
-mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
+mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
     const u64 vertex_buffer_size = vertex_count * sizeof(vertex);
     const u64 index_buffer_size = index_count * sizeof(u32);
 
@@ -73,7 +73,6 @@ mesh_buffers upload_mesh(renderer_state* state, u32 index_count, u32* indices, u
     vkUnmapMemory(state->device.handle, staging.memory);
 
     IMMEDIATE_SUBMIT(state, cmd, {
-        VkCommandBuffer cmd = state->imm_buffer;
         VkBufferCopy vertex_copy = {
             .dstOffset = 0,
             .srcOffset = 0,

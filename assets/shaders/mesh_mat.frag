@@ -13,7 +13,7 @@ layout (location = 3) in vec2 in_uv;
 
 layout(location = 0) out vec4 out_frag_color;
 
-const vec3 specular_color = vec3(0.3f);
+const vec3 specular_color = vec3(0.3f, 0.3f, 0.3f);
 const float shininess = 32;
 const float screen_gamma = 2.2;
 

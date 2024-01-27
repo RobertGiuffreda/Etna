@@ -150,9 +150,6 @@ typedef struct renderer_state {
     draw_context main_draw_context;
 
     scene _scene;
-
-    // TEMP: Here in case of testing
-    mesh_buffers rectangle;
 } renderer_state;
 
 /** Takes a code block in the ... argument and begins recording of a command buffer before the 

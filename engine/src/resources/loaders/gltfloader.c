@@ -334,7 +334,6 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
             //     ETWARN("Loading mesh[%lu]: %s without texture coordinates.", i, mesh->name);
             // }
 
-
             // Load vertex color information
             cgltf_accessor* color = get_accessor_from_attributes(
                 gltf_primitive->attributes, gltf_primitive->attributes_count, "COLOR_0");
@@ -357,7 +356,7 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
                 new_surface->material = &gltf->materials[0];
             }
         }
-        new_mesh->buffers = upload_mesh(state,
+        new_mesh->buffers = upload_mesh_immediate(state,
             dynarray_length(indices), indices,
             dynarray_length(vertices), vertices
         );
@@ -810,9 +809,10 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
                     v->uv_x = uvs.x;
                     v->uv_y = uvs.y;
                 }
-            } else {
-                ETWARN("Loading mesh %s primitive %lu without vertex coordinates.", gltf_mesh->name, j);
             }
+            // else {
+            //     ETWARN("Loading mesh %s primitive %lu without vertex coordinates.", gltf_mesh->name, j);
+            // }
 
             // Load vertex color information
             cgltf_accessor* color = get_accessor_from_attributes(
@@ -826,9 +826,10 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
                         return false;
                     }
                 }
-            } else {
-                ETWARN("Loading mesh %s primitive %lu without vertex colors.", gltf_mesh->name, j);
             }
+            // else {
+            //     ETWARN("Loading mesh %s primitive %lu without vertex colors.", gltf_mesh->name, j);
+            // }
 
             // Set material
             if (gltf_primitive->material) {
@@ -847,13 +848,16 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
             .vertex_count = dynarray_length(vertices),
             .vertices = vertices
         };
-        mesh_submit(scene->mesh_bank, &config);
+        // mesh_manager_submit_immediate(scene->mesh_bank, &config);
+        mesh_manager_submit(scene->mesh_bank, &config);
         etfree(surfaces, sizeof(surface) * gltf_mesh->primitives_count, MEMORY_TAG_SCENE);
     }
     dynarray_destroy(vertices);
     dynarray_destroy(indices);
 
-        // Count up needed mesh_nodes & needed nodes. Then allocate backing memory for them
+    // mesh_manager_uploads_wait(scene->mesh_bank);
+
+    // Count up needed mesh_nodes & needed nodes. Then allocate backing memory for them
     u32 node_count = 0;
     u32 mesh_node_count = 0;
     for (u32 i = 0; i < data->nodes_count; ++i) {
@@ -886,7 +890,7 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
         if (data->nodes[i].mesh) {
             mesh_node* m_node = &scene->mesh_nodes[m_node_i];
             u32 mesh_index = CGLTF_ARRAY_INDEX(cgltf_mesh, data->meshes, data->nodes[i].mesh);
-            m_node->mesh = mesh_get(scene->mesh_bank, mesh_index);
+            m_node->mesh = mesh_manager_get(scene->mesh_bank, mesh_index);
             node = node_from_mesh_node(m_node);
             m_node_i++;
         } else {
