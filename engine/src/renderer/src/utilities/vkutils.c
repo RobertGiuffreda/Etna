@@ -1,4 +1,7 @@
 #include "vkutils.h"
+
+#include "renderer/src/utilities/vkinit.h"
+
 #include "renderer/src/renderer.h"
 #include "renderer/src/buffer.h"
 
@@ -91,4 +94,25 @@ mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* 
     buffer_destroy(state, &staging);
 
     return new_surface;
+}
+
+void _cmd_allocate_begin(renderer_state* state, VkCommandPool pool, VkCommandBuffer* cmd) {
+    VkCommandBufferAllocateInfo cmd_alloc = init_command_buffer_allocate_info(pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+    VK_CHECK(vkAllocateCommandBuffers(state->device.handle, &cmd_alloc, cmd));
+
+    VkCommandBufferBeginInfo cmd_begin = init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VK_CHECK(vkBeginCommandBuffer(*cmd, &cmd_begin));
+}
+
+void _fence_create(renderer_state* state, VkFence* fence) {
+    VkFenceCreateInfo fence_info = init_fence_create_info(/* Flags: */ 0);
+    VK_CHECK(vkCreateFence(state->device.handle, &fence_info, state->allocator, fence));
+}
+
+void _cmd_end_submit(renderer_state* state, VkCommandBuffer cmd, VkFence fence) {
+    VK_CHECK(vkEndCommandBuffer(cmd));
+    VkCommandBufferSubmitInfo cmd_submit = init_command_buffer_submit_info(cmd);
+    VkSubmitInfo2 submit_info = init_submit_info2(0, NULL, 1, &cmd_submit, 0, NULL);
+
+    VK_CHECK(vkQueueSubmit2(state->device.graphics_queue, 1, &submit_info, fence));
 }

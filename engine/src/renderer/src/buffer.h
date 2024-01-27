@@ -2,8 +2,6 @@
 
 #include "renderer/src/vk_types.h"
 
-#include "renderer/src/utilities/vkinit.h"
-
 void buffer_create(
     renderer_state* state,
     u64 size,

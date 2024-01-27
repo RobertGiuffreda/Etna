@@ -3,6 +3,7 @@
 #include "core/logger.h"
 
 #include "renderer/src/renderer.h"
+#include "renderer/src/utilities/vkinit.h"
 
 void buffer_create(
     renderer_state* state,

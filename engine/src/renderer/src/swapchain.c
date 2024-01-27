@@ -288,7 +288,7 @@ b8 recreate_swapchain(renderer_state* state) {
         (swapchain_image_count > surface_capabilities.maxImageCount))
     {
         // Cannot go over max amount of images for swapchain
-        swapchain_image_count = surface_capabilities.minImageCount;
+        swapchain_image_count = surface_capabilities.maxImageCount;
     }
 
     VkSurfaceTransformFlagBitsKHR pre_transform;

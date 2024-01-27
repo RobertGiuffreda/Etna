@@ -14,8 +14,10 @@
  * Once I get a better handle of what will be required of the managers,
  * they will be modified.
  * 
- * 
- * NOTE: Managers currently untested
+ * Mesh manager currently allocates as 3 memory allocations(staging buffer, index buffer, vertex buffer)
+ * for each mesh before the wait operation is called and the staging buffers are destroyed.
+ * A staging buffer system using the dedicated transfer queue and suballocation of memory should be
+ * implemented to minimize memory allocations as the spec only allows 4096
  */
 
 typedef struct mesh mesh;

@@ -11,6 +11,7 @@
 #include "renderer/src/renderer.h"
 #include "renderer/src/buffer.h"
 
+#include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/utilities/vkutils.h"
 // TEMP: END
 
@@ -214,14 +215,12 @@ b8 mesh_manager_submit(mesh_manager* manager, mesh_config* config) {
         &new_mesh->buffers.index_buffer);
 
     // Get index into upload staging buffers and fences dynamic arrays
-    // u32 upload_index = manager->upload_count/*++*/;
-    // dynarray_resize((void**)&manager->staging_buffers, manager->upload_count);
-    // dynarray_resize((void**)&manager->upload_fences, manager->upload_count);
+    u32 upload_index = manager->upload_count++;
+    dynarray_resize((void**)&manager->staging_buffers, manager->upload_count);
+    dynarray_resize((void**)&manager->upload_fences, manager->upload_count);
 
-    // buffer* staging = &manager->staging_buffers[upload_index];
+    buffer* staging = &manager->staging_buffers[upload_index];
     
-    buffer temp;
-    buffer* staging = &temp;
     buffer_create(manager->state, staging_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         staging);
@@ -238,67 +237,18 @@ b8 mesh_manager_submit(mesh_manager* manager, mesh_config* config) {
     etcopy_memory((u8*)staging_memory + vertex_buffer_size, config->indices, index_buffer_size);
     vkUnmapMemory(manager->state->device.handle, staging->memory);
 
-    // VkFenceCreateInfo upload_fence_info = init_fence_create_info(/* Flags: */ 0);
-    // VK_CHECK(vkCreateFence(
-    //     manager->state->device.handle,
-    //     &upload_fence_info,
-    //     manager->state->allocator,
-    //     &manager->upload_fences[upload_index]));
-    
-    // VkCommandBufferAllocateInfo upload_cmd_alloc = init_command_buffer_allocate_info(
-    //     manager->upload_pool,
-    //     VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-    //     /* Count: */ 1);
-    // VkCommandBuffer upload_cmd;
-    // VK_CHECK(vkAllocateCommandBuffers(manager->state->device.handle, &upload_cmd_alloc, &upload_cmd));
-
-    // VkCommandBufferBeginInfo upload_begin = init_command_buffer_begin_info(/* Flags: */ 0);
-    // VK_CHECK(vkBeginCommandBuffer(upload_cmd, &upload_begin));
-
-    VK_CHECK(vkResetFences(manager->state->device.handle, 1, &manager->test_fence));
-    VK_CHECK(vkResetCommandBuffer(manager->test_buffer, 0));
-
-    VkCommandBufferBeginInfo cmd_begin =
-        init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    
-    VK_CHECK(vkBeginCommandBuffer(manager->test_buffer, &cmd_begin));
-
-    VkCommandBuffer cmd = manager->test_buffer;
-
-    VkBufferCopy vertex_copy = {
-        .dstOffset = 0,
-        .srcOffset = 0,
-        .size = vertex_buffer_size};
-    VkBufferCopy index_copy = {
-        .dstOffset = 0,
-        .srcOffset = vertex_buffer_size,
-        .size = index_buffer_size};
-    vkCmdCopyBuffer(cmd, staging->handle, new_mesh->buffers.vertex_buffer.handle, 1, &vertex_copy);
-    vkCmdCopyBuffer(cmd, staging->handle, new_mesh->buffers.index_buffer.handle, 1, &index_copy);
-
-    VK_CHECK(vkEndCommandBuffer(manager->test_buffer));
-
-    VkCommandBufferSubmitInfo cmd_info = init_command_buffer_submit_info(manager->test_buffer);
-    VkSubmitInfo2 submit = init_submit_info2(0, 0, 1, &cmd_info, 0, 0);
-
-    VK_CHECK(vkQueueSubmit2(manager->state->device.graphics_queue, 1, &submit, manager->test_fence));
-
-    VK_CHECK(vkWaitForFences(manager->state->device.handle, 1, &manager->test_fence, VK_TRUE, 0xFFFFFFFFFFFFFFFF));
-
-    buffer_destroy(manager->state, staging);
-
-    // VK_CHECK(vkEndCommandBuffer(upload_cmd));
-    // VkCommandBufferSubmitInfo upload_submit = init_command_buffer_submit_info(upload_cmd);
-    // VkSubmitInfo2 submit_upload_info = init_submit_info2(0, 0, 1, &upload_submit, 0, 0);
-    // VK_CHECK(vkQueueSubmit2(
-    //     manager->state->device.graphics_queue,
-    //     /* submit count: */ 1,
-    //     &submit_upload_info,
-    //     manager->upload_fences[upload_index]
-    // ));
-
-    // VK_CHECK(vkWaitForFences(manager->state->device.handle, 1, &manager->upload_fences[upload_index], VK_TRUE, 0xFFFFFFFFFFFFFFFF));
-    // vkDestroyFence(manager->state->device.handle, manager->upload_fences[upload_index], manager->state->allocator);
+    IMM_SUBMIT_FENCE(manager->state, manager->upload_fences[upload_index], manager->upload_pool, cmd, {
+        VkBufferCopy vertex_copy = {
+            .dstOffset = 0,
+            .srcOffset = 0,
+            .size = vertex_buffer_size};
+        VkBufferCopy index_copy = {
+            .dstOffset = 0,
+            .srcOffset = vertex_buffer_size,
+            .size = index_buffer_size};
+        vkCmdCopyBuffer(cmd, staging->handle, new_mesh->buffers.vertex_buffer.handle, 1, &vertex_copy);
+        vkCmdCopyBuffer(cmd, staging->handle, new_mesh->buffers.index_buffer.handle, 1, &index_copy);
+    });
 
     manager->mesh_count++;
     return true;

@@ -855,7 +855,7 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
     dynarray_destroy(vertices);
     dynarray_destroy(indices);
 
-    // mesh_manager_uploads_wait(scene->mesh_bank);
+    mesh_manager_uploads_wait(scene->mesh_bank);
 
     // Count up needed mesh_nodes & needed nodes. Then allocate backing memory for them
     u32 node_count = 0;
