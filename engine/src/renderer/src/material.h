@@ -31,4 +31,4 @@ material_instance material_blueprint_create_instance(
     material_blueprint* blueprint,
     material_pass pass,
     const struct material_resources* resources,
-    ds_allocator_growable* allocator);
+    ds_allocator* allocator);

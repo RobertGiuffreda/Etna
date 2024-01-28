@@ -174,7 +174,7 @@ material_instance material_blueprint_create_instance(
     material_blueprint* blueprint,
     material_pass pass,
     const struct material_resources* resources,
-    ds_allocator_growable* allocator)
+    ds_allocator* allocator)
 {
     material_instance instance;
     instance.pass_type = pass;
@@ -184,7 +184,7 @@ material_instance material_blueprint_create_instance(
         instance.pipeline = &blueprint->opaque_pipeline;
     }
 
-    instance.material_set = descriptor_set_allocator_growable_allocate(
+    instance.material_set = descriptor_set_allocator_allocate(
         allocator, blueprint->ds_layout, state);
 
     descriptor_set_writer_clear(&blueprint->writer);

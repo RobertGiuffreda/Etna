@@ -4,6 +4,7 @@
 #include "core/logger.h"
 
 #include "renderer/src/utilities/vkinit.h"
+#include "renderer/src/utilities/vkutils.h"
 #include "renderer/src/renderer.h"
 #include "renderer/src/buffer.h"
 
@@ -226,7 +227,6 @@ void image_barrier(
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .image = image,
         .subresourceRange = subresource_range};
-
     VkDependencyInfo dependency = {
         .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
         .pNext = 0,

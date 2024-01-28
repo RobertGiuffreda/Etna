@@ -37,7 +37,7 @@ typedef struct loaded_gltf {
     node** top_nodes;
     u32 top_node_count;
 
-    ds_allocator_growable descriptor_allocator;
+    ds_allocator descriptor_allocator;
 
     buffer material_data_buffer;
 
@@ -51,7 +51,7 @@ typedef struct frame_data {
     VkFence render_fence;
     VkCommandPool command_pool;
     VkCommandBuffer command_buffer;
-    ds_allocator_growable ds_allocator;
+    ds_allocator ds_allocator;
     buffer scene_data_buffer;
 } frame_data;
 
@@ -90,36 +90,27 @@ typedef struct renderer_state {
 
     u32 frame_index;
     
-    // NOTE: Per frame structures/data. Add to separate struct??
+    // NOTE: Per frame structures/data
     VkSemaphore* swapchain_semaphores;
     VkSemaphore* render_semaphores;
 
     VkFence* render_fences;
     
-    // Going to use the graphics queue for everything for now until I get a
-    // better handle on things. 
+    // Graphics queue for everything until I get a handle vulkan. 
     VkCommandPool* graphics_pools;
     VkCommandBuffer* main_graphics_command_buffers;
 
     // Descriptor Set allocator for allocating per frame descriptors
-    ds_allocator_growable* frame_allocators;
+    ds_allocator* frame_allocators;
 
-    // Per frame scene buffers to avoid synchronization
-    buffer* scene_data_buffers;
+    buffer* scene_data;
     // NOTE: Per frame END
 
-    // NOTE: Immediate command pool & buffer
     VkCommandPool imm_pool;
     VkCommandBuffer imm_buffer;
     VkFence imm_fence;
 
-    // TODO: Change these from function pointers
-    void (*immediate_begin)(struct renderer_state* state);
-    void (*immediate_end)(struct renderer_state* state);
-    // NOTE: END
-
-    // Global descriptor set allocator
-    ds_allocator_growable global_ds_allocator;
+    ds_allocator global_ds_allocator;
 
     // NOTE: Compute effect members
     shader gradient_shader;
@@ -129,11 +120,11 @@ typedef struct renderer_state {
     VkDescriptorSet draw_image_descriptor_set;
     // NOTE: END
 
-    // NOTE: Default images, samplers, materials
+    // NOTE: Defaults
     image white_image;
     image black_image;
     image grey_image;
-    image error_checkerboard_image;
+    image error_image;
 
     VkSampler default_sampler_linear;
     VkSampler default_sampler_nearest;
@@ -142,31 +133,12 @@ typedef struct renderer_state {
 
     material_instance default_material_instance;
     buffer default_material_constants;
-    // NOTE: END
 
-    // Scene data.
     VkDescriptorSetLayout scene_data_descriptor_set_layout;
+    scene _scene;
     
     draw_context main_draw_context;
-
-    scene _scene;
 } renderer_state;
-
-/** Takes a code block in the ... argument and begins recording of a command buffer before the 
- * code block is run and submits it afterwards  
- * @param state The renderer_state pointer
- * @param cmd The variable name of the VkCommandBuffer to be used in the code block
- * @param ... The code block containing the commands to record and submit
- */
-#define IMMEDIATE_SUBMIT(state, cmd, ...)       \
-do {                                            \
-    state->immediate_begin(state);              \
-    VkCommandBuffer cmd = state->imm_buffer;    \
-    do {                                        \
-        __VA_ARGS__;                            \
-    } while (0);                                \
-    state->immediate_end(state);                \
-} while(0);                                     \
 
 // TODO: Setup debug names for vulkan objects
 #ifdef _DEBUG

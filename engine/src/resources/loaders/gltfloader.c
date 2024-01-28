@@ -89,14 +89,12 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
         {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
         {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 1}
     };
-    pool_size_ratio* dynarray_ratios = 
-        dynarray_create_data(3, sizeof(pool_size_ratio), 3, ratios);
-    descriptor_set_allocator_growable_initialize(
+    descriptor_set_allocator_initialize(
         &gltf->descriptor_allocator,
         data->materials_count,
-        dynarray_ratios,
+        /* pool size count: */3,
+        ratios,
         state);
-    dynarray_destroy(dynarray_ratios);
 
     // Create samplers
     gltf->samplers = etallocate(sizeof(VkSampler) * data->samplers_count, MEMORY_TAG_RENDERABLE);
@@ -121,7 +119,7 @@ b8 load_gltf(struct loaded_gltf* gltf, const char* path, struct renderer_state* 
 
     gltf->images = etallocate(sizeof(image) * data->images_count, MEMORY_TAG_RENDERABLE);
     for (u32 i = 0; i < data->images_count; ++i) {
-        gltf->images[i] = state->error_checkerboard_image;
+        gltf->images[i] = state->error_image;
         b8 image_result = load_image(
             &data->images[i],
             path,
@@ -485,7 +483,7 @@ void unload_gltf(struct loaded_gltf* gltf) {
         vkDestroySampler(state->device.handle, gltf->samplers[i], state->allocator);
     etfree(gltf->samplers, sizeof(VkSampler) * gltf->sampler_count, MEMORY_TAG_RENDERABLE);
 
-    descriptor_set_allocator_growable_shutdown(&gltf->descriptor_allocator, state);
+    descriptor_set_allocator_shutdown(&gltf->descriptor_allocator, state);
 
     str_duplicate_free(gltf->name);
 }
@@ -518,7 +516,6 @@ b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
     ETINFO("Json from %s successfully dumped to %s", gltf_path, dump_file_path);
     return true;
 }
-
 
 b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* state) {
     scene->state = state;
@@ -555,41 +552,25 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
     //     { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 3},
     //     { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
     //     { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3}};
-    // // pool_size_ratio* frame_ratios = dynarray_create_data(4, sizeof(pool_size_ratio), 4, ratios);
-    // pool_size_ratio* frame_ratios = dynarray_create_data(4, sizeof(pool_size_ratio), 4, ps_ratios);
-    // scene->ds_allocators = etallocate(sizeof(ds_allocator_growable) * state->image_count, MEMORY_TAG_SCENE);
+    // scene->ds_allocators = etallocate(sizeof(ds_allocator) * state->image_count, MEMORY_TAG_SCENE);
     // scene->scene_data_buffers = etallocate(sizeof(buffer) * state->image_count, MEMORY_TAG_SCENE);
     // for (u32 i = 0; i < state->image_count; ++i) {
     //     buffer_create(
     //         state,
-    //         sizeof(gpu_scene_data),
+    //         sizeof(scene_data),
     //         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     //         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     //         &scene->scene_data_buffers[i]);
-    //     descriptor_set_allocator_growable_initialize(
+    //     descriptor_set_allocator_initialize(
     //         &scene->ds_allocators[i],
     //         /* Initial Sets: */ 1000,
-    //         frame_ratios,
+    //         /* pool size count: */ 4,
+    //         ps_ratios,
     //         state);
     // }
-    // dynarray_destroy(frame_ratios);
 
     camera_create(&scene->cam);
     scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
-
-    // Descriptor Allocator for materials
-    pool_size_ratio mps_ratios[] = {
-        {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3},
-        {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
-        {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 1}
-    };
-    pool_size_ratio* mat_ds_ratios = dynarray_create_data(3, sizeof(pool_size_ratio), 3, mps_ratios);
-    descriptor_set_allocator_growable_initialize(
-        &scene->mat_ds_allocator,
-        data->materials_count,
-        mat_ds_ratios,
-        state);
-    dynarray_destroy(mat_ds_ratios);
 
     // Create samplers
     scene->samplers = etallocate(sizeof(VkSampler) * data->samplers_count, MEMORY_TAG_SCENE);
@@ -603,12 +584,11 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
             .magFilter = gltf_filter_to_vk_filter(i_sampler->mag_filter),
             .minFilter = gltf_filter_to_vk_filter(i_sampler->min_filter),
             .mipmapMode = gltf_filter_to_vk_mipmap_mode(i_sampler->min_filter)};
-        
-        vkCreateSampler(
+        VK_CHECK(vkCreateSampler(
             state->device.handle,
             &sampler_info,
             state->allocator,
-            &scene->samplers[i]);
+            &scene->samplers[i]));
     }
     scene->sampler_count = data->samplers_count;
 
@@ -642,13 +622,13 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
         &scene->material_buffer
     );
     void* mapped_memory;
-    vkMapMemory(
+    VK_CHECK(vkMapMemory(
         state->device.handle,
         scene->material_buffer.memory,
         /* offset: */ 0,
         sizeof(struct material_constants) * data->materials_count,
         /* flags: */ 0,
-        &mapped_memory);
+        &mapped_memory));
     struct material_constants* material_constants = (struct material_constants*)mapped_memory;
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material* i_material = (data->materials + i);
@@ -697,7 +677,7 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, color_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, color_tex->sampler);
 
-                material_resources.color_image = *image_get(scene->image_bank, img_index);
+                material_resources.color_image = *image_manager_get(scene->image_bank, img_index);
                 material_resources.color_sampler = scene->samplers[smpl_index];
             }
             if (i_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
@@ -705,7 +685,7 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, mr_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, mr_tex->sampler);
 
-                material_resources.metal_rough_image = *image_get(scene->image_bank, img_index);
+                material_resources.metal_rough_image = *image_manager_get(scene->image_bank, img_index);
                 material_resources.metal_rough_sampler = scene->samplers[smpl_index];
             }
         }
@@ -715,7 +695,7 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
             .pass_type = pass_type,
             .resources = &material_resources
         };
-        material_submit(scene->material_bank, &config);
+        material_manager_submit(scene->material_bank, &config);
     }
     vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
 
@@ -834,9 +814,9 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
             // Set material
             if (gltf_primitive->material) {
                 u64 mat_index = CGLTF_ARRAY_INDEX(cgltf_material, data->materials, gltf_primitive->material);
-                new_surface->material = material_get(scene->material_bank, mat_index);
+                new_surface->material = material_manager_get(scene->material_bank, mat_index);
             } else {
-                new_surface->material = material_get(scene->material_bank, 0);
+                new_surface->material = material_manager_get(scene->material_bank, 0);
             }
         }
         mesh_config config = {
@@ -945,7 +925,6 @@ static b8 load_image(cgltf_image* in_image, const char* gltf_path, renderer_stat
 
     int width, height, channels;
 
-    // Load the image from a buffer view
     if (in_image->buffer_view) {
         void* buffer_data = in_image->buffer_view->buffer->data;
         u64 byte_offset = in_image->buffer_view->offset;
@@ -1019,7 +998,7 @@ static b8 load_image(cgltf_image* in_image, const char* gltf_path, renderer_stat
         }
     }
 
-    // Image is located in an external file
+    // Make data URI is not a website URL
     if (str_str_search(uri, "://") == NULL && gltf_path) {
         u64 full_path_bytes = str_length(gltf_path) + str_length(uri) + 1;
         char* full_path = etallocate(
@@ -1055,6 +1034,8 @@ static b8 load_image(cgltf_image* in_image, const char* gltf_path, renderer_stat
     return false;
 }
 
+// TODO: Have this return data to be processed by stbi_load_from_memory
+// Image manager should handle loading in image memory
 static void* load_image_data(
     cgltf_image* in_image,
     const char* gltf_path,
@@ -1063,7 +1044,7 @@ static void* load_image_data(
     int* channels)
 {
     if (in_image->uri == NULL && in_image->buffer_view == NULL) {
-        return false;
+        return NULL;
     }
 
     // Load the image from a buffer view
@@ -1090,7 +1071,7 @@ static void* load_image_data(
             void* decoded_data;
             cgltf_result result = cgltf_load_buffer_base64(&options, size, comma, &decoded_data);
             if (result != cgltf_result_success) {
-                return false;
+                return NULL;
             }
 
             void* data = stbi_load_from_memory(

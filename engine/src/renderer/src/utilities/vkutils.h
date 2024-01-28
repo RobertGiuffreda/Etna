@@ -2,15 +2,18 @@
 
 #include "renderer/src/vk_types.h"
 
+/** TODO:
+ * Turn simple functions to macros
+ */
+
 i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
     u32 memory_type_bits_requirement, VkMemoryPropertyFlags required_properties);
 
-mesh_buffers upload_mesh_immediate(
-    renderer_state* state,
-    u32 index_count, u32* indices, 
-    u32 vertex_count, vertex* vertices);
+#define CODE_BLOCK(...) \
+do {                    \
+    __VA_ARGS__;        \
+} while(0);             \
 
-// TODO: Rename to represent that it allocates & begins command buffer recording
 void _cmd_allocate_begin(renderer_state* state, VkCommandPool pool, VkCommandBuffer* cmd);
 void _cmd_end_submit(renderer_state* state, VkCommandBuffer cmd, VkFence fence);
 
@@ -26,3 +29,22 @@ do {                                                        \
     _fence_create(state, &fence);                           \
     _cmd_end_submit(state, cmd_n, fence);                   \
 } while(0);                                                 \
+
+void _immediate_begin(renderer_state* state);
+void _immediate_end(renderer_state* state);
+
+#define IMMEDIATE_SUBMIT(state, cmd_n, ...)     \
+do {                                            \
+    _immediate_begin(state);                    \
+    VkCommandBuffer cmd_n = state->imm_buffer;  \
+    do {                                        \
+        __VA_ARGS__;                            \
+    } while (0);                                \
+    _immediate_end(state);                      \
+} while(0);                                     \
+
+// TODO: Old function, still here just in case/testing
+mesh_buffers upload_mesh_immediate(
+    renderer_state* state,
+    u32 index_count, u32* indices, 
+    u32 vertex_count, vertex* vertices);

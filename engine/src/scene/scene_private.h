@@ -23,7 +23,7 @@ typedef struct scene {
     u32 top_node_count;
 
     camera cam;
-    gpu_scene_data data;
+    scene_data data;
 
     // TEMP: Leftovers from loaded_gltf not refactored yet
     mesh_node* mesh_nodes;
@@ -34,12 +34,11 @@ typedef struct scene {
     u32 sampler_count;
     VkSampler* samplers;
 
-    ds_allocator_growable mat_ds_allocator;
     buffer material_buffer;
     // TEMP: END
 
     // For items that need to modified per frame
-    // ds_allocator_growable* ds_allocators;
+    // ds_allocator* ds_allocators;
     // buffer* scene_data_buffers;
 
     struct renderer_state* state;

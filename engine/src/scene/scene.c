@@ -32,7 +32,7 @@ static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 
 /** NOTE: Implementation details
  * Currently the scene descriptor set is hardcoded as a singular
- * uniform buffer that matches struct gpu_scene_data.
+ * uniform buffer that matches struct scene_data.
  */
 b8 scene_initalize(scene* scene, struct renderer_state* state) {
     // NOTE: This will be passed a config when serialization is implemented
@@ -80,10 +80,8 @@ void scene_shutdown(scene* scene) {
 
     camera_destroy(&scene->cam);
 
-    descriptor_set_allocator_growable_shutdown(&scene->mat_ds_allocator, state);
-
     // for (u32 i = 0; i < state->image_count; ++i) {
-    //     descriptor_set_allocator_growable_shutdown(&scene->ds_allocators[i], state);
+    //     descriptor_set_allocator_shutdown(&scene->ds_allocators[i], state);
     //     buffer_destroy(state, &scene->scene_data_buffers[i]);
     // }
     // etfree(scene->ds_allocators);

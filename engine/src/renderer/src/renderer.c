@@ -263,10 +263,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     initialize_descriptors(state);
     ETINFO("Descriptors Initialized.");
 
-    // Set immediate command buffer start and end functions
-    state->immediate_begin = immediate_begin;
-    state->immediate_end = immediate_end;
-
     if (!initialize_compute_effects(state)) {
         ETERROR("Could not initialize compute effects.");
         return false;
@@ -357,7 +353,7 @@ b8 renderer_draw_frame(renderer_state* state) {
         1000000000);
     VK_CHECK(result);
     
-    descriptor_set_allocator_growable_clear_pools(&state->frame_allocators[state->frame_index], state);
+    descriptor_set_allocator_clear_pools(&state->frame_allocators[state->frame_index], state);
 
     u32 swapchain_index;
     result = vkAcquireNextImageKHR(
@@ -631,90 +627,75 @@ static void initialize_descriptors(renderer_state* state) {
     pool_size_ratio global_ratios[] = {
         { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 1},
         { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 1}};
-    // pool_size_ratio* global_ratios_dynarray = dynarray_create_data(2, sizeof(pool_size_ratio), 2, global_ratios);
-    pool_size_ratio* global_ratios_dynarray = dynarray_create_data_tagged(2, sizeof(pool_size_ratio), 2, MEMORY_TAG_DESCRIPTOR_DYN, global_ratios);
-    descriptor_set_allocator_growable_initialize(&state->global_ds_allocator, 10, global_ratios_dynarray, state);
-    dynarray_destroy(global_ratios_dynarray);
-    ETINFO("Global descriptor set allocator initialized.");
+    descriptor_set_allocator_initialize(&state->global_ds_allocator, 10, 2, global_ratios, state);
 
     // Descriptor set layout for accessing the render image from a compute shader
     dsl_builder dsl_builder = descriptor_set_layout_builder_create();
     descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
     state->draw_image_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
     descriptor_set_layout_builder_destroy(&dsl_builder);
-    ETINFO("Draw Image Descriptor Set Layout created.");
 
-    state->draw_image_descriptor_set = descriptor_set_allocator_growable_allocate(&state->global_ds_allocator, state->draw_image_descriptor_set_layout, state);
-    ETINFO("Draw Image Descriptor Set allocated");
+    state->draw_image_descriptor_set = descriptor_set_allocator_allocate(&state->global_ds_allocator, state->draw_image_descriptor_set_layout, state);
 
     ds_writer writer = descriptor_set_writer_create_initialize();
     descriptor_set_writer_write_image(&writer, 0, state->render_image.view, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
     descriptor_set_writer_update_set(&writer, state->draw_image_descriptor_set, state);
     descriptor_set_writer_shutdown(&writer);
-    ETINFO("Draw Image Descriptor Set updated.");
 
     dsl_builder = descriptor_set_layout_builder_create();
     descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     state->scene_data_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
     descriptor_set_layout_builder_destroy(&dsl_builder);
-    ETINFO("Scene data descriptor set layout created.");
 
-    // Create pool size ratios to be used for the frames
-    pool_size_ratio ratios[] = {
+    pool_size_ratio frame_ratios[] = {
         { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 3},
         { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 3},
         { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
         { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3}};
-    // pool_size_ratio* frame_ratios = dynarray_create_data(4, sizeof(pool_size_ratio), 4, ratios);
-    pool_size_ratio* frame_ratios = dynarray_create_data(4, sizeof(pool_size_ratio), 4, ratios);
-    state->frame_allocators = etallocate(sizeof(ds_allocator_growable) * state->image_count, MEMORY_TAG_RENDERER);
+    state->frame_allocators = etallocate(sizeof(ds_allocator) * state->image_count, MEMORY_TAG_RENDERER);
     for (u32 i = 0; i < state->image_count; ++i) {
         // Initialize growable allocator for the frames
-        descriptor_set_allocator_growable_initialize(&state->frame_allocators[i], 1000, frame_ratios, state);
+        descriptor_set_allocator_initialize(&state->frame_allocators[i], 1000, 4, frame_ratios, state);
     }
-    ETINFO("Frame Descriptors created");
 
-    // Clean up allocated memory
-    dynarray_destroy(frame_ratios);
+    ETINFO("Descriptors Initialized");
 }
 
 // TODO: Should be reverse order of creation just for uniformity
 static void shutdown_descriptors(renderer_state* state) {
-    descriptor_set_allocator_growable_shutdown(&state->global_ds_allocator, state);
-    ETINFO("Descriptor Set Allocator destroyed.");
+    descriptor_set_allocator_shutdown(&state->global_ds_allocator, state);
 
     vkDestroyDescriptorSetLayout(state->device.handle, state->scene_data_descriptor_set_layout, state->allocator);
-    ETINFO("Scene data descriptor set layout destroyed.");
 
     vkDestroyDescriptorSetLayout(state->device.handle, state->draw_image_descriptor_set_layout, state->allocator);
-    ETINFO("Draw Image descriptor set layout destroyed.");
 
     // Shutdown growable descriptor set allocators
     for (u32 i = 0; i < state->image_count; ++i) {
-        descriptor_set_allocator_growable_shutdown(&state->frame_allocators[i], state);
+        descriptor_set_allocator_shutdown(&state->frame_allocators[i], state);
     }
-    etfree(state->frame_allocators, sizeof(ds_allocator_growable) * state->image_count, MEMORY_TAG_RENDERER);
-    ETINFO("Destroyed frame descriptors");
+    etfree(state->frame_allocators, sizeof(ds_allocator) * state->image_count, MEMORY_TAG_RENDERER);
+
+    ETINFO("Descriptors shutdown");
 }
 
 static void create_scene_data_buffers(renderer_state* state) {
-    state->scene_data_buffers = etallocate(sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
+    state->scene_data = etallocate(sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
     for (u32 i = 0; i < state->image_count; ++i) {
         buffer_create(
             state,
-            sizeof(gpu_scene_data),
+            sizeof(scene_data),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &state->scene_data_buffers[i]
+            &state->scene_data[i]
         );
     }
 }
 
 static void destroy_scene_data_buffers(renderer_state* state) {
     for (u32 i = 0; i < state->image_count; ++i) {
-        buffer_destroy(state, &state->scene_data_buffers[i]);
+        buffer_destroy(state, &state->scene_data[i]);
     }
-    etfree(state->scene_data_buffers, sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
+    etfree(state->scene_data, sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
 }
 
 static b8 initialize_compute_effects(renderer_state* state) {
@@ -819,7 +800,7 @@ static b8 initialize_default_data(renderer_state* state) {
         VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &state->error_checkerboard_image);
+        &state->error_image);
     ETINFO("Checkerboard default image created.");
 
     VkSamplerCreateInfo sampler_info = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
@@ -885,7 +866,7 @@ static void shutdown_default_data(renderer_state* state) {
     vkDestroySampler(state->device.handle, state->default_sampler_linear, state->allocator);
     vkDestroySampler(state->device.handle, state->default_sampler_nearest, state->allocator);
 
-    image_destroy(state, &state->error_checkerboard_image);
+    image_destroy(state, &state->error_image);
     image_destroy(state, &state->black_image);
     image_destroy(state, &state->grey_image);
     image_destroy(state, &state->white_image);
@@ -925,20 +906,20 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     void* mapped_scene_data;
     vkMapMemory(
         state->device.handle,
-        state->scene_data_buffers[state->frame_index].memory,
+        state->scene_data[state->frame_index].memory,
         /* Offset: */ 0,
-        sizeof(gpu_scene_data),
+        sizeof(scene_data),
         /* Flags: */ 0,
         &mapped_scene_data);
 
-    // Cast mapped memory to gpu_scene_data pointer to read and modify it
-    gpu_scene_data* frame_scene_data = (gpu_scene_data*)mapped_scene_data;
+    // Cast mapped memory to scene_data pointer to read and modify it
+    scene_data* frame_scene_data = (scene_data*)mapped_scene_data;
     *frame_scene_data = state->_scene.data;
     vkUnmapMemory(
         state->device.handle,
-        state->scene_data_buffers[state->frame_index].memory);
+        state->scene_data[state->frame_index].memory);
 
-    VkDescriptorSet scene_descriptor_set = descriptor_set_allocator_growable_allocate(
+    VkDescriptorSet scene_descriptor_set = descriptor_set_allocator_allocate(
         &state->frame_allocators[state->frame_index],
         state->scene_data_descriptor_set_layout,
         state);
@@ -947,8 +928,8 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     descriptor_set_writer_write_buffer(
         &writer,
         /* Binding: */ 0,
-        state->scene_data_buffers[state->frame_index].handle,
-        sizeof(gpu_scene_data),
+        state->scene_data[state->frame_index].handle,
+        sizeof(scene_data),
         /* Offset: */ 0,
         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     descriptor_set_writer_update_set(&writer, scene_descriptor_set, state);
@@ -1009,27 +990,6 @@ b8 rebuild_swapchain(renderer_state* state) {
     }
 
     return true;
-}
-
-static void immediate_begin(struct renderer_state* state) {
-    VK_CHECK(vkResetFences(state->device.handle, 1, &state->imm_fence));
-    VK_CHECK(vkResetCommandBuffer(state->imm_buffer, 0));
-
-    VkCommandBufferBeginInfo cmd_begin =
-        init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    
-    VK_CHECK(vkBeginCommandBuffer(state->imm_buffer, &cmd_begin));
-}
-
-static void immediate_end(struct renderer_state* state) {
-    VK_CHECK(vkEndCommandBuffer(state->imm_buffer));
-
-    VkCommandBufferSubmitInfo cmd_info = init_command_buffer_submit_info(state->imm_buffer);
-    VkSubmitInfo2 submit = init_submit_info2(0, 0, 1, &cmd_info, 0, 0);
-
-    VK_CHECK(vkQueueSubmit2(state->device.graphics_queue, 1, &submit, state->imm_fence));
-
-    VK_CHECK(vkWaitForFences(state->device.handle, 1, &state->imm_fence, VK_TRUE, 0xFFFFFFFFFFFFFFFF));
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

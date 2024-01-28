@@ -12,15 +12,13 @@
  * Less unwieldy function & object names 
 */
 
-// NOTE: Descriptor binding count more than one is unsupported at the moment.
+// NOTE: Descriptor binding count greater than 1 is unsupported at the moment.
 // layout (set = 1, binding = 4) uniform usampler2D test_tex[2];
 // layout(set = 1, binding = 3) uniform test_block {
 // 	ivec4 test_ivec[4];
 // 	uvec4 test_uvec[4];
 // } test[2];
-// NOTE: END
 
-/* NOTE: Functions for: Descriptor Set Layout Builder */
 dsl_builder descriptor_set_layout_builder_create(void) {
     dsl_builder builder;
     builder.bindings = dynarray_create(0, sizeof(VkDescriptorSetLayoutBinding));
@@ -62,7 +60,6 @@ VkDescriptorSetLayout descriptor_set_layout_builder_build(dsl_builder* builder, 
     return layout;
 }
 
-/* NOTE: Functions for: Descriptor Set Writer */
 ds_writer descriptor_set_writer_create_initialize(void) {
     ds_writer writer;
     descriptor_set_writer_initialize(&writer);
@@ -148,87 +145,41 @@ void descriptor_set_writer_update_set(ds_writer* writer, VkDescriptorSet set, re
     vkUpdateDescriptorSets(state->device.handle, (u32)dynarray_length(writer->writes), writer->writes, 0, 0);
 }
 
-/* NOTE: Functions for: Descriptor Set Allocator */
-// pool_sizes is a dynamic array
-void descriptor_set_allocator_initialize(ds_allocator* allocator, u32 max_sets, VkDescriptorPoolSize* pool_sizes, renderer_state* state) {
-    allocator->pool_sizes = dynarray_copy(pool_sizes);
-    descriptor_set_allocator_create_pool(allocator, max_sets, state);
-}
-
-void descriptor_set_allocator_create_pool(ds_allocator* allocator, u32 max_sets, renderer_state* state) {
-    VkDescriptorPoolCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .pNext = 0,
-        .flags = 0,
-        .maxSets = max_sets,
-        .poolSizeCount = dynarray_length(allocator->pool_sizes),
-        .pPoolSizes = allocator->pool_sizes};
-    
-    vkCreateDescriptorPool(state->device.handle, &info, state->allocator, &allocator->pool);
-}
-
-void descriptor_set_allocator_clear_descriptor_sets(ds_allocator* allocator, renderer_state* state) {
-    vkResetDescriptorPool(state->device.handle, allocator->pool, 0);
-}
-
-void descriptor_set_allocator_shutdown(ds_allocator* allocator, renderer_state* state) {
-    dynarray_destroy(allocator->pool_sizes);
-    if (allocator->pool) descriptor_set_allocator_destroy_pool(allocator, state);
-}
-
-void descriptor_set_allocator_destroy_pool(ds_allocator* allocator, renderer_state* state) {
-    vkDestroyDescriptorPool(state->device.handle, allocator->pool, state->allocator);
-}
-
-VkDescriptorSet descriptor_set_allocator_allocate(ds_allocator* allocator, VkDescriptorSetLayout layout, renderer_state* state) {
-    VkDescriptorSetAllocateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .pNext = 0,
-        .descriptorPool = allocator->pool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &layout};
-    
-    VkDescriptorSet ds;
-    VK_CHECK(vkAllocateDescriptorSets(state->device.handle, &info, &ds));
-
-    return ds;
-}
-
-/* NOTE: Functions for growable descriptor set allocator */
-// TODO: Create a function that allocates a copy of an array
-// that does not need to be a dynarray instead and use it instead
-void descriptor_set_allocator_growable_initialize(
-    ds_allocator_growable* allocator,
+void descriptor_set_allocator_initialize(
+    ds_allocator* allocator,
     u32 initial_sets,
+    u32 pool_size_count,
     pool_size_ratio* pool_sizes,
     renderer_state* state)
 {
     // Memory init
-    allocator->pool_sizes = dynarray_copy(pool_sizes);
+    allocator->pool_size_count = pool_size_count;
+    allocator->pool_sizes = etallocate(sizeof(pool_size_ratio) * pool_size_count, MEMORY_TAG_RENDERER);
     allocator->ready_pools = dynarray_create(0, sizeof(VkDescriptorPool));
     allocator->full_pools = dynarray_create(0, sizeof(VkDescriptorPool));
     allocator->sets_per_pool = initial_sets;
     // Create first pool
     VkDescriptorPool new_pool = 
-        descriptor_set_allocator_growable_create_pool(allocator, state);
+        descriptor_set_allocator_create_pool(allocator, state);
     
     allocator->sets_per_pool *= 1.5f;
     dynarray_push((void**)&allocator->ready_pools, &new_pool);
 }
 
-void descriptor_set_allocator_growable_shutdown(
-    ds_allocator_growable* allocator,
+void descriptor_set_allocator_shutdown(
+    ds_allocator* allocator,
     renderer_state* state)
 {
-    descriptor_set_allocator_growable_destroy_pools(allocator, state);
-    dynarray_destroy(allocator->pool_sizes);
+    descriptor_set_allocator_destroy_pools(allocator, state);
+    etfree(allocator->pool_sizes, sizeof(pool_size_ratio) * allocator->pool_size_count, MEMORY_TAG_RENDERER);
     dynarray_destroy(allocator->ready_pools);
     dynarray_destroy(allocator->full_pools);
+    allocator->pool_size_count = 0;
     allocator->sets_per_pool = 0;
 }
 
-void descriptor_set_allocator_growable_clear_pools(
-    ds_allocator_growable* allocator,
+void descriptor_set_allocator_clear_pools(
+    ds_allocator* allocator,
     renderer_state* state)
 {
     u32 rpool_len = dynarray_length(allocator->ready_pools);
@@ -246,8 +197,8 @@ void descriptor_set_allocator_growable_clear_pools(
     dynarray_clear(allocator->full_pools);
 }
 
-void descriptor_set_allocator_growable_destroy_pools(
-    ds_allocator_growable* allocator,
+void descriptor_set_allocator_destroy_pools(
+    ds_allocator* allocator,
     renderer_state* state)
 {
     u32 rpool_len = dynarray_length(allocator->ready_pools);
@@ -265,13 +216,13 @@ void descriptor_set_allocator_growable_destroy_pools(
     dynarray_clear(allocator->full_pools);
 }
 
-VkDescriptorSet descriptor_set_allocator_growable_allocate(
-    ds_allocator_growable* allocator,
+VkDescriptorSet descriptor_set_allocator_allocate(
+    ds_allocator* allocator,
     VkDescriptorSetLayout layout,
     renderer_state* state)
 {
     VkDescriptorPool to_use = 
-        descriptor_set_allocator_growable_get_pool(allocator, state);
+        descriptor_set_allocator_get_pool(allocator, state);
     VkDescriptorSetAllocateInfo alloc_info = init_descriptor_set_allocate_info();
     alloc_info.descriptorPool = to_use;
     alloc_info.descriptorSetCount = 1;
@@ -283,7 +234,7 @@ VkDescriptorSet descriptor_set_allocator_growable_allocate(
     if (result == VK_ERROR_OUT_OF_POOL_MEMORY || result == VK_ERROR_FRAGMENTED_POOL) {
         dynarray_push((void**)&allocator->full_pools, &to_use);
 
-        to_use = descriptor_set_allocator_growable_get_pool(allocator, state);
+        to_use = descriptor_set_allocator_get_pool(allocator, state);
         alloc_info.descriptorPool = to_use;
 
         VK_CHECK(vkAllocateDescriptorSets(state->device.handle, &alloc_info, &ds));
@@ -293,15 +244,15 @@ VkDescriptorSet descriptor_set_allocator_growable_allocate(
     return ds;
 }
 
-VkDescriptorPool descriptor_set_allocator_growable_get_pool(
-    ds_allocator_growable* allocator,
+VkDescriptorPool descriptor_set_allocator_get_pool(
+    ds_allocator* allocator,
     renderer_state* state)
 {
     VkDescriptorPool new_pool;
     if (dynarray_length(allocator->ready_pools) != 0) {
         dynarray_pop(allocator->ready_pools, &new_pool);
     } else {
-        new_pool = descriptor_set_allocator_growable_create_pool(allocator, state);
+        new_pool = descriptor_set_allocator_create_pool(allocator, state);
         allocator->sets_per_pool *= 1.5;
         if (allocator->sets_per_pool > 4092) {
             allocator->sets_per_pool = 4092;
@@ -309,12 +260,12 @@ VkDescriptorPool descriptor_set_allocator_growable_get_pool(
     }
     return new_pool;
 }
-VkDescriptorPool descriptor_set_allocator_growable_create_pool(
-    ds_allocator_growable* allocator,
+VkDescriptorPool descriptor_set_allocator_create_pool(
+    ds_allocator* allocator,
     renderer_state* state)
 {
     VkDescriptorPoolSize* sizes = dynarray_create(1, sizeof(VkDescriptorPoolSize));
-    for (u32 i = 0; i < dynarray_length(allocator->pool_sizes); ++i) {
+    for (u32 i = 0; i < allocator->pool_size_count; ++i) {
         VkDescriptorPoolSize new_size = {
             .type = allocator->pool_sizes[i].type,
             .descriptorCount = allocator->pool_sizes[i].ratio * allocator->sets_per_pool

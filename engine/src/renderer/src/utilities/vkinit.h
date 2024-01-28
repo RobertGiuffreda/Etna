@@ -2,7 +2,7 @@
 
 #include "renderer/src/vk_types.h"
 
-// TODO: Make these inline
+// TODO: extern inline??
 
 VkCommandPoolCreateInfo init_command_pool_create_info(
     VkCommandPoolCreateFlags flags,

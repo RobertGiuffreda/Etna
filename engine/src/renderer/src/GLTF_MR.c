@@ -121,7 +121,7 @@ material_instance GLTF_MR_create_instance(
     renderer_state* state,
     material_pass pass,
     const struct material_resources* resources,
-    ds_allocator_growable* descriptor_allocator)
+    ds_allocator* descriptor_allocator)
 {
     material_instance mat_data;
     mat_data.pass_type = pass;
@@ -131,7 +131,7 @@ material_instance GLTF_MR_create_instance(
         mat_data.pipeline = &mat->opaque_pipeline;
     }
 
-    mat_data.material_set = descriptor_set_allocator_growable_allocate(
+    mat_data.material_set = descriptor_set_allocator_allocate(
         descriptor_allocator, mat->material_layout, state);
 
     descriptor_set_writer_clear(&mat->writer);

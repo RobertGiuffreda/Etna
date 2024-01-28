@@ -12,13 +12,11 @@
 
 typedef struct renderer_state renderer_state;
 
+// TEMP: Until descriptor set management refactor
 typedef struct descriptor_set_layout_builder {
-    // Dynarray
-    VkDescriptorSetLayoutBinding* bindings;
+    VkDescriptorSetLayoutBinding* bindings;  // Dynarray
 } dsl_builder;
 
-// Descriptor Set writer. Stores descriptor set writes so they can
-// be applied all at once in the command vkUpdateDescriptorSets 
 typedef struct descriptor_set_writer {
     VkDescriptorImageInfo* image_infos;
     VkDescriptorBufferInfo* buffer_infos;
@@ -26,41 +24,34 @@ typedef struct descriptor_set_writer {
     VkWriteDescriptorSet* writes;
 } ds_writer;
 
-typedef struct descriptor_set_allocator {
-    // Dynarray created from hardcoded array(for now)
-    VkDescriptorPoolSize* pool_sizes;
-    VkDescriptorPool pool;
-} ds_allocator;
-
-// Growable descriptor allocator types
 typedef struct pool_size_ratio {
     VkDescriptorType type;
     float ratio;
 } pool_size_ratio;
 
-typedef struct descriptor_set_allocator_growable {
+typedef struct descriptor_set_allocator {
     pool_size_ratio* pool_sizes;
-    VkDescriptorPool* ready_pools;
-    VkDescriptorPool* full_pools;
+    u32 pool_size_count;
+
+    VkDescriptorPool* ready_pools;  // Dynarray
+    VkDescriptorPool* full_pools;   // Dynarray
     u32 sets_per_pool;
-} ds_allocator_growable;
+} ds_allocator;
+// TEMP: END
 
 // TEMP: Until my vulkan memory management is implemented
 typedef struct image {
     u32 id;
     char* name;
+
     VkImage handle;
     VkImageView view;
-
     VkDeviceMemory memory;
 
     VkExtent3D extent;
     VkImageType type;
     VkFormat format;
     VkImageAspectFlags aspects;
-
-    // For use in transfer system. 
-    VkPipelineStageFlags2 stages; // NOTE: Unused
 } image;
 
 typedef struct buffer {
@@ -68,9 +59,6 @@ typedef struct buffer {
     VkBuffer handle;
     VkDeviceMemory memory;
     u64 size;
-
-    // For use in transfer system.
-    VkPipelineStageFlags2 stages; // NOTE: Unused
 } buffer;
 // TEMP: END
 
@@ -85,7 +73,7 @@ typedef struct gpu_draw_push_constants {
     VkDeviceAddress vertex_buffer;
 } gpu_draw_push_constants;
 
-typedef struct gpu_scene_data {
+typedef struct scene_data {
     m4s view;
     m4s proj;
     m4s viewproj;
@@ -93,7 +81,7 @@ typedef struct gpu_scene_data {
     v4s light_color;
     v4s light_position;
     v4s view_pos;
-} gpu_scene_data;
+} scene_data;
 
 typedef struct material_pipeline {
     VkPipeline pipeline;
@@ -106,7 +94,7 @@ typedef struct material_instance {
     material_pass pass_type;
 } material_instance;
 
-// TODO: Make material_resources & material_constants generic structs to poss generic information
+// TODO: Make material_constants & material_resources generic structs to pass generic information
 struct material_constants {
     v4s color_factors;
     v4s metal_rough_factors;
@@ -124,7 +112,6 @@ struct material_resources {
     u32 data_buffer_offset;
 };
 
-// GLTF Metallic Roughness
 // Default material type as importing GLTF file's is 
 // the only thing supported at the moment
 typedef struct GLTF_MR {

@@ -24,12 +24,6 @@ struct mesh_manager {
     buffer* staging_buffers;
     u32 upload_count;
 
-    // TEMP: Testing
-    VkCommandPool test_pool;
-    VkCommandBuffer test_buffer;
-    VkFence test_fence;
-    // TEMP: END
-
     mesh meshes[MAX_MESH_COUNT];
     u32 mesh_count;
 };
@@ -47,31 +41,6 @@ b8 mesh_manager_initialize(mesh_manager** manager, struct renderer_state* state)
         &upload_pool_info,
         state->allocator,
         &new_manager->upload_pool));
-
-    // TEMP: Testing uploading buffers
-    VkCommandPoolCreateInfo test_pool_info = init_command_pool_create_info(
-        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        state->device.graphics_qfi);
-    VK_CHECK(vkCreateCommandPool(
-        state->device.handle,
-        &test_pool_info,
-        state->allocator,
-        &new_manager->test_pool));
-
-    VkCommandBufferAllocateInfo test_buff_alloc_info = init_command_buffer_allocate_info(
-        new_manager->test_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
-    VK_CHECK(vkAllocateCommandBuffers(
-        state->device.handle,
-        &test_buff_alloc_info,
-        &new_manager->test_buffer));
-
-    VkFenceCreateInfo test_fence_info = init_fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
-    VK_CHECK(vkCreateFence(
-        state->device.handle,
-        &test_fence_info,
-        state->allocator,
-        &new_manager->test_fence));
-    // TEMP: END
 
     new_manager->upload_fences = dynarray_create(1, sizeof(VkFence));
     new_manager->staging_buffers = dynarray_create(1, sizeof(buffer));
@@ -92,17 +61,6 @@ void mesh_manager_shutdown(mesh_manager* manager) {
         manager->upload_pool,
         manager->state->allocator);
     
-    // TEMP: Testing sync
-    vkDestroyCommandPool(
-        manager->state->device.handle,
-        manager->test_pool,
-        manager->state->allocator);
-    vkDestroyFence(
-        manager->state->device.handle,
-        manager->test_fence,
-        manager->state->allocator);
-    // TEMP: END
-
     for (u32 i = 0; i < manager->mesh_count; ++i) {
         dynarray_destroy(manager->meshes[i].surfaces);
         str_duplicate_free(manager->meshes[i].name);
@@ -116,34 +74,6 @@ void mesh_manager_shutdown(mesh_manager* manager) {
 
 mesh* mesh_manager_get(mesh_manager* manager, u32 id) {
     return &manager->meshes[id];
-}
-
-b8 mesh_manager_submit_immediate_ref(mesh_manager* manager, mesh_config* config, mesh** out_mesh_ref) {
-    ETASSERT(out_mesh_ref);
-    if (manager->mesh_count >= MAX_MESH_COUNT)
-        return false;
-
-    mesh* new_mesh = &manager->meshes[manager->mesh_count];
-    new_mesh->id = manager->mesh_count;
-    new_mesh->name = str_duplicate_allocate(config->name);
-
-    new_mesh->surfaces = dynarray_create_data(
-        config->surface_count,
-        sizeof(surface),
-        config->surface_count,
-        config->surfaces);
-
-    new_mesh->buffers = upload_mesh_immediate(
-        manager->state,
-        config->index_count,
-        config->indices,
-        config->vertex_count,
-        config->vertices
-    );
-    manager->mesh_count++;
-
-    *out_mesh_ref = new_mesh;
-    return true;
 }
 
 b8 mesh_manager_submit_immediate(mesh_manager* manager, mesh_config* config) {

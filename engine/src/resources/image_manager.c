@@ -11,6 +11,8 @@
 #include "renderer/src/image.h"
 // TEMP: END
 
+// TODO: image_manager_load vs image_manager_submit
+
 #define MAX_IMAGE_COUNT 128
 
 struct image_manager {
@@ -25,7 +27,7 @@ b8 image_manager_initialize(image_manager** manager, struct renderer_state* stat
     new_manager->state = state;
 
     for (u32 i = 0; i < MAX_IMAGE_COUNT; ++i) {
-        new_manager->images[i] = state->error_checkerboard_image;
+        new_manager->images[i] = state->error_image;
         new_manager->images[i].id = INVALID_ID;
     }
 
@@ -46,55 +48,17 @@ void image_manager_shutdown(image_manager* manager) {
 }
 
 // TEMP: Function to increment the image count to skip over images
-// that do not load properly leaving the error_checkerboard_image reference 
+// that do not load properly leaving the error_image reference 
 void image_manager_increment(image_manager* manager) {
     manager->image_count++;
 }
 // TEMP: END
 
-image* image_get(image_manager* manager, u32 id) {
+image* image_manager_get(image_manager* manager, u32 id) {
     return &manager->images[id];
 }
 
-b8 image2D_submit_ref(
-    image_manager* manager,
-    image_config* config,
-    image** out_image_ref)
-{
-    ETASSERT(out_image_ref);
-    if (manager->image_count >= MAX_IMAGE_COUNT)
-        return false;
-
-    image* new_image = &manager->images[manager->image_count];
-    new_image->id = manager->image_count;
-    new_image->name = str_duplicate_allocate(config->name);
-    
-    VkExtent3D image_size = {
-        .width = config->width,
-        .height = config->height,
-        .depth = 1
-    };
-    image2D_create_data(
-        manager->state,
-        config->data,
-        image_size,
-        VK_FORMAT_R8G8B8A8_UNORM,
-        VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        new_image
-    );
-    manager->image_count++;
-    
-    *out_image_ref = new_image;
-    return true;
-}
-
-// TEMP: Until scene from config file is implemented. Proper ID management
-b8 image2D_submit(
-    image_manager* manager,
-    image_config* config)
-{
+b8 image2D_submit(image_manager* manager, image_config* config) {
     if (manager->image_count >= MAX_IMAGE_COUNT)
         return false;
 
@@ -120,4 +84,3 @@ b8 image2D_submit(
     manager->image_count++;
     return true;
 }
-// TEMP: END
