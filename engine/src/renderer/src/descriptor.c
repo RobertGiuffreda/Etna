@@ -152,18 +152,19 @@ void descriptor_set_allocator_initialize(
     pool_size_ratio* pool_sizes,
     renderer_state* state)
 {
-    // Memory init
     allocator->pool_size_count = pool_size_count;
     allocator->pool_sizes = etallocate(sizeof(pool_size_ratio) * pool_size_count, MEMORY_TAG_RENDERER);
+    etcopy_memory(allocator->pool_sizes, pool_sizes, sizeof(pool_size_ratio) * pool_size_count);
     allocator->ready_pools = dynarray_create(0, sizeof(VkDescriptorPool));
     allocator->full_pools = dynarray_create(0, sizeof(VkDescriptorPool));
     allocator->sets_per_pool = initial_sets;
+
     // Create first pool
-    VkDescriptorPool new_pool = 
+    VkDescriptorPool first_pool = 
         descriptor_set_allocator_create_pool(allocator, state);
     
     allocator->sets_per_pool *= 1.5f;
-    dynarray_push((void**)&allocator->ready_pools, &new_pool);
+    dynarray_push((void**)&allocator->ready_pools, &first_pool);
 }
 
 void descriptor_set_allocator_shutdown(

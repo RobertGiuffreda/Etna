@@ -143,8 +143,7 @@ typedef struct mesh {
     char* name;
 
     // TODO: Stop using dynamic array here
-    // Dynarray
-    surface* surfaces;
+    surface* surfaces;  // Dynarray
     mesh_buffers buffers;
 } mesh;
 
