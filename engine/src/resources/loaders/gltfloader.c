@@ -633,10 +633,6 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material* i_material = (data->materials + i);
 
-        if (i_material->normal_texture.texture) {
-            ETINFO("Has normal.");
-        }
-
         // TODO: Check for cgltf_pbr_metallic_roughness beforehand
         // if not present use some default values
         cgltf_pbr_metallic_roughness gltf_pbr_mr = i_material->pbr_metallic_roughness;

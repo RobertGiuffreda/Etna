@@ -87,7 +87,7 @@ b8 device_create(renderer_state* state, device* out_device) {
     u32 queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties2(out_device->gpu, &queue_family_count, 0);
     VkQueueFamilyProperties2* qf_props = 
-        (VkQueueFamilyProperties2*)etallocate(sizeof(VkQueueFamilyProperties2) * queue_family_count, MEMORY_TAG_RENDERER);
+        etallocate(sizeof(VkQueueFamilyProperties2) * queue_family_count, MEMORY_TAG_RENDERER);
     for (u32 i = 0; i < queue_family_count; ++i) {
         qf_props[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
         qf_props[i].pNext = 0;
@@ -95,27 +95,30 @@ b8 device_create(renderer_state* state, device* out_device) {
     vkGetPhysicalDeviceQueueFamilyProperties2(out_device->gpu, &queue_family_count, qf_props);
 
     // Create bitmasks for each possible queue family
-    u32* qfi_bitmasks = (u32*)etallocate(sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
-    etzero_memory(qfi_bitmasks, sizeof(u32) * queue_family_count);
+    u32* qfi_flags = etallocate(sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
+    etzero_memory(qfi_flags, sizeof(u32) * queue_family_count);
     u32 index_count = 0;
-    i32* indices = (i32*)etallocate(sizeof(i32) * queue_family_count, MEMORY_TAG_RENDERER);
+    i32* indices = etallocate(sizeof(i32) * queue_family_count, MEMORY_TAG_RENDERER);
 
     // TODO: Perform these OR opertations only if the capability is asked for.
     // Only really relevant when the renderer will act different based on gpu capability
-    if ((qfi_bitmasks[out_device->graphics_qfi] |= QFI_GRAPHICS) == QFI_GRAPHICS)
-        indices[index_count++] = (i32)out_device->graphics_qfi;
-    if ((qfi_bitmasks[out_device->transfer_qfi] |= QFI_TRANSFER) == QFI_TRANSFER)
-        indices[index_count++] = (i32)out_device->transfer_qfi;
-    if ((qfi_bitmasks[out_device->compute_qfi] |= QFI_COMPUTE) == QFI_COMPUTE)
-        indices[index_count++] = (i32)out_device->compute_qfi;
-    if ((qfi_bitmasks[out_device->present_qfi] |= QFI_PRESENTATION) == QFI_PRESENTATION)
-        indices[index_count++] = (i32)out_device->present_qfi;
+    if ((qfi_flags[out_device->graphics_qfi] |= QFI_GRAPHICS) == QFI_GRAPHICS)
+        indices[index_count++] = out_device->graphics_qfi;
+        
+    if ((qfi_flags[out_device->transfer_qfi] |= QFI_TRANSFER) == QFI_TRANSFER)
+        indices[index_count++] = out_device->transfer_qfi;
+
+    if ((qfi_flags[out_device->compute_qfi] |= QFI_COMPUTE) == QFI_COMPUTE)
+        indices[index_count++] = out_device->compute_qfi;
+
+    if ((qfi_flags[out_device->present_qfi] |= QFI_PRESENTATION) == QFI_PRESENTATION)
+        indices[index_count++] = out_device->present_qfi;
 
     // For retrieving the amount of queue families
-    u32* queue_counts = (u32*)etallocate(sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
+    u32* queue_counts = etallocate(sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
 
     VkDeviceQueueCreateInfo* queue_cinfos = 
-        (VkDeviceQueueCreateInfo*)etallocate(sizeof(VkDeviceQueueCreateInfo) * index_count, MEMORY_TAG_RENDERER);
+        etallocate(sizeof(VkDeviceQueueCreateInfo) * index_count, MEMORY_TAG_RENDERER);
     f32 priorities[4] = {1.0f, 1.0f, 1.0f, 1.0f};
     for (u32 i = 0; i < index_count; i++) {
         queue_cinfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -123,9 +126,9 @@ b8 device_create(renderer_state* state, device* out_device) {
         queue_cinfos[i].flags = 0;
 
         // The number of flags set is the number of separate queues we
-        // will attempt to get from the queue family. If there are not 
+        // will attempt to get from the queue family. If there are not
         // enough queues available we will get the maximum.
-        u32 flags_set = hamming_weight(qfi_bitmasks[indices[i]]);
+        u32 flags_set = hamming_weight(qfi_flags[indices[i]]);
         u32 qf_queue_count = qf_props[indices[i]].queueFamilyProperties.queueCount;
         u32 queue_count = (qf_queue_count < flags_set) ? qf_queue_count : flags_set;
         // Save requested queue counts for use when fetching queues after
@@ -177,7 +180,7 @@ b8 device_create(renderer_state* state, device* out_device) {
 
     // Stores the current index of the queue to be fetched for each.
     // If max has been reached the queue fetched is the zero index queue
-    u32* curr_queue_indices = (u32*)etallocate(sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
+    u32* curr_queue_indices = etallocate(sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
     etzero_memory(curr_queue_indices, sizeof(u32) * queue_family_count);
 
     // Graphics
@@ -216,7 +219,7 @@ b8 device_create(renderer_state* state, device* out_device) {
     etfree(queue_cinfos, sizeof(VkDeviceQueueCreateInfo) * index_count, MEMORY_TAG_RENDERER);
     etfree(queue_counts, sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
     etfree(indices, sizeof(i32) * queue_family_count, MEMORY_TAG_RENDERER);
-    etfree(qfi_bitmasks, sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
+    etfree(qfi_flags, sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
     etfree(qf_props, sizeof(VkQueueFamilyProperties2) * queue_family_count, MEMORY_TAG_RENDERER);
     return true;
 }
@@ -281,6 +284,11 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
             VK_API_VERSION_MAJOR(properties->driverVersion),
             VK_API_VERSION_MINOR(properties->driverVersion),
             VK_API_VERSION_PATCH(properties->driverVersion));
+
+        ETINFO("Graphics index:     %d", out_device->graphics_qfi);
+        ETINFO("Presentation index: %d", out_device->present_qfi);
+        ETINFO("Compute index:      %d", out_device->compute_qfi);
+        ETINFO("Transfer index:     %d", out_device->transfer_qfi);
     }
     
     // Clean up dynarrays
@@ -441,11 +449,6 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
         if(no_transfer) ETINFO("Transfer queue family required & not found");
         return false;
     }
-
-    ETINFO("Graphics index %u", g_index);
-    ETINFO("Presentation index %u", p_index);
-    ETINFO("Compute index %u", c_index);
-    ETINFO("Transfer index %u", t_index);
 
     requirements->g_index = g_index;
     requirements->p_index = p_index;

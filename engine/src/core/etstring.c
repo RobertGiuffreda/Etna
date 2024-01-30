@@ -4,6 +4,7 @@
 
 #include <string.h>
 
+
 u64 str_length(const char* str) {
     return strlen(str);
 }

@@ -9,7 +9,7 @@
 #define LOG_TRACE_ENABLED
 
 typedef enum log_level {
-    LOG_FATAL,
+    LOG_FATAL = 0x0000,
     LOG_ERROR,
     LOG_WARN,
     LOG_INFO,

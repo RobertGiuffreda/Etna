@@ -55,6 +55,13 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         ETFATAL("Unable to initialize logger.");
         return false;
     }
+    ETFATAL("Testing fatal.");
+    ETERROR("Testing error.");
+    ETWARN("Testing warn.");
+    ETINFO("Testing info.");
+    ETDEBUG("Testing debug");
+    ETTRACE("Testing trace");
+
 
     // Check if the application passed the functions
     b8 has_init, has_shutdown, has_update, has_render = false;

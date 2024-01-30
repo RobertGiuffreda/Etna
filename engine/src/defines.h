@@ -44,41 +44,20 @@ STATIC_ASSERT(sizeof(b8) == 1, "Expected b8 to be 1 byte.");
 #define true 1
 #define false 0
 
-// TODO: More readable Platform detection code
-// Platform detection
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
-#define ETPLATFORM_WINDOWS 1
-#ifndef _WIN64
-#error "64-bit required on Windows."
-#endif
+    #define ET_WINDOWS 1
+    #if !defined(_WIN64)
+        #error "64-bit required on Windows."
+    #endif
 #elif defined(__linux__) || defined(__gnu_linux__)
-// Linux OS
-#define ETPLATFORM_LINUX 1
-#if defined(__ANDROID__)
-#define ETPLATFORM_ANDROID 1
-#endif
+    #define ET_LINUX 1
+    #if defined(__ANDROID__)
+        #define ET_ANDROID 1
+    #endif
 #elif defined(__unix__)
-#define ETPLATFORM_UNIX 1
+    #define ET_UNIX 1
 #elif defined(_POSIX_VERSION)
-//Posix
-#define ETPLATFORM_POSIX 1
-#elif __APPLE__
-//Apple platform
-#define ETPLATFORM_APPLE 1
-//Apple Platform
-#include <TargetConditionals.h>
-#if TARGET_IPHONE_SIMULATOR
-//ios simulator
-#define ETPLATFORM_IOS 1
-#define ETPLATFORM_IOS_SIMULATOR 1
-#elif TARGET_OS_IPHONE
-#define ETPLATFORM_IOS 1
-//ios device
-#elif TARGET_OS_MAC
-//other mac os variants
+    #define ET_POSIX 1
 #else
-#error "Unknown Apple platform"
-#endif
-#else
-#error "Unknown Platform"
+    #error "Unknown Platform"
 #endif

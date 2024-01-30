@@ -12,8 +12,6 @@ void buffer_create(
     VkMemoryPropertyFlags memory_property_flags,
     buffer* out_buffer)
 {
-
-
     // Does buffer create need an initializer or does this 
     // needlessly obfuscate buffer creation
     VkBufferCreateInfo buffer_info = init_buffer_create_info(usage_flags, size);
