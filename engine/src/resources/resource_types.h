@@ -5,7 +5,7 @@
 #define INVALID_ID 0xFFFFFFFF
 
 /** NOTE:
- * Functionality of the xxxx_manager objects is currently
+ * Functionality of the xxxxx_manager objects is currently
  * very limited. 
  * They essentially function as linear allocators for each 
  * kind of object they manage. So assets cannot be removed or
@@ -19,6 +19,8 @@
  * A staging buffer system using the dedicated transfer queue and suballocation of memory should be
  * implemented to minimize memory allocations as the spec only allows 4096
  */
+
+// TODO: xxxxx_manager_load vs xxxxx_manager_submit
 
 typedef struct mesh mesh;
 typedef struct image image;
