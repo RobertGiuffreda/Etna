@@ -13,5 +13,5 @@ glb_json.json
 etna_log.txt
 etna_err.txt
 
-Makefile
+bin
 *Makefile

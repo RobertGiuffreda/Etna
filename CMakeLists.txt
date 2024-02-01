@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.21)
 
 #Set project
 project(TestEtna VERSION 1.0.1 DESCRIPTION "Test writing Etna")
