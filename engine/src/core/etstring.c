@@ -34,8 +34,6 @@ char* str_str_search(const char* str, const char* sub_str) {
 }
 
 char* str_duplicate_allocate(const char* str) {
-    // if (!str) return NULL;
-
     u32 len = strlen(str);
     char* str2 = etallocate(sizeof(char) * len + 1, MEMORY_TAG_STRING);
     etcopy_memory(str2, str, sizeof(char) * len);
@@ -44,6 +42,5 @@ char* str_duplicate_allocate(const char* str) {
 }
 
 void str_duplicate_free(char* str) {
-    // if (!str) return;
     etfree(str, sizeof(char) * (strlen(str) + 1), MEMORY_TAG_STRING);
 }

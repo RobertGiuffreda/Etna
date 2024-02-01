@@ -49,6 +49,8 @@ void file_close(etfile* file);
  */
 b8 file_size(etfile* file, u64* out_size);
 
+b8 file_copy(etfile* file, etfile* copy);
+
 /**
  * @brief Reads all bytes from the provided file to here
  * 
@@ -57,7 +59,7 @@ b8 file_size(etfile* file, u64* out_size);
  * @param out_bytes_read A pointer to a number which will be populated with the number of bytes read from the file.
  * @return True if sucessful, false otherwise.
  */
-b8 file_read_bytes(etfile* file, u8* out_bytes, u64* out_bytes_read);
+b8 file_read_bytes(etfile* file, u8* out_bytes, u64 byte_count);
 
 /** 
  * @brief Writes provided data to the file.

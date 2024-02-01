@@ -2,19 +2,20 @@
 
 #include "core/logger.h"
 #include "core/etmemory.h"
+#include "core/etstring.h"
 
 #include <sys/stat.h>
 #include <stdio.h>
 
 //TODO: Platform specific code for filesytem
-
 //TODO: Replace if checks with asserts to pass responsibility to the caller
 
 struct etfile {
+    const char* path;
     FILE* handle;
 };
 
-static inline void _filesystem_size(FILE* file, u64* out_size);
+static inline void _file_size(FILE* file, u64* out_size);
 
 b8 file_exists(const char* path) {
 #ifdef _MSC_VER
@@ -61,21 +62,40 @@ void file_close(etfile* file) {
 // TODO: Check if works for not binary mode files
 b8 file_size(etfile* file, u64* out_size) {
     if (file && file->handle) {
-        _filesystem_size(file->handle, out_size);
+        _file_size(file->handle, out_size);
         return true;
     }
     return false;
 }
 
+b8 file_copy(etfile* file, etfile* copy) {
+    u64 file_byte_count = 0;
+    _file_size(file->handle, &file_byte_count);
+    u8* file_bytes = etallocate(sizeof(u8) * file_byte_count, MEMORY_TAG_FILE);
+
+    if (!file_read_bytes(file, file_bytes, file_byte_count)) {
+        ETERROR("Error reading file contents.");
+        etfree(file_bytes, sizeof(u8) * file_byte_count, MEMORY_TAG_FILE);
+        return false;
+    }
+
+    u64 bytes_copied = 0;
+    if (!file_write(copy, file_byte_count, file_bytes, &bytes_copied)) {
+        ETERROR("Error copying file contents.");
+        etfree(file_bytes, sizeof(u8) * file_byte_count, MEMORY_TAG_FILE);
+        return false;
+    }
+
+    etfree(file_bytes, sizeof(u8) * file_byte_count, MEMORY_TAG_FILE);
+    return true;
+}
+
 // TODO: Custom allocator for file reading
 // TODO: Check if works for not binary mode files
-b8 file_read_bytes(etfile* file, u8* out_bytes, u64* out_bytes_read) {
+b8 file_read_bytes(etfile* file, u8* out_bytes, u64 byte_count) {
     if (file && file->handle) {
-        u64 size = 0;
-        _filesystem_size(file->handle, &size);
-
-        *out_bytes_read = fread(out_bytes, 1, size, file->handle);
-        return *out_bytes_read == size;
+        u64 bytes_read = fread(out_bytes, 1, byte_count, file->handle);
+        return bytes_read == byte_count;
     }
     return false;
 }
@@ -94,7 +114,7 @@ b8 file_write(etfile* file, u64 data_size, const void* data, u64* out_bytes_writ
 
 // Static helper method.
 //NOTE: Sets the file position indicator to the beginning of the file
-void _filesystem_size(FILE* file, u64* out_size) {
+void _file_size(FILE* file, u64* out_size) {
     fseek(file, 0, SEEK_END);
     *out_size = ftell(file);
     rewind(file);

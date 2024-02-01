@@ -3,9 +3,15 @@ plans
 tests
 demonstration/*.mp4
 
+extern/glfw/bin
+extern/SPIRV-Reflect/bin
+
 assets/gltf/zda_test.glb
 assets/gltf/house2.glb
 
 glb_json.json
 etna_log.txt
 etna_err.txt
+
+Makefile
+*Makefile
