@@ -1,11 +1,14 @@
 #pragma once
 #include "defines.h"
 #include "math/math_types.h"
+#include "renderer/renderer_types.h"
 
-b8 scene_initalize(struct scene* scene, struct renderer_state* state);
+typedef struct scene scene;
 
-void scene_update(struct scene* scene);
+b8 scene_initalize(scene* scene, renderer_state* state);
 
-void scene_shutdown(struct scene* scene);
+void scene_update(scene* scene);
 
-void scene_draw(struct scene* scene, const m4s top_matrix, struct draw_context* ctx);
+void scene_shutdown(scene* scene);
+
+void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx);

@@ -83,12 +83,8 @@ void mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_context* ctx);
 // Returns a reference to the base node struct in mesh_node
 node* node_from_mesh_node(mesh_node* node);
 
-void gltf_draw(struct loaded_gltf* gltf, const m4s top_matrix, struct draw_context* ctx);
-
 void node_print(node* node);
 
 void mesh_node_print(mesh_node* node);
-
-void gltf_print(struct loaded_gltf* gltf, const char* gltf_name);
 
 void draw_context_print(draw_context* ctx);

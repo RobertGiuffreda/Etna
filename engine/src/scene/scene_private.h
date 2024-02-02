@@ -13,6 +13,10 @@
 #include "renderer/src/renderables.h"
 #include "resources/resource_types.h"
 
+struct mesh_manager;
+struct image_manager;
+struct material_manager;
+
 typedef struct scene {
     char* name;
     struct mesh_manager* mesh_bank;

@@ -1,10 +1,10 @@
 #pragma once
-
 #include "resource_types.h"
+#include "renderer/renderer_types.h"
 
 typedef struct mesh_manager mesh_manager;
 
-b8 mesh_manager_initialize(mesh_manager** manager, struct renderer_state* state);
+b8 mesh_manager_initialize(mesh_manager** manager, renderer_state* state);
 
 void mesh_manager_shutdown(mesh_manager* manager);
 

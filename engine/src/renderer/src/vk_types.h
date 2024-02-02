@@ -4,13 +4,12 @@
 #include "core/asserts.h"
 
 #include "math/math_types.h"
+#include "renderer/renderer_types.h"
 #include "resources/resource_types.h"
-
+#define VK_ENABLE_BETA_EXTENSIONS
 #include <vulkan/vulkan.h>
 
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
-
-typedef struct renderer_state renderer_state;
 
 // TEMP: Until descriptor set management refactor
 typedef struct descriptor_set_layout_builder {

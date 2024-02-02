@@ -131,6 +131,7 @@ b8 device_create(renderer_state* state, device* out_device) {
         u32 flags_set = hamming_weight(qfi_flags[indices[i]]);
         u32 qf_queue_count = qf_props[indices[i]].queueFamilyProperties.queueCount;
         u32 queue_count = (qf_queue_count < flags_set) ? qf_queue_count : flags_set;
+
         // Save requested queue counts for use when fetching queues after
         queue_counts[indices[i]] = queue_count;
 
@@ -140,6 +141,7 @@ b8 device_create(renderer_state* state, device* out_device) {
 
         queue_cinfos[i].pQueuePriorities = priorities;
     }
+
     // Device features to enable
     VkPhysicalDeviceVulkan13Features enabled_features13 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
@@ -170,6 +172,7 @@ b8 device_create(renderer_state* state, device* out_device) {
         .enabledLayerCount = 0,     // Depricated
         .ppEnabledLayerNames = 0,   // Depricated
     };
+
     VK_CHECK(vkCreateDevice(
         out_device->gpu, 
         &device_cinfo,
@@ -195,21 +198,21 @@ b8 device_create(renderer_state* state, device* out_device) {
     vkGetDeviceQueue(
         out_device->handle,
         out_device->present_qfi,
-        (p_max_queues) ? curr_queue_indices[out_device->present_qfi]++ : 0,
+        (p_max_queues) ? 0 : curr_queue_indices[out_device->present_qfi]++,
         &out_device->present_queue);
 
     b8 c_max_queues = (curr_queue_indices[out_device->compute_qfi] == queue_counts[out_device->compute_qfi]);
     vkGetDeviceQueue(
         out_device->handle,
         out_device->present_qfi,
-        (c_max_queues) ? curr_queue_indices[out_device->compute_qfi]++ : 0,
+        (c_max_queues) ? 0 : curr_queue_indices[out_device->compute_qfi]++,
         &out_device->compute_queue);
 
     b8 t_max_queues = (curr_queue_indices[out_device->transfer_qfi] == queue_counts[out_device->transfer_qfi]);
     vkGetDeviceQueue(
         out_device->handle,
         out_device->transfer_qfi,
-        (t_max_queues) ? curr_queue_indices[out_device->transfer_qfi]++ : 0,
+        (t_max_queues) ? 0 : curr_queue_indices[out_device->transfer_qfi]++,
         &out_device->transfer_queue);
 
     ETINFO("Queues Obtained.");
@@ -245,6 +248,8 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
     VkPhysicalDevice* physical_devices = dynarray_create(physical_device_count, sizeof(VkPhysicalDevice));
     vkEnumeratePhysicalDevices(state->instance, &physical_device_count, physical_devices);
 
+    bool device_found = false;
+
     for (u32 i = 0; i < physical_device_count; ++i) {
         // Get physical device properties
         VkPhysicalDeviceProperties2 properties2 = {
@@ -253,12 +258,12 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
         vkGetPhysicalDeviceProperties2(physical_devices[i], &properties2);
         VkPhysicalDeviceProperties* properties = &properties2.properties;
 
-        //TEMP: To get my laptop to not pick my integrated GPU
-        if (properties->deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-            ETINFO("Device: %u is not a discrete GPU. Skipping", i);
-            continue;
-        }
-        //TEMP: END
+        // //TEMP: To get my laptop to not pick my integrated GPU
+        // if (properties->deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+        //     ETINFO("Device: %u is not a discrete GPU. Skipping", i);
+        //     continue;
+        // }
+        // //TEMP: END
 
         if (!device_meets_requirements(physical_devices[i], state->surface, requirements)) {
             ETFATAL("Device Requirements not met.");
@@ -289,11 +294,12 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
         ETINFO("Presentation index: %d", out_device->present_qfi);
         ETINFO("Compute index:      %d", out_device->compute_qfi);
         ETINFO("Transfer index:     %d", out_device->transfer_qfi);
+        device_found = true;
     }
     
     // Clean up dynarrays
     dynarray_destroy(physical_devices);
-    return true;
+    return device_found;
 }
 
 static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surface, gpu_reqs* requirements) {
@@ -394,13 +400,18 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
 
         // Dedicated Transfer queue?
         /* Dedicated transfer queue will not have any of the other bits in transfer check set.
-        * NOTE: My graphics card has VK_QUEUE_OPTICAL_FLOW_BIT_NV in a differrent queue 
+        * NOTE: My graphics card has VK_QUEUE_OPTICAL_FLOW_BIT_NV & VK_QUEUE_VIDEO_DECODE_BIT_KHR
+        * & VK_QUEUE_VIDEO_ENCODE_BIT_KHR in separate queue families
         * from the dedicated transfer & I am basing my reasoning on that.
         */
         VkQueueFlags transfer_check = 
             VK_QUEUE_TRANSFER_BIT |
             VK_QUEUE_COMPUTE_BIT |
             VK_QUEUE_GRAPHICS_BIT |
+            VK_QUEUE_VIDEO_DECODE_BIT_KHR |
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+            VK_QUEUE_VIDEO_ENCODE_BIT_KHR |
+#endif
             VK_QUEUE_OPTICAL_FLOW_BIT_NV;
         if ((q_props->queueFlags & transfer_check) == VK_QUEUE_TRANSFER_BIT) {
             t_index = i;
@@ -458,7 +469,7 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
 }
 
 static u32 hamming_weight(u32 x) {
-#if defined(__GNUC__) || defined(__CLANG__)
+#if defined(__GNUC__) || defined(__clang__)
 return __builtin_popcount(x);
 #else // Windows popcount intinsic is hardware specific so we do it Brian Kernighan's way.
     u32 count = 0;

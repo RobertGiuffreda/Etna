@@ -21,7 +21,7 @@ struct image_manager {
     u32 image_count;
 };
 
-b8 image_manager_initialize(image_manager** manager, struct renderer_state* state) {
+b8 image_manager_initialize(image_manager** manager, renderer_state* state) {
     image_manager* new_manager = etallocate(sizeof(image_manager), MEMORY_TAG_RESOURCE);
     etzero_memory(new_manager, sizeof(image_manager));
     new_manager->state = state;

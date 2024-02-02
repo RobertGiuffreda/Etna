@@ -72,7 +72,8 @@ target_link_directories(engine PRIVATE $ENV{VULKAN_SDK}/Lib)
 target_link_libraries(engine
     PRIVATE vulkan-1
     PRIVATE glfw
-    PRIVATE spirv-reflect-static)
+    PRIVATE spirv-reflect-static
+)
 
 #HACK: Glob_recurse for now as structure is uncertain.
 #Get executable source files:
@@ -96,4 +97,5 @@ target_include_directories(sandbox
 target_link_directories(sandbox PRIVATE $ENV{VULKAN_SDK}/Lib)
 target_link_libraries(sandbox
     PRIVATE engine
-    PRIVATE vulkan-1)
+    PRIVATE vulkan-1
+)

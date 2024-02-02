@@ -59,9 +59,6 @@ static void shutdown_default_data(renderer_state* state);
 
 static void draw_geometry(renderer_state* state, VkCommandBuffer cmd);
 
-static void immediate_begin(struct renderer_state* state);
-static void immediate_end(struct renderer_state* state);
-
 b8 rebuild_swapchain(renderer_state* state);
 
 VkBool32 vk_debug_callback(
@@ -832,7 +829,7 @@ static b8 initialize_default_data(renderer_state* state) {
         .metal_rough_factors = (v4s){.raw = {1.f, .5f, 0.f, 0.f}},
     };
     struct material_constants* mapped_data;
-    vkMapMemory(state->device.handle, state->default_material_constants.memory, 0, sizeof(struct material_constants), 0, &mapped_data);
+    vkMapMemory(state->device.handle, state->default_material_constants.memory, 0, sizeof(struct material_constants), 0, (void**)&mapped_data);
     *mapped_data = scene_uniform_data;
     vkUnmapMemory(state->device.handle, state->default_material_constants.memory);
 

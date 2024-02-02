@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
     }
 
     if (!engine_initialize(engine_details, app_details)) {
-        ETDEBUG("Engine Initialize failed.");
+        ETFATAL("Engine Initialize failed.");
         return 1;
     }
 

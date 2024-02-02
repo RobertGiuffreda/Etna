@@ -2,9 +2,11 @@
 
 #include "defines.h"
 
-typedef struct renderer_state renderer_state;
+#include "renderer/renderer_types.h"
 
-b8 renderer_initialize(renderer_state** state, struct etwindow_state* window, const char* application_name);
+struct etwindow_state;
+
+b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window, const char* application_name);
 
 void renderer_shutdown(renderer_state* state);
 

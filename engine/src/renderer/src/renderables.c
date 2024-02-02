@@ -170,13 +170,6 @@ node* node_from_mesh_node(mesh_node* node) {
     return &node->base;
 }
 
-void gltf_draw(struct loaded_gltf* gltf, const m4s top_matrix, struct draw_context* ctx) {
-    u32 node_count = dynarray_length(gltf->top_nodes);
-    for (u32 i = 0; i < node_count; ++i) {
-        node_draw(gltf->top_nodes[i], top_matrix, ctx);
-    }
-}
-
 void mesh_asset_print(mesh* m_asset) {
     ETINFO("Mesh asset %s data:", m_asset->name);
     for (u32 i = 0; i < dynarray_length(m_asset->surfaces); ++i) {
@@ -198,22 +191,6 @@ void node_print(node* node) {
 void mesh_node_print(mesh_node* node) {
     mesh_asset_print(node->mesh);
     node_print(&node->base);
-}
-
-void gltf_print(struct loaded_gltf* gltf, const char* gltf_name) {
-    ETINFO("GLTF: %s's data:", gltf_name);
-    ETINFO(
-        "Mesh count: %lu | Image count: %lu | Material count: %lu | Sampler count %lu.",
-        gltf->mesh_count, gltf->image_count, gltf->material_count, gltf->sampler_count
-    );
-    ETINFO(
-        "Mesh node count: %lu | node count: %lu | Top node count: %lu",
-        gltf->mesh_node_count, gltf->node_count, gltf->top_node_count
-    );
-    ETINFO("Mesh asset information: ");
-    for (u32 i = 0; i < gltf->mesh_node_count; ++i) {
-        mesh_node_print(&gltf->mesh_nodes[i]);
-    }
 }
 
 void draw_context_print(draw_context* ctx) {

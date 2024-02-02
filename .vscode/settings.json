@@ -180,7 +180,8 @@
         "mat4.h": "c",
         "gltf_mr.h": "c",
         "swapchain.h": "c",
-        "stdalign.h": "c"
+        "stdalign.h": "c",
+        "scene.h": "c"
     },
     "C_Cpp.dimInactiveRegions": false
 }

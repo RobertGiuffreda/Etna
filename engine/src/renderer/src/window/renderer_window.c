@@ -8,7 +8,7 @@ struct etwindow_state {
     b8 cursor_captured;
 };
 
-b8 window_create_vulkan_surface(renderer_state* renderer_state, etwindow_state* window_state) {
+b8 window_create_vulkan_surface(renderer_state* renderer_state, struct etwindow_state* window_state) {
     VkResult result = glfwCreateWindowSurface(
         renderer_state->instance,
         window_state->impl_window,
