@@ -1,31 +1,35 @@
 #include "application.h"
 
 #include <application_types.h>
-#include <memory/etmemory.h>
 #include <core/logger.h>
-#include <math/math_types.h>
 #include <core/etfile.h>
+#include <math/math_types.h>
+#include <memory/etmemory.h>
+#include <scene/scene.h>
 
-struct application_state_t {
-    u32 temp;
+struct application_t {
+    scene* main_scene;
 };
 
-b8 application_initialize(struct application_state_t* state) {
-    // Zero memory allocated for the application state 
-    etzero_memory(state, sizeof(struct application_state_t));
+b8 application_initialize(application_t* app) {
+    // Zero memory allocated for the app
+    etzero_memory(app, sizeof(application_t));
     return true;
 }
 
-void application_shutdown(struct application_state_t* state) {}
+void application_shutdown(application_t* app) {
+    // scene_shutdown(app->main_scene);
+}
 
-b8 application_update(struct application_state_t* state) {
+b8 application_update(application_t* app) {
+    // scene_update(app->main_scene);
     return true;
 }
 
-b8 application_render(struct application_state_t* state) {
+b8 application_render(application_t* app) {
     return true;
 }
 
 u64 get_appstate_size(void) {
-    return sizeof(struct application_state_t);
+    return sizeof(application_t);
 }

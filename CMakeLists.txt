@@ -26,7 +26,7 @@ file(MAKE_DIRECTORY ${GLTF_DIRECTORY})
 # Copy over the gltf files
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/structure.glb ${GLTF_DIRECTORY}/structure.glb COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/house2.glb ${GLTF_DIRECTORY}/house2.glb COPYONLY)
-# configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/zda_test.glb ${GLTF_DIRECTORY}/zda_test.glb COPYONLY)
+configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/zda_test.glb ${GLTF_DIRECTORY}/zda_test.glb COPYONLY)
 
 #NOTE: External dependencies
 #Add glfw as a dependency to be built alongside the engine

@@ -28,13 +28,13 @@ typedef struct engine_state {
     // HACK:TEMP: END
 
     // Application data
-    b8 (*app_initialize)(application_state* app_state);
-    void (*app_shutdown)(application_state* app_state);
-    b8 (*app_update)(application_state* app_state);
-    b8 (*app_render)(application_state* app_state);
+    b8 (*app_initialize)(application_t* app);
+    void (*app_shutdown)(application_t* app);
+    b8 (*app_update)(application_t* app);
+    b8 (*app_render)(application_t* app);
 
     u64 app_state_size;
-    application_state* app_state;
+    application_t* app;
     etwindow_state* window_state;
     events_state* events_state;
     input_state* input_state;
@@ -129,11 +129,11 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     state->app_shutdown = app_details.shutdown;
     state->app_update = app_details.update;
     state->app_render = app_details.render;
-    state->app_state_size = app_details.state_size;
-    state->app_state = (application_state*)etallocate(app_details.state_size, MEMORY_TAG_APPLICATION);
+    state->app_state_size = app_details.app_size;
+    state->app = (application_t*)etallocate(app_details.app_size, MEMORY_TAG_APPLICATION);
 
     // Initialize application
-    if (!state->app_initialize(state->app_state)) {
+    if (!state->app_initialize(state->app)) {
         ETFATAL("Unable to initialize application. application_initialize returned false.");
         return false;
     }
@@ -146,7 +146,7 @@ b8 engine_run(void) {
     // TEMP: Better clocking needs to be implemented
     while (state->is_running && !etwindow_should_close(state->window_state)) {
         clock_start(&state->frame_clk);
-        state->app_update(state->app_state);
+        state->app_update(state->app);
 
         if (!state->minimized) {
             // HACK: scene update changes renderer state.
@@ -163,10 +163,10 @@ b8 engine_run(void) {
 
 void engine_shutdown(void) {
     // Call the passed in shutdown function for the application
-    state->app_shutdown(state->app_state);
+    state->app_shutdown(state->app);
 
-    // Free the app_state memory
-    etfree(state->app_state, state->app_state_size, MEMORY_TAG_APPLICATION);
+    // Free the app memory
+    etfree(state->app, state->app_state_size, MEMORY_TAG_APPLICATION);
 
     scene_shutdown(state->main_scene);
 

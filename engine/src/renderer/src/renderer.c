@@ -687,7 +687,8 @@ static void destroy_scene_data_buffers(renderer_state* state) {
 
 static b8 initialize_compute_effects(renderer_state* state) {
     if (!load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader)) {
-
+        ETERROR("Error loading compute effect shader.");
+        return false;
     }
 
     VkPipelineLayoutCreateInfo compute_effect_pipeline_layout_info = init_pipeline_layout_create_info();

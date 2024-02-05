@@ -39,7 +39,7 @@ static void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx);
  */
 b8 scene_initalize(scene** scn, renderer_state* state) {
     // HACK:TODO: Make configurable & from application
-    const char* path = "build/assets/gltf/structure.glb";
+    const char* path = "build/assets/gltf/zda_test.glb";
     // HACK:TODO: END
 
     scene* new_scene = etallocate(sizeof(struct scene), MEMORY_TAG_SCENE);
@@ -115,6 +115,10 @@ void scene_shutdown(scene* scene) {
         node_destroy(&scene->nodes[i]);
     }
     etfree(scene->nodes, sizeof(node) * scene->node_count, MEMORY_TAG_SCENE);
+
+    // HACK: Better way to wait until resources are unused
+    vkDeviceWaitIdle(state->device.handle);
+    // HACK: END
 
     mesh_manager_shutdown(scene->mesh_bank);
     buffer_destroy(state, &scene->material_buffer);

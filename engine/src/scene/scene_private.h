@@ -19,9 +19,12 @@ struct material_manager;
 
 typedef struct scene {
     char* name;
+
+    // TODO: Move managers to some project representation that contains scenes
     struct mesh_manager* mesh_bank;
     struct image_manager* image_bank;
     struct material_manager* material_bank;
+    // TODO: END
 
     node** top_nodes;
     u32 top_node_count;

@@ -346,9 +346,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     dynarray_destroy(vertices);
     dynarray_destroy(indices);
 
-    ETINFO("Triangle count: %llu.", vertex_count);
-    ETINFO("Triangle count: %llu.", vertex_count/3);
-
     mesh_manager_uploads_wait(scene->mesh_bank);
 
     // Count up needed mesh_nodes & needed nodes. Then allocate backing memory for them
