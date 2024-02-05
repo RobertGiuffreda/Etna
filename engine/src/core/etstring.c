@@ -1,6 +1,6 @@
 #include "etstring.h"
 
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 
 #include <string.h>
 

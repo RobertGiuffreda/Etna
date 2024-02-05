@@ -1,7 +1,7 @@
 #include "dynarray.h"
 #include "core/logger.h"
 #include "core/asserts.h"
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 
 // TODO: IMPLEMENT SAFETY CHECKS FOR THE ARRAY:
 // Out of bounds reading, impossible values, etc...

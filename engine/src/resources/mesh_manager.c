@@ -2,7 +2,7 @@
 
 #include "containers/dynarray.h"
 
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 #include "core/logger.h"
 #include "core/etstring.h"
 
@@ -89,14 +89,12 @@ b8 mesh_manager_submit_immediate(mesh_manager* manager, mesh_config* config) {
         sizeof(surface),
         config->surface_count,
         config->surfaces);
-
     new_mesh->buffers = upload_mesh_immediate(
         manager->state,
         config->index_count,
         config->indices,
         config->vertex_count,
-        config->vertices
-    );
+        config->vertices);
     manager->mesh_count++;
     return true;
 }

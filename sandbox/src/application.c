@@ -1,7 +1,7 @@
 #include "application.h"
 
 #include <application_types.h>
-#include <core/etmemory.h>
+#include <memory/etmemory.h>
 #include <core/logger.h>
 #include <math/math_types.h>
 #include <core/etfile.h>

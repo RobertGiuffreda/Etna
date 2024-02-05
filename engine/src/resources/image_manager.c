@@ -1,6 +1,6 @@
 #include "image_manager.h"
 
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 #include "core/asserts.h"
 #include "core/logger.h"
 #include "core/etstring.h"

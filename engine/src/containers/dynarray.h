@@ -1,7 +1,7 @@
 #pragma once
 
 #include "defines.h"
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 
 #define DYNARRAY_DEFAULT_CAPACITY 1
 

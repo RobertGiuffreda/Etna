@@ -2,7 +2,7 @@
 
 #include "core/asserts.h"
 #include "core/logger.h"
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 
 #include "containers/dynarray.h"
 

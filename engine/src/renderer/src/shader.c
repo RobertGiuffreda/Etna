@@ -1,6 +1,6 @@
 #include "shader.h"
 
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 #include "core/logger.h"
 #include "core/etstring.h"
 #include "core/etfile.h"

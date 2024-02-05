@@ -1,7 +1,7 @@
 #include "engine.h"
 
 #include "core/asserts.h"
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 #include "core/logger.h"
 #include "core/events.h"
 #include "core/input.h"
@@ -19,6 +19,7 @@
 typedef struct engine_state {
     b8 is_running;
     b8 minimized;
+    clock frame_clk;
 
     // Application data
     b8 (*app_initialize)(application_state* app_state);
@@ -132,8 +133,9 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
 b8 engine_run(void) {
     state->is_running = true;
 
+    // TEMP: Better clocking needs to be implemented
     while (state->is_running && !etwindow_should_close(state->window_state)) {
-        // Application per frame update
+        clock_start(&state->frame_clk);
         state->app_update(state->app_state);
 
         if (!state->minimized) {
@@ -143,6 +145,7 @@ b8 engine_run(void) {
         }
         input_update(state->input_state);
         etwindow_poll_events(); // glfwPollEvents() called
+        clock_time(&state->frame_clk);
     }
     
     return true;
@@ -198,13 +201,19 @@ b8 engine_on_resize(u16 event_code, void* engine_state, event_data data) {
 
 b8 engine_on_key_event(u16 event_code, void* engine_state, event_data data) {
     keys key = EVENT_DATA_KEY(data);
-    switch (event_code)
-    {
-    case EVENT_CODE_KEY_RELEASE:
-        if (key == KEY_ESCAPE) {
+    if (event_code == EVENT_CODE_KEY_RELEASE) {
+        switch (key)
+        {
+        case KEY_ESCAPE:
             state->is_running = false;
+            break;
+        case KEY_F:
+            // HACK: I'm sorry, this is awful. But I don't want to implement a GUI before I am ready
+            ETINFO("Last frame time: %llf ms.", state->frame_clk.elapsed * 1000);
+            break;
+        default:
+            break;
         }
-        break;
     }
     return true;
 }

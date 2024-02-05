@@ -13,6 +13,8 @@
 
 #include "core/etfile.h"
 
+#include "memory/etmemory.h"
+
 // NOTE: Currenly leaks memory on failure to load gltf file
 // TODO: Create a function to call when importing a file fails
 // that checks for memory allocations and frees them before returning
@@ -238,6 +240,9 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
     }
     vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
 
+    // TEMP: Testing
+    u64 vertex_count = 0;
+
     vertex* vertices = dynarray_create(1, sizeof(vertex));
     u32* indices = dynarray_create(1, sizeof(u32));
     for (u32 i = 0; i < data->meshes_count; ++i) {
@@ -276,6 +281,8 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
                 ETERROR("Attempted to load mesh without vertex positions.");
                 return false;
             }
+
+            vertex_count += position->count;
 
             dynarray_resize((void**)&vertices, dynarray_length(vertices) + position->count);
             cgltf_size pos_element_size = cgltf_calc_size(position->type, position->component_type);
@@ -373,6 +380,9 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
     }
     dynarray_destroy(vertices);
     dynarray_destroy(indices);
+
+    ETINFO("Triangle count: %llu.", vertex_count);
+    ETINFO("Triangle count: %llu.", vertex_count/3);
 
     mesh_manager_uploads_wait(scene->mesh_bank);
 

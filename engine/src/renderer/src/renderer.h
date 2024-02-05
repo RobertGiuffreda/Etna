@@ -96,7 +96,7 @@ typedef struct renderer_state {
 
     VkFence* render_fences;
     
-    // Graphics queue for everything until I get a handle vulkan. 
+    // Graphics queue for everything until I get a handle vulkan.
     VkCommandPool* graphics_pools;
     VkCommandBuffer* main_graphics_command_buffers;
 

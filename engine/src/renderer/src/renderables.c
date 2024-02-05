@@ -4,7 +4,7 @@
 
 #include "math/math_types.h"
 
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 #include "core/logger.h"
 
 #include "renderer/src/renderer.h"

@@ -1,6 +1,6 @@
 #include "image.h"
 
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 #include "core/logger.h"
 
 #include "renderer/src/utilities/vkinit.h"

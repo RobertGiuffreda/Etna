@@ -1,6 +1,6 @@
 #include "vkinit.h"
 
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 
 #include "renderer/src/buffer.h"
 #include "renderer/src/renderer.h"

@@ -4,7 +4,7 @@
 
 #include "containers/dynarray.h"
 
-#include "core/etmemory.h"
+#include "memory/etmemory.h"
 #include "core/logger.h"
 
 #define DEFAULT_PIPELINE_STAGE_COUNT 2

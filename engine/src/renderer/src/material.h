@@ -4,14 +4,12 @@
 #include "renderer/src/shader.h"
 
 typedef struct material_blueprint {
-    shader vertex;
-    shader fragment;
-
     material_pipeline opaque_pipeline;
     material_pipeline transparent_pipeline;
-
     VkDescriptorSetLayout ds_layout;
 
+    shader vertex;
+    shader fragment;
     ds_writer writer;
 } material_blueprint;
 
