@@ -7,28 +7,14 @@
 #include "core/etstring.h"
 
 // TEMP: This should be made renderer implementation agnostic
-#include "renderer/src/vk_types.h"
-#include "renderer/src/renderer.h"
+#include "resource_private.h"
 #include "renderer/src/buffer.h"
 
 #include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/utilities/vkutils.h"
 // TEMP: END
 
-#define MAX_MESH_COUNT 512
-
-struct mesh_manager {
-    renderer_state* state;
-    VkCommandPool upload_pool;
-    VkFence* upload_fences;
-    buffer* staging_buffers;
-    u32 upload_count;
-
-    mesh meshes[MAX_MESH_COUNT];
-    u32 mesh_count;
-};
-
-b8 mesh_manager_initialize(mesh_manager** manager, struct renderer_state* state) {
+b8 mesh_manager_initialize(mesh_manager** manager, renderer_state* state) {
     mesh_manager* new_manager = etallocate(sizeof(mesh_manager), MEMORY_TAG_RESOURCE);
     etzero_memory(new_manager, sizeof(mesh_manager));
     new_manager->state = state;

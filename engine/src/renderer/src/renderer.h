@@ -73,13 +73,10 @@ typedef struct renderer_state {
 
     // Determines amount of frames: Length of perframe arrays
     u32 image_count;
-
     VkSurfaceKHR surface;
-
     VkExtent3D window_extent;
-    
-    // True if window was resized
-    b8 swapchain_dirty;
+
+    b8 swapchain_dirty; // True if window was resized
     // NOTE: END
 
     // NOTE: Main render images and attachments
@@ -133,10 +130,11 @@ typedef struct renderer_state {
 
     material_instance default_material_instance;
     buffer default_material_constants;
+    // NOTE: Defaults end
 
+    // TODO: Some sort of 
     VkDescriptorSetLayout scene_data_descriptor_set_layout;
-    scene _scene;
-    
+
     draw_context main_draw_context;
 } renderer_state;
 

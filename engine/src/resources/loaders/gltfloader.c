@@ -52,7 +52,8 @@ static void recurse_print_nodes(cgltf_node* node, u32 depth, u64* node_count);
 static cgltf_accessor* get_accessor_from_attributes(cgltf_attribute* attributes, cgltf_size attributes_count, const char* name);
 
 static b8 load_image(cgltf_image* in_image, const char* gltf_path, renderer_state* state, image* out_image);
-// Loads the image data from gltf. *data needs to be freed with stb_image_free(*data); 
+
+// Loads the image data from gltf. *data needs to be freed with stb_image_free(*data);
 static void* load_image_data(cgltf_image* in_image, const char* gltf_path, int* width, int* height, int* channels);
 
 static void import_gltf_failure(struct loaded_gltf* gltf);
@@ -62,9 +63,7 @@ static void gltf_combine_paths(char* path, const char* base, const char* uri);
 static VkFilter gltf_filter_to_vk_filter(cgltf_int filter);
 static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter);
 
-b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* state) {
-    scene->state = state;
-    
+b8 import_gltf(scene* scene, const char* path, renderer_state* state) {    
     // Attempt to load gltf file data with cgltf library
     cgltf_options options = {0};
     cgltf_data* data = 0;
@@ -82,53 +81,18 @@ b8 import_gltf(struct scene* scene, const char* path, struct renderer_state* sta
         return false;
     }
 
-    scene_initalize(scene, state);
-
-    scene->name = str_duplicate_allocate(path);
-
-    scene->state = state;
-
-    mesh_manager_initialize(&scene->mesh_bank, state);
-    image_manager_initialize(&scene->image_bank, state);
-    material_manager_initialize(&scene->material_bank, state);
-
-    // pool_size_ratio ps_ratios[] = {
-    //     { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 3},
-    //     { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 3},
-    //     { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
-    //     { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3}};
-    // scene->ds_allocators = etallocate(sizeof(ds_allocator) * state->image_count, MEMORY_TAG_SCENE);
-    // scene->scene_data_buffers = etallocate(sizeof(buffer) * state->image_count, MEMORY_TAG_SCENE);
-    // for (u32 i = 0; i < state->image_count; ++i) {
-    //     buffer_create(
-    //         state,
-    //         sizeof(scene_data),
-    //         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    //         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    //         &scene->scene_data_buffers[i]);
-    //     descriptor_set_allocator_initialize(
-    //         &scene->ds_allocators[i],
-    //         /* Initial Sets: */ 1000,
-    //         /* pool size count: */ 4,
-    //         ps_ratios,
-    //         state);
-    // }
-
-    camera_create(&scene->cam);
-    scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
-
     // Create samplers
     scene->samplers = etallocate(sizeof(VkSampler) * data->samplers_count, MEMORY_TAG_SCENE);
     for (u32 i = 0; i < data->samplers_count; ++i) {
-        cgltf_sampler* i_sampler = (data->samplers + i);
+        cgltf_sampler* gltf_sampler = (data->samplers + i);
         VkSamplerCreateInfo sampler_info = {
             .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
             .pNext = 0,
             .maxLod = VK_LOD_CLAMP_NONE,
             .minLod = 0,
-            .magFilter = gltf_filter_to_vk_filter(i_sampler->mag_filter),
-            .minFilter = gltf_filter_to_vk_filter(i_sampler->min_filter),
-            .mipmapMode = gltf_filter_to_vk_mipmap_mode(i_sampler->min_filter)};
+            .magFilter = gltf_filter_to_vk_filter(gltf_sampler->mag_filter),
+            .minFilter = gltf_filter_to_vk_filter(gltf_sampler->min_filter),
+            .mipmapMode = gltf_filter_to_vk_mipmap_mode(gltf_sampler->min_filter)};
         VK_CHECK(vkCreateSampler(
             state->device.handle,
             &sampler_info,

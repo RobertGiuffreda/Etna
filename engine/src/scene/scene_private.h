@@ -45,5 +45,5 @@ typedef struct scene {
     // ds_allocator* ds_allocators;
     // buffer* scene_data_buffers;
 
-    struct renderer_state* state;
+    renderer_state* state;
 } scene;

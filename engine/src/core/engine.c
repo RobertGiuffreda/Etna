@@ -12,6 +12,8 @@
 
 #include "renderer/rendererAPI.h"
 
+#include "scene/scene.h"
+
 #include "application_types.h"
 
 // TODO: Add application name to config
@@ -20,6 +22,10 @@ typedef struct engine_state {
     b8 is_running;
     b8 minimized;
     clock frame_clk;
+
+    // HACK:TEMP: Proper scene & project management
+    scene* main_scene;
+    // HACK:TEMP: END
 
     // Application data
     b8 (*app_initialize)(application_state* app_state);
@@ -111,6 +117,10 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
+    // HACK:TEMP: Loading scene should happen in editor/application
+    scene_initalize(&state->main_scene, state->renderer_state);
+    // HACK:TEMP: END
+
     event_observer_register(EVENT_CODE_KEY_RELEASE, (void*)state, engine_on_key_event);
     event_observer_register(EVENT_CODE_RESIZE, (void*)state, engine_on_resize);
 
@@ -139,8 +149,8 @@ b8 engine_run(void) {
         state->app_update(state->app_state);
 
         if (!state->minimized) {
-            // TODO: Remove scene from renderer 
-            renderer_update_scene(state->renderer_state);
+            // HACK: scene update changes renderer state.
+            scene_update(state->main_scene);
             renderer_draw_frame(state->renderer_state);
         }
         input_update(state->input_state);
@@ -157,6 +167,8 @@ void engine_shutdown(void) {
 
     // Free the app_state memory
     etfree(state->app_state, state->app_state_size, MEMORY_TAG_APPLICATION);
+
+    scene_shutdown(state->main_scene);
 
     renderer_shutdown(state->renderer_state);
 
