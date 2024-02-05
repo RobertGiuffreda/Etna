@@ -23,7 +23,7 @@
 #include "renderer/src/descriptor.h"
 #include "renderer/src/shader.h"
 #include "renderer/src/renderables.h"
-#include "resources/loaders/gltfloader.h"
+#include "resources/importers/gltfimporter.h"
 // TEMP: END
 
 // TEMP: Until events refactor

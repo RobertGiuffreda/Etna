@@ -23,7 +23,7 @@
 #include "core/logger.h"
 #include "core/etstring.h"
 
-#include "resources/loaders/gltfloader.h"
+#include "resources/importers/gltfimporter.h"
 
 #include "scene/scene.h"
 

@@ -1,4 +1,4 @@
-#include "gltfloader.h"
+#include "gltfimporter.h"
 
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
@@ -56,13 +56,14 @@ static b8 load_image(cgltf_image* in_image, const char* gltf_path, renderer_stat
 // Loads the image data from gltf. *data needs to be freed with stb_image_free(*data);
 static void* load_image_data(cgltf_image* in_image, const char* gltf_path, int* width, int* height, int* channels);
 
-static void import_gltf_failure(struct loaded_gltf* gltf);
+static void import_gltf_failure(scene* scn);
 
 static void gltf_combine_paths(char* path, const char* base, const char* uri);
 
 static VkFilter gltf_filter_to_vk_filter(cgltf_int filter);
 static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter);
 
+// TODO: Handle loading other parts of gltf, like skeletal animation and cameras 
 b8 import_gltf(scene* scene, const char* path, renderer_state* state) {    
     // Attempt to load gltf file data with cgltf library
     cgltf_options options = {0};
@@ -639,7 +640,7 @@ static void* load_image_data(
 }
 
 // TODO: Implement this function to call on errors loading the gltf file and freeing memory
-static void import_gltf_failure(struct loaded_gltf* gltf) {
+static void import_gltf_failure(scene* scn) {
     
 }
 

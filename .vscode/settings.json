@@ -181,7 +181,8 @@
         "gltf_mr.h": "c",
         "swapchain.h": "c",
         "stdalign.h": "c",
-        "scene.h": "c"
+        "scene.h": "c",
+        "gltfimporter.h": "c"
     },
     "C_Cpp.dimInactiveRegions": false,
     "dotnet.defaultSolution": "disable"

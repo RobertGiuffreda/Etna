@@ -29,7 +29,7 @@ typedef struct scene {
     camera cam;
     scene_data data;
 
-    // TEMP: Leftovers from loaded_gltf not refactored yet
+    // TEMP: Leftovers from loaded_gltf not refactored out yet
     mesh_node* mesh_nodes;
     u32 mesh_node_count;
     node* nodes;
