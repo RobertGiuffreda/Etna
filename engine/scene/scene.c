@@ -1,7 +1,7 @@
 #include "scene.h"
 #include "scene/scene_private.h"
 
-#include "containers/dynarray.h"
+#include "data_structures/dynarray.h"
 
 #include "memory/etmemory.h"
 #include "core/etstring.h"

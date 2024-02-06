@@ -9,8 +9,7 @@
                 "${workspaceFolder}/extern/cglm/include/",
                 "${workspaceFolder}/extern/SPIRV-Reflect/",
                 "${workspaceFolder}/extern/stb_image/",
-                "${workspaceFolder}/extern/cgltf/",
-                "${workspaceFolder}/extern/Nuklear/"
+                "${workspaceFolder}/extern/cgltf/"
             ],
             "defines": [
                 "UNICODE",
