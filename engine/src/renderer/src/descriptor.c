@@ -1,6 +1,6 @@
 #include "descriptor.h"
 
-#include "containers/dynarray.h"
+#include "data_structures/dynarray.h"
 
 #include "core/logger.h"
 

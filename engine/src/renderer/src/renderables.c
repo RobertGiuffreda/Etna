@@ -1,6 +1,6 @@
 #include "renderables.h"
 
-#include "containers/dynarray.h"
+#include "data_structures/dynarray.h"
 
 #include "math/math_types.h"
 

@@ -3,7 +3,7 @@
 #include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/renderer.h"
 
-#include "containers/dynarray.h"
+#include "data_structures/dynarray.h"
 #include "memory/etmemory.h"
 #include "core/logger.h"
 #include "core/etstring.h"

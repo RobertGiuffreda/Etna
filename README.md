@@ -22,7 +22,7 @@ A small `vulkan` renderer written using the `C` programming language. This is wr
 * Custom file formats for scenes, materials, and meshes
 * Serialization support to read in these formats as well as write them out
 * Non Blocking event system
-* Editor using Immediate Mode UI [Nuklear](https://github.com/vurtun/nuklear)
+* Editor using C bindings for ImGui [cimgui](https://github.com/cimgui/cimgui/tree/docking_inter)
 
 ## Screenshots
 ![Screenshot 1](https://github.com/RobertGiuffreda/TestEtna/blob/main/demonstration/EtnaScreenshot.png)

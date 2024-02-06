@@ -6,7 +6,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "containers/dynarray.h"
+#include "data_structures/dynarray.h"
 
 #include "core/logger.h"
 #include "core/etstring.h"

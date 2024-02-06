@@ -17,7 +17,7 @@
 
 #include "window/renderer_window.h"
 
-#include "containers/dynarray.h"
+#include "data_structures/dynarray.h"
 
 #include "memory/etmemory.h"
 #include "core/logger.h"
