@@ -10,10 +10,10 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 #Compile shaders and add them to the build directory
 set(SHADER_COMPILER $ENV{VULKAN_SDK}/Bin/glslangValidator.exe)
 
-file(GLOB_RECURSE SHADER_SRC_FILES "assets/shaders/*.vert" "assets/shaders/*.frag" "assets/shaders/*.comp")
+file(GLOB_RECURSE SHADER_FILES "assets/shaders/*.vert" "assets/shaders/*.frag" "assets/shaders/*.comp")
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/assets/shaders/)
 
-foreach(SHADER_FILE ${SHADER_SRC_FILES})
+foreach(SHADER_FILE ${SHADER_FILES})
     get_filename_component(SHADER_FILE_NAME ${SHADER_FILE} NAME)
     set(SPV_FILE ${PROJECT_BINARY_DIR}/assets/shaders/${SHADER_FILE_NAME}.spv)
     execute_process(COMMAND ${SHADER_COMPILER} -g ${SHADER_FILE} -o ${SPV_FILE} --target-env vulkan1.3)
@@ -43,11 +43,11 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/extern/SPIRV-Reflect)
 
 #HACK: Glob_recurse for now as structure is uncertain.
 #Get library source files:
-file(GLOB_RECURSE ENGINE_SRC_FILES "engine/src/*.c")
-file(GLOB_RECURSE ENGINE_HEADER_FILES "engine/src/*.h")
+file(GLOB_RECURSE ENGINE_FILES "engine/*.c")
+file(GLOB_RECURSE ENGINE_HEADER_FILES "engine/*.h")
 
 #Create engine
-add_library(engine ${ENGINE_SRC_FILES} ${ENGINE_HEADER_FILES})
+add_library(engine ${ENGINE_FILES} ${ENGINE_HEADER_FILES})
 
 #Compiler defines for engine
 target_compile_definitions(engine PRIVATE _DEBUG)
@@ -56,7 +56,7 @@ target_compile_definitions(engine PRIVATE _DEBUG)
 
 #Include directories for engine library
 target_include_directories(engine
-    PRIVATE ${CMAKE_SOURCE_DIR}/engine/src/
+    PRIVATE ${CMAKE_SOURCE_DIR}/engine/
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/glfw/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/cglm/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/SPIRV-Reflect/
@@ -77,11 +77,11 @@ target_link_libraries(engine
 
 #HACK: Glob_recurse for now as structure is uncertain.
 #Get executable source files:
-file(GLOB_RECURSE SANDBOX_SRC_FILES "sandbox/src/*.c")
-file(GLOB_RECURSE SANDBOX_HEADER_FILES "sandbox/src/*.h")
+file(GLOB_RECURSE SANDBOX_FILES "sandbox/*.c")
+file(GLOB_RECURSE SANDBOX_HEADER_FILES "sandbox/*.h")
 
 #Specify executable
-add_executable(sandbox ${SANDBOX_SRC_FILES} ${SANDBOX_HEADER_FILES})
+add_executable(sandbox ${SANDBOX_FILES} ${SANDBOX_HEADER_FILES})
 
 # Compiler defines for sandbox
 target_compile_definitions(sandbox PRIVATE _DEBUG)
@@ -90,7 +90,7 @@ target_compile_definitions(sandbox PRIVATE _DEBUG)
 
 #Include directories for sandbox
 target_include_directories(sandbox
-    PRIVATE ${CMAKE_SOURCE_DIR}/engine/src
+    PRIVATE ${CMAKE_SOURCE_DIR}/engine/
     PRIVATE ${CMAKE_SOURCE_DIR}/extern/cglm/include)
 
 #Link libraries to sandbox
