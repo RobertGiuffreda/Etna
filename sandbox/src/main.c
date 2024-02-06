@@ -13,16 +13,14 @@ b8 define_configuration(engine_config* engine_details, application_config* app_d
     engine_details->x_start_pos = 0;
     engine_details->y_start_pos = 0;
 
-    engine_details->width = 1920;
-    engine_details->height = 1080;
+    engine_details->width = 720;
+    engine_details->height = 480;
 
     app_details->initialize = application_initialize;
     app_details->shutdown = application_shutdown;
     app_details->update = application_update;
     app_details->render = application_render;
 
-    app_details->state_size = get_appstate_size();
-    app_details->state = 0;
-
+    app_details->app_size = get_appstate_size();
     return true;
 }

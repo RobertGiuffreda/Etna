@@ -23,7 +23,7 @@
 #include "core/logger.h"
 #include "core/etstring.h"
 
-#include "resources/loaders/gltfloader.h"
+#include "resources/importers/gltfimporter.h"
 
 #include "scene/scene.h"
 
@@ -327,15 +327,6 @@ void renderer_shutdown(renderer_state* state) {
     ETINFO("Vulkan instance destroyed");
 
     etfree(state, sizeof(renderer_state), MEMORY_TAG_RENDERER);
-}
-
-void renderer_update_scene(renderer_state* state) {    
-    scene_update(&state->_scene);
-
-    dynarray_clear(state->main_draw_context.opaque_surfaces);
-    dynarray_clear(state->main_draw_context.transparent_surfaces);
-    scene_draw(&state->_scene, glms_mat4_identity(), &state->main_draw_context);
-
 }
 
 b8 renderer_draw_frame(renderer_state* state) {
@@ -696,7 +687,8 @@ static void destroy_scene_data_buffers(renderer_state* state) {
 
 static b8 initialize_compute_effects(renderer_state* state) {
     if (!load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader)) {
-
+        ETERROR("Error loading compute effect shader.");
+        return false;
     }
 
     VkPipelineLayoutCreateInfo compute_effect_pipeline_layout_info = init_pipeline_layout_create_info();
@@ -838,13 +830,6 @@ static b8 initialize_default_data(renderer_state* state) {
 
     state->default_material_instance = GLTF_MR_create_instance(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
 
-    const char* path = "build/assets/gltf/structure.glb";
-    
-    if (!import_gltf(&state->_scene, path, state)) {
-        ETFATAL("Error loading gltf %s.", path);
-        return false;
-    }
-
     // Create a dynarray to store the draw context surface render objects
     state->main_draw_context.opaque_surfaces = dynarray_create(0, sizeof(render_object));
     state->main_draw_context.transparent_surfaces = dynarray_create(0, sizeof(render_object));
@@ -854,8 +839,6 @@ static b8 initialize_default_data(renderer_state* state) {
 static void shutdown_default_data(renderer_state* state) {
     dynarray_destroy(state->main_draw_context.transparent_surfaces);
     dynarray_destroy(state->main_draw_context.opaque_surfaces);
-
-    scene_shutdown(&state->_scene);
 
     buffer_destroy(state, &state->default_material_constants);
 
@@ -896,24 +879,6 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     scissor.extent.height = render_extent.height;
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-    // Set the per frame scene data in state->scene_data_buffers[frame_index]
-    // TODO: Keep scene_data_buffers persistently mapped
-    void* mapped_scene_data;
-    vkMapMemory(
-        state->device.handle,
-        state->scene_data[state->frame_index].memory,
-        /* Offset: */ 0,
-        sizeof(scene_data),
-        /* Flags: */ 0,
-        &mapped_scene_data);
-
-    // Cast mapped memory to scene_data pointer to read and modify it
-    scene_data* frame_scene_data = (scene_data*)mapped_scene_data;
-    *frame_scene_data = state->_scene.data;
-    vkUnmapMemory(
-        state->device.handle,
-        state->scene_data[state->frame_index].memory);
 
     VkDescriptorSet scene_descriptor_set = descriptor_set_allocator_allocate(
         &state->frame_allocators[state->frame_index],

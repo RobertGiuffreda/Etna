@@ -19,9 +19,12 @@ struct material_manager;
 
 typedef struct scene {
     char* name;
+
+    // TODO: Move managers to some project representation that contains scenes
     struct mesh_manager* mesh_bank;
     struct image_manager* image_bank;
     struct material_manager* material_bank;
+    // TODO: END
 
     node** top_nodes;
     u32 top_node_count;
@@ -29,7 +32,7 @@ typedef struct scene {
     camera cam;
     scene_data data;
 
-    // TEMP: Leftovers from loaded_gltf not refactored yet
+    // TEMP: Leftovers from loaded_gltf not refactored out yet
     mesh_node* mesh_nodes;
     u32 mesh_node_count;
     node* nodes;
@@ -45,5 +48,5 @@ typedef struct scene {
     // ds_allocator* ds_allocators;
     // buffer* scene_data_buffers;
 
-    struct renderer_state* state;
+    renderer_state* state;
 } scene;

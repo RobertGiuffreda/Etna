@@ -2,15 +2,14 @@
 
 #include <defines.h>
 #include <math/math_types.h>
+#include <application_types.h>
 
-struct application_state_t;
+b8 application_initialize(application_t* app);
 
-b8 application_initialize(struct application_state_t* state);
+void application_shutdown(application_t* app);
 
-void application_shutdown(struct application_state_t* state);
+b8 application_update(application_t* app);
 
-b8 application_update(struct application_state_t* state);
-
-b8 application_render(struct application_state_t* state);
+b8 application_render(application_t* app);
 
 u64 get_appstate_size(void);

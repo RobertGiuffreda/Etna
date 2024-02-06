@@ -7,9 +7,8 @@
 #include "core/etstring.h"
 
 // TEMP: This should be made renderer implementation agnostic
-#include "renderer/src/vk_types.h"
+#include "resource_private.h"
 #include "renderer/src/descriptor.h"
-#include "renderer/src/GLTF_MR.h"
 #include "renderer/src/material.h"
 // TEMP: END
 
@@ -25,17 +24,6 @@
  * 
  * Eventually load & serialize blueprints
  */
-
-#define MAX_MATERIAL_COUNT 256
-
-struct material_manager {
-    renderer_state* state;
-    ds_allocator ds_allocator;
-    material_blueprint blueprint;
-    
-    material materials[MAX_MATERIAL_COUNT];
-    u32 material_count;
-};
 
 b8 material_manager_initialize(material_manager** manager, struct renderer_state* state) {
     material_manager* new_manager = etallocate(sizeof(material_manager), MEMORY_TAG_RESOURCE);

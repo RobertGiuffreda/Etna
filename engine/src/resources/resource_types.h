@@ -26,6 +26,10 @@ typedef struct mesh mesh;
 typedef struct image image;
 typedef struct material material;
 
+typedef struct mesh_manager mesh_manager;
+typedef struct image_manager image_manager;
+typedef struct material_manager material_manager;
+
 typedef enum material_pass {
     MATERIAL_PASS_MAIN_COLOR,
     MATERIAL_PASS_TRANSPARENT,

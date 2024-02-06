@@ -6,20 +6,9 @@
 #include "core/etstring.h"
 
 // TEMP: This should be made renderer implementation agnostic
-#include "renderer/src/vk_types.h"
-#include "renderer/src/renderer.h"
+#include "resource_private.h"
 #include "renderer/src/image.h"
 // TEMP: END
-
-// TODO: image_manager_load vs image_manager_submit
-
-#define MAX_IMAGE_COUNT 128
-
-struct image_manager {
-    renderer_state* state;
-    image images[MAX_IMAGE_COUNT];
-    u32 image_count;
-};
 
 b8 image_manager_initialize(image_manager** manager, renderer_state* state) {
     image_manager* new_manager = etallocate(sizeof(image_manager), MEMORY_TAG_RESOURCE);

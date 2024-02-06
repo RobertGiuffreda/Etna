@@ -2,8 +2,6 @@
 #include "resource_types.h"
 #include "renderer/renderer_types.h"
 
-typedef struct image_manager image_manager;
-
 b8 image_manager_initialize(image_manager** manager, renderer_state* state);
 
 void image_manager_shutdown(image_manager* manager);

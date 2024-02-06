@@ -23,26 +23,74 @@
 #include "renderer/src/descriptor.h"
 #include "renderer/src/shader.h"
 #include "renderer/src/renderables.h"
-#include "resources/loaders/gltfloader.h"
+#include "resources/importers/gltfimporter.h"
 // TEMP: END
 
 // TEMP: Until events refactor
 static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 // TEMP: END
 
+// HACK: Seems wrong
+static void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx);
+
 /** NOTE: Implementation details
  * Currently the scene descriptor set is hardcoded as a singular
  * uniform buffer that matches struct scene_data.
  */
-b8 scene_initalize(scene* scene, struct renderer_state* state) {
+b8 scene_initalize(scene** scn, renderer_state* state) {
+    // HACK:TODO: Make configurable & from application
+    const char* path = "build/assets/gltf/zda_test.glb";
+    // HACK:TODO: END
+
+    scene* new_scene = etallocate(sizeof(struct scene), MEMORY_TAG_SCENE);
+    new_scene->state = state;
+    new_scene->name = str_duplicate_allocate(path);
+
+    mesh_manager_initialize(&new_scene->mesh_bank, state);
+    image_manager_initialize(&new_scene->image_bank, state);
+    material_manager_initialize(&new_scene->material_bank, state);
+
+    // pool_size_ratio ps_ratios[] = {
+    //     { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 3},
+    //     { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 3},
+    //     { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
+    //     { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3}};
+    // new_scene->ds_allocators = etallocate(sizeof(ds_allocator) * state->image_count, MEMORY_TAG_SCENE);
+    // new_scene->scene_data_buffers = etallocate(sizeof(buffer) * state->image_count, MEMORY_TAG_SCENE);
+    // for (u32 i = 0; i < state->image_count; ++i) {
+    //     buffer_create(
+    //         state,
+    //         sizeof(scene_data),
+    //         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    //         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    //         &new_scene->scene_data_buffers[i]);
+    //     descriptor_set_allocator_initialize(
+    //         &new_scene->ds_allocators[i],
+    //         /* Initial Sets: */ 1000,
+    //         /* pool size count: */ 4,
+    //         ps_ratios,
+    //         state);
+    // }
+
+    camera_create(&new_scene->cam);
+    new_scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
+
     // NOTE: This will be passed a config when serialization is implemented
     v4s a_color = { .raw = {.1f, .1f, .1f, 3.f}};
     v4s l_color = { .raw = {1.f, 1.f, 1.f, 50.f}};
     
-    scene->data.ambient_color = a_color;
-    scene->data.light_color = l_color;
+    new_scene->data.ambient_color = a_color;
+    new_scene->data.light_color = l_color;
 
-    event_observer_register(EVENT_CODE_KEY_RELEASE, scene, scene_on_key_event);
+    // HACK:TEMP: Serialize and deserialization of a scene file
+    if (!import_gltf(new_scene, path, state)) {
+        ETERROR("Error loading gltf file initializing scene.");
+        return false;
+    }
+    // HACK:TEMP: END
+
+    event_observer_register(EVENT_CODE_KEY_RELEASE, new_scene, scene_on_key_event);
+    *scn = new_scene;
     return true;
 }
 
@@ -68,8 +116,11 @@ void scene_shutdown(scene* scene) {
     }
     etfree(scene->nodes, sizeof(node) * scene->node_count, MEMORY_TAG_SCENE);
 
-    mesh_manager_shutdown(scene->mesh_bank);
+    // HACK: Better way to wait until resources are unused
+    vkDeviceWaitIdle(state->device.handle);
+    // HACK: END
 
+    mesh_manager_shutdown(scene->mesh_bank);
     buffer_destroy(state, &scene->material_buffer);
     material_manager_shutdown(scene->material_bank);
     image_manager_shutdown(scene->image_bank);
@@ -90,6 +141,7 @@ void scene_shutdown(scene* scene) {
     str_duplicate_free(scene->name);
     
     scene->state = 0;
+    etfree(scene, sizeof(struct scene), MEMORY_TAG_SCENE);
 }
 
 // TEMP: For testing and debugging
@@ -125,9 +177,37 @@ void scene_update(scene* scene) {
     scene->data.viewproj = vp;
     
     scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
+
+    // TODO: Place below hacks into a scene_render function or something
+
+    // HACK:TEMP: Better way to update scene buffer
+    // Set the per frame scene data in state->scene_data_buffers[frame_index]
+    void* mapped_scene_data;
+    vkMapMemory(
+        state->device.handle,
+        state->scene_data[state->frame_index].memory,
+        /* Offset: */ 0,
+        sizeof(scene_data),
+        /* Flags: */ 0,
+        &mapped_scene_data);
+    // Cast mapped memory to scene_data pointer to read and modify it
+    scene_data* frame_scene_data = (scene_data*)mapped_scene_data;
+    *frame_scene_data = scene->data;
+    vkUnmapMemory(
+        state->device.handle,
+        state->scene_data[state->frame_index].memory);
+    // HACK:TEMP: END
+
+    // HACK: Renderer should be responsible for clearing draw context
+    dynarray_clear(state->main_draw_context.opaque_surfaces);
+    dynarray_clear(state->main_draw_context.transparent_surfaces);
+    // HACK: END
+    scene_draw(scene, glms_mat4_identity(), &state->main_draw_context);
+
+    // TODO: END
 }
 
-void scene_draw(struct scene* scene, const m4s top_matrix, struct draw_context* ctx) {
+void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx) {
     for (u32 i = 0; i < scene->top_node_count; ++i) {
         node_draw(scene->top_nodes[i], top_matrix, ctx);
     }

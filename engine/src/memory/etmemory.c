@@ -34,6 +34,7 @@ static const char* memory_strings[MEMORY_TAG_MAX] = {
     "Resource:      ",
     "Material:      ",
     "File:          ",
+    "Serialzier:    ",
     "Dynarray:      ",
     "Descriptor Dyn:",
     "Pipeline Dyn:  ",
