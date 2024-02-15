@@ -39,7 +39,7 @@ static void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx);
  */
 b8 scene_initalize(scene** scn, renderer_state* state) {
     // HACK:TODO: Make configurable & from application
-    const char* path = "build/assets/gltf/zda_test.glb";
+    const char* path = "build/assets/gltf/structure.glb";
     // HACK:TODO: END
 
     scene* new_scene = etallocate(sizeof(struct scene), MEMORY_TAG_SCENE);
@@ -146,6 +146,8 @@ void scene_shutdown(scene* scene) {
 
 // TEMP: For testing and debugging
 static f32 light_offset = 2.0f;
+static b8 light_dynamic = true;
+// TEMP: END
 
 void scene_update(scene* scene) {
     renderer_state* state = scene->state;
@@ -167,9 +169,10 @@ void scene_update(scene* scene) {
     project.raw[1][1] *= -1;
 
     v4s l_pos = glms_vec4(scene->cam.position, 1.0f);
-    l_pos.y += light_offset;
-    scene->data.light_position = l_pos;
-
+    if (light_dynamic) {
+        scene->data.light_position = l_pos;
+        scene->data.light_position.y += light_offset;
+    }
 
     m4s vp = glms_mat4_mul(project, view);
     scene->data.view = view;
@@ -224,6 +227,8 @@ static b8 scene_on_key_event(u16 code, void* scne, event_data data) {
     case KEY_K:
         light_offset -= 2.0f; 
         break;
+    case KEY_J:
+        light_dynamic = !light_dynamic;
     }
     return false;
 }

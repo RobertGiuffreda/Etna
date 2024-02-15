@@ -68,7 +68,7 @@ typedef struct mesh_buffers {
 } mesh_buffers;
 
 typedef struct gpu_draw_push_constants {
-    m4s world_matrix;
+    m4s render_matrix;
     VkDeviceAddress vertex_buffer;
 } gpu_draw_push_constants;
 

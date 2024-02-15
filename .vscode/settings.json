@@ -185,5 +185,6 @@
         "gltfimporter.h": "c"
     },
     "C_Cpp.dimInactiveRegions": false,
-    "dotnet.defaultSolution": "disable"
+    "dotnet.defaultSolution": "disable",
+    "cmake.configureOnOpen": false
 }

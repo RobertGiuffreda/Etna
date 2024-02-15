@@ -82,6 +82,8 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         return false;
     }
 
+
+
     // Create samplers
     scene->samplers = etallocate(sizeof(VkSampler) * data->samplers_count, MEMORY_TAG_SCENE);
     for (u32 i = 0; i < data->samplers_count; ++i) {
@@ -205,9 +207,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     }
     vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
 
-    // TEMP: Testing
-    u64 vertex_count = 0;
-
     vertex* vertices = dynarray_create(1, sizeof(vertex));
     u32* indices = dynarray_create(1, sizeof(u32));
     for (u32 i = 0; i < data->meshes_count; ++i) {
@@ -246,8 +245,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 ETERROR("Attempted to load mesh without vertex positions.");
                 return false;
             }
-
-            vertex_count += position->count;
 
             dynarray_resize((void**)&vertices, dynarray_length(vertices) + position->count);
             cgltf_size pos_element_size = cgltf_calc_size(position->type, position->component_type);
@@ -373,6 +370,10 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
     } else scene->nodes = 0;
     
+    // TEMP: Testing lighting situation
+    b8 once = true;
+    // TEMP: END
+
     node** nodes_by_index = etallocate(sizeof(node*) * data->nodes_count, MEMORY_TAG_SCENE);
     for (u32 m_node_i = 0, node_i = 0; (m_node_i + node_i) < data->nodes_count;) {
         u32 i = m_node_i + node_i;

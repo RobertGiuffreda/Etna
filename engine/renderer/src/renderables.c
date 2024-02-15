@@ -4,8 +4,10 @@
 
 #include "math/math_types.h"
 
-#include "memory/etmemory.h"
 #include "core/logger.h"
+#include "core/etstring.h"
+
+#include "memory/etmemory.h"
 
 #include "renderer/src/renderer.h"
 
@@ -152,9 +154,11 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
             .transform = node_matrix,
             .vertex_buffer_address = node->mesh->buffers.vertex_buffer_address,
 
+            // NOTE: This is the name of the node from gltf not the mesh.
             .mesh_name = node->base.name,
             .material_name = s->material->name
         };
+
         if (s->material->data.pass_type == MATERIAL_PASS_TRANSPARENT) {
             dynarray_push((void**)&ctx->transparent_surfaces, &def);
         }

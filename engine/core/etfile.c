@@ -11,7 +11,7 @@
 //TODO: Replace if checks with asserts to pass responsibility to the caller
 
 struct etfile {
-    const char* path;
+    char* path;
     FILE* handle;
 };
 

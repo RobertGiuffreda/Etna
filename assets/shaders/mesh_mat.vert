@@ -29,13 +29,14 @@ layout (push_constant) uniform constants {
 void main() {
     vertex v = push_constants.v_buffer.vertices[gl_VertexIndex];
 
-    vec4 position = vec4(v.position, 1.0f);
+    gl_Position = scene_data.viewproj * push_constants.render_matrix * vec4(v.position, 1.0f);
 
-    gl_Position = scene_data.viewproj * push_constants.render_matrix * position;
+    out_position = (push_constants.render_matrix * vec4(v.position, 1.0f)).xyz;
 
-    out_position = (push_constants.render_matrix * vec4(v.position, 0.0f)).xyz;
-    // TODO: Compute the normal matrix from inverse transpose model view
-    out_normal = (push_constants.render_matrix * vec4(v.normal, 0.0f)).xyz;
+    // TODO: Compute the normal matrix on the GPU and not GPU
+    out_normal = (transpose(inverse(push_constants.render_matrix)) * vec4(v.normal, 0.0f)).xyz;
+    // out_normal = (push_constants.render_matrix * vec4(v.normal, 0.0f)).xyz;
+
     out_color = v.color.xyz * material_data.color_factors.xyz;
     out_uv.x = v.uv_x;
     out_uv.y = v.uv_y;

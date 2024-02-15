@@ -25,7 +25,7 @@ void main() {
     vec3 diffuse_color = material_data.color_factors.rgb * texture(color_tex, in_uv).rgb;
 
     // From fragment position to light position direction
-    vec3 light_dir = (scene_data.light_position - vec4(in_position, 0.0f)).xyz;
+    vec3 light_dir = scene_data.light_position.xyz - in_position;
     float dist = length(light_dir);
     float attenuation = 1 / (dist * dist);
     light_dir = normalize(light_dir);

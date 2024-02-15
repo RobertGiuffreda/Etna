@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.28)
 
 #Set project
 project(TestEtna VERSION 1.0.1 DESCRIPTION "Test writing Etna")
@@ -46,10 +46,10 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/extern/SPIRV-Reflect)
 file(GLOB_RECURSE ENGINE_FILES "engine/*.c")
 file(GLOB_RECURSE ENGINE_HEADER_FILES "engine/*.h")
 
-#Create engine
+# Create engine
 add_library(engine ${ENGINE_FILES} ${ENGINE_HEADER_FILES})
 
-#Compiler defines for engine
+# Compiler defines for engine
 target_compile_definitions(engine PRIVATE _DEBUG)
 # target_compile_options(engine PRIVATE /fsanitize=address)
 # target_link_options(engine PRIVATE /INFERASANLIBS)

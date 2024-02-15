@@ -925,7 +925,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
 
         gpu_draw_push_constants push_constants = {
             .vertex_buffer = draw->vertex_buffer_address,
-            .world_matrix = draw->transform};
+            .render_matrix = draw->transform};
         vkCmdPushConstants(cmd, draw->material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants);
 
         vkCmdDrawIndexed(cmd, draw->index_count, 1, draw->first_index, 0, 0);
