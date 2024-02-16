@@ -31,11 +31,11 @@ typedef struct event_data {
 // Observer callback function
 typedef b8 (*pfn_on_event)(u16 event_code, void* observer, event_data data);
 
-typedef struct events_state_t events_state;
+typedef struct events_state_t events_t;
 
-b8 events_initialize(events_state** event_system_state);
+b8 events_initialize(events_t** event_system_state);
 
-void events_shutdown(events_state* event_system_state);
+void events_shutdown(events_t* event_system_state);
 
 b8 event_observer_register(u16 event_code, void* observer, pfn_on_event on_event);
 

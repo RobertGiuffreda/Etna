@@ -59,8 +59,6 @@ static void shutdown_default_data(renderer_state* state);
 
 static void draw_geometry(renderer_state* state, VkCommandBuffer cmd);
 
-b8 rebuild_swapchain(renderer_state* state);
-
 VkBool32 vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageTypes,
@@ -71,7 +69,7 @@ VkBool32 vk_debug_callback(
 // This is fine for now as a return value of false is unrecoverable.
 // But if there is a situation in the future where we run the function again to try again
 // then we will be leaking memory 
-b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window, const char* application_name) {
+b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, const char* application_name) {
     renderer_state* state = etallocate(sizeof(renderer_state), MEMORY_TAG_RENDERER);
     etzero_memory(state, sizeof(renderer_state));
     
@@ -79,6 +77,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window
     state->swapchain_dirty = false;
     state->swapchain = VK_NULL_HANDLE;
     state->frame_index = 0;
+    state->swapchain_index = 0;
 
     VkApplicationInfo app_cinfo = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -329,11 +328,12 @@ void renderer_shutdown(renderer_state* state) {
     etfree(state, sizeof(renderer_state), MEMORY_TAG_RENDERER);
 }
 
-b8 renderer_draw_frame(renderer_state* state) {
-    // Wait for the current frame to end rendering by waiting on its render fence
+b8 renderer_prepare_frame(renderer_state* state) {
+        // Wait for the current frame to end rendering by waiting on its render fence
     // Reset the render fence for reuse
+    VkResult result;
 
-    VkResult result = vkWaitForFences(
+    result = vkWaitForFences(
         state->device.handle,
         /* Fence count: */ 1,
         &state->render_fences[state->frame_index],
@@ -343,33 +343,53 @@ b8 renderer_draw_frame(renderer_state* state) {
     
     descriptor_set_allocator_clear_pools(&state->frame_allocators[state->frame_index], state);
 
-    u32 swapchain_index;
     result = vkAcquireNextImageKHR(
         state->device.handle,
         state->swapchain,
         0xFFFFFFFFFFFFFFFF,
         state->swapchain_semaphores[state->frame_index],
         VK_NULL_HANDLE,
-        &swapchain_index);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        rebuild_swapchain(state);
-        return true;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        ETFATAL("Failed to acquire swapchain image.");
+        &state->swapchain_index);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        VK_CHECK(vkDeviceWaitIdle(state->device.handle));
+        state->swapchain_dirty = false;
+        
+        // NOTE: VK_SUBOPTIMAL_KHR means an image will be successfully
+        // acquired. Signalling the semaphore current semaphore when it is. 
+        // This unsignals the semaphore by recreating it.
+        if (result == VK_SUBOPTIMAL_KHR) {
+            vkDestroySemaphore(
+                state->device.handle,
+                state->swapchain_semaphores[state->frame_index],
+                state->allocator);
+            VkSemaphoreCreateInfo info = init_semaphore_create_info(/* Create Flags: */ 0);
+            vkCreateSemaphore(
+                state->device.handle,
+                &info,
+                state->allocator,
+                &state->swapchain_semaphores[state->frame_index]
+            );
+        }
+        recreate_swapchain(state);
         return false;
-    }
+    } else VK_CHECK(result);
 
     VK_CHECK(vkResetFences(
         state->device.handle,
-        1,
-        &state->render_fences[state->frame_index]));
+        /* Fence count: */ 1,
+        &state->render_fences[state->frame_index]
+    ));
 
     VK_CHECK(vkResetCommandBuffer(state->main_graphics_command_buffers[state->frame_index], 0));
+    VkCommandBufferBeginInfo begin_info = init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VK_CHECK(vkBeginCommandBuffer(state->main_graphics_command_buffers[state->frame_index], &begin_info));
+    return true;
+}
+
+b8 renderer_draw_frame(renderer_state* state) {   
+    VkResult result;
 
     VkCommandBuffer frame_cmd = state->main_graphics_command_buffers[state->frame_index];
-    
-    VkCommandBufferBeginInfo begin_info = init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    VK_CHECK(vkBeginCommandBuffer(frame_cmd, &begin_info));
 
     image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
@@ -410,7 +430,7 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
     // Image barrier to transition swapchain image to transfer destination optimal
-    image_barrier(frame_cmd, state->swapchain_images[swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
+    image_barrier(frame_cmd, state->swapchain_images[state->swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_ACCESS_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
@@ -418,13 +438,13 @@ b8 renderer_draw_frame(renderer_state* state) {
     blit_image2D_to_image2D(
         frame_cmd,
         state->render_image.handle,
-        state->swapchain_images[swapchain_index],
+        state->swapchain_images[state->swapchain_index],
         state->render_extent,
         state->window_extent,
         VK_IMAGE_ASPECT_COLOR_BIT);
 
     // Image barrier to transition the swapchian image from transfer destination optimal to present khr
-    image_barrier(frame_cmd, state->swapchain_images[swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
+    image_barrier(frame_cmd, state->swapchain_images[state->swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_NONE,
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
@@ -464,14 +484,13 @@ b8 renderer_draw_frame(renderer_state* state) {
         .pSwapchains = &state->swapchain,
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &state->render_semaphores[state->frame_index],
-        .pImageIndices = &swapchain_index};
+        .pImageIndices = &state->swapchain_index};
     result = vkQueuePresentKHR(state->device.present_queue, &present_info);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || state->swapchain_dirty) {
-        rebuild_swapchain(state);
-    } else if (result != VK_SUCCESS) {
-        ETFATAL("Error presenting swapchain image");
-        return false;
-    }
+        VK_CHECK(vkDeviceWaitIdle(state->device.handle));
+        state->swapchain_dirty = false;
+        recreate_swapchain(state);
+    } else VK_CHECK(result);
 
     // Move to the next frame
     state->frame_index = (state->frame_index + 1) % state->image_count;
@@ -932,25 +951,16 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     }
 
     vkCmdEndRendering(cmd);
+
+    // Clear the renderer draw commands for the next frame  
+    dynarray_clear(state->main_draw_context.opaque_surfaces);
+    dynarray_clear(state->main_draw_context.transparent_surfaces);
 }
 
 void renderer_on_resize(renderer_state* state, i32 width, i32 height) {
     // state->window_extent.width = (u32)width;
     // state->window_extent.height = (u32)height;
     state->swapchain_dirty = true;
-}
-
-// Name is a bit confusing with recreate_swapchain around as well
-b8 rebuild_swapchain(renderer_state* state) {
-    // TODO: Use less heavy handed synchronization
-    VK_CHECK(vkDeviceWaitIdle(state->device.handle));
-    state->swapchain_dirty = false;
-    if (!recreate_swapchain(state)) {
-        ETERROR("Error recreating swapchain.");
-        return false;
-    }
-
-    return true;
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

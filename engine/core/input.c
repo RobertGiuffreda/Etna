@@ -14,28 +14,28 @@ typedef struct mouse_state {
 // Least significant bit is a flag for down vs up
 // Second least significant bit is a flag for repeating.
 // If a key is held down the os will send informatino saying the key is repeating
-struct input_state {
+struct input_t {
     u8 previous_keys[KEY_MAX];
     u8 current_keys[KEY_MAX];
     mouse_state previous_mouse;
     mouse_state current_mouse;
 };
 
-static struct input_state* state;
+static struct input_t* state;
 
-b8 input_initialize(input_state** input_system_state) {
-    *input_system_state = etallocate(sizeof(struct input_state), MEMORY_TAG_INPUT);
-    etzero_memory(*input_system_state, sizeof(struct input_state));
+b8 input_initialize(input_t** input_system_state) {
+    *input_system_state = etallocate(sizeof(struct input_t), MEMORY_TAG_INPUT);
+    etzero_memory(*input_system_state, sizeof(struct input_t));
     state = *input_system_state;
     return true;
 }
 
-void input_shutdown(input_state* input_system_state) {
-    etfree(input_system_state, sizeof(struct input_state), MEMORY_TAG_INPUT);
+void input_shutdown(input_t* input_system_state) {
+    etfree(input_system_state, sizeof(struct input_t), MEMORY_TAG_INPUT);
     state = 0;
 }
 
-void input_update(input_state* input_system_state) {
+void input_update(input_t* input_system_state) {
     etcopy_memory(state->previous_keys, state->current_keys, sizeof(b8) * KEY_MAX);
     etcopy_memory(&state->previous_mouse, &state->current_mouse, sizeof(mouse_state));
 }

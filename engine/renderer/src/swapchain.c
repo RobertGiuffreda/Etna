@@ -208,7 +208,7 @@ void shutdown_swapchain(renderer_state* state) {
 }
 
 // TODO: Linear allocator for the swapchain images and views equal to the max number of images
-b8 recreate_swapchain(renderer_state* state) {
+void recreate_swapchain(renderer_state* state) {
     // Destroy the old swapchains image views
     for (u32 i = 0; i < state->image_count; ++i) {
         vkDestroyImageView(
@@ -414,5 +414,4 @@ b8 recreate_swapchain(renderer_state* state) {
             state->allocator,
             &state->swapchain_image_views[i]));
     }
-    return true;
 }

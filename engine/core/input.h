@@ -155,13 +155,13 @@ typedef enum key_state {
 #define EVENT_DATA_KEY(edata) (keys)edata.u16[0]
 #define EVENT_DATA_BUTTON(edata) (buttons)edata.u16[0]
 
-typedef struct input_state input_state;
+typedef struct input_t input_t;
 
-b8 input_initialize(input_state** input_system_state);
+b8 input_initialize(input_t** input_system_state);
 
-void input_shutdown(input_state* input_system_state);
+void input_shutdown(input_t* input_system_state);
 
-void input_update(input_state* input_system_state);
+void input_update(input_t* input_system_state);
 
 void input_process_key(keys key, u8 action);
 void input_process_button(buttons button, b8 pressed);

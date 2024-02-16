@@ -4,11 +4,13 @@
 
 #include "renderer/renderer_types.h"
 
-struct etwindow_state;
+struct etwindow_t;
 
-b8 renderer_initialize(renderer_state** out_state, struct etwindow_state* window, const char* application_name);
+b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, const char* application_name);
 
 void renderer_shutdown(renderer_state* state);
+
+b8 renderer_prepare_frame(renderer_state* state);
 
 b8 renderer_draw_frame(renderer_state* state);
 

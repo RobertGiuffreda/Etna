@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     if (!define_configuration(&engine_details, &app_details)) {
         // NOTE: This is before logger is setup so no output into log file
         ETFATAL("define_configuration failed to run.");
-        return -1;
+        return 1;
     }
 
     if (!engine_initialize(engine_details, app_details)) {

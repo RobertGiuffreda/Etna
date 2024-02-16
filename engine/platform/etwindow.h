@@ -9,12 +9,12 @@ typedef struct etwindow_config {
     u32 height;
 } etwindow_config;
 
-typedef struct etwindow_state etwindow_state;
+typedef struct etwindow_t etwindow_t;
 
-b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_state);
+b8 etwindow_initialize(etwindow_config* config, etwindow_t** out_window_state);
 
-void etwindow_shutdown(etwindow_state* window_state);
+void etwindow_shutdown(etwindow_t* window);
 
-b8 etwindow_should_close(etwindow_state* window_state);
+b8 etwindow_should_close(etwindow_t* window);
 
 void etwindow_poll_events(void);

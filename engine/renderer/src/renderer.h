@@ -86,6 +86,7 @@ typedef struct renderer_state {
     // NOTE: END
 
     u32 frame_index;
+    u32 swapchain_index;
     
     // NOTE: Per frame structures/data
     VkSemaphore* swapchain_semaphores;

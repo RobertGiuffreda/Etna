@@ -10,7 +10,7 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-struct etwindow_state {
+struct etwindow_t {
     GLFWwindow* impl_window;
     b8 cursor_captured;
 };
@@ -23,7 +23,7 @@ static void cursor_position_callback(GLFWwindow* window, f64 xpos, f64 ypos);
 static void scroll_callback(GLFWwindow* window, f64 xoffset, f64 yoffset);
 static void resize_callback(GLFWwindow* window, i32 width, i32 height);
 
-b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_state) {
+b8 etwindow_initialize(etwindow_config* config, etwindow_t** out_window_state) {
     // Setup window using GLFW_NO_API as per glfw vulkan guide
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
@@ -49,7 +49,7 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_stat
     glfwSetWindowPos(window, config->x_start_pos, config->y_start_pos);
     glfwShowWindow(window);
 
-    *out_window_state = (etwindow_state*)etallocate(sizeof(struct etwindow_state), MEMORY_TAG_WINDOW);
+    *out_window_state = (etwindow_t*)etallocate(sizeof(struct etwindow_t), MEMORY_TAG_WINDOW);
     (*out_window_state)->impl_window = window;
     (*out_window_state)->cursor_captured = true;
 
@@ -57,16 +57,16 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_state** out_window_stat
     return true;
 }
 
-void etwindow_shutdown(etwindow_state* window_state) {
-    event_observer_deregister(EVENT_CODE_KEY_RELEASE, window_state, etwindow_on_key_event);
+void etwindow_shutdown(etwindow_t* window) {
+    event_observer_deregister(EVENT_CODE_KEY_RELEASE, window, etwindow_on_key_event);
     
     // Destroy window & free state memory
-    glfwDestroyWindow(window_state->impl_window);
-    etfree(window_state, sizeof(struct etwindow_state), MEMORY_TAG_WINDOW);
+    glfwDestroyWindow(window->impl_window);
+    etfree(window, sizeof(struct etwindow_t), MEMORY_TAG_WINDOW);
 }
 
-b8 etwindow_should_close(etwindow_state* window_state) {
-    return glfwWindowShouldClose(window_state->impl_window);
+b8 etwindow_should_close(etwindow_t* window) {
+    return glfwWindowShouldClose(window->impl_window);
 }
 
 void etwindow_poll_events(void) {
@@ -74,7 +74,7 @@ void etwindow_poll_events(void) {
 }
 
 static b8 etwindow_on_key_event(u16 code, void* window, event_data data) {
-    struct etwindow_state* win = (struct etwindow_state*)window;
+    struct etwindow_t* win = (struct etwindow_t*)window;
     keys key = EVENT_DATA_KEY(data);
     
     if (key == KEY_P) {

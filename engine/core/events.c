@@ -31,15 +31,15 @@ struct events_state_t {
 
 static struct events_state_t* system_state;
 
-b8 events_initialize(events_state** event_system_state) {
-    *event_system_state = (events_state*)etallocate(sizeof(struct events_state_t), MEMORY_TAG_EVENTS);
+b8 events_initialize(events_t** event_system_state) {
+    *event_system_state = (events_t*)etallocate(sizeof(struct events_state_t), MEMORY_TAG_EVENTS);
     etzero_memory(*event_system_state, sizeof(struct events_state_t));
     system_state = *event_system_state;
 
     return true;
 }
 
-void events_shutdown(events_state* event_system_state) {
+void events_shutdown(events_t* event_system_state) {
     for (i32 i = 0; i < MAX_MESSAGE_CODES; ++i) {
         // If immediate observers has been initialized then we destroy the dynarray
         if (event_system_state->immediate_observers[i]) {

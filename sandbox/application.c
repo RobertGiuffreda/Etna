@@ -12,7 +12,6 @@ struct application_t {
 };
 
 b8 application_initialize(application_t* app) {
-    // Zero memory allocated for the app
     etzero_memory(app, sizeof(application_t));
     return true;
 }

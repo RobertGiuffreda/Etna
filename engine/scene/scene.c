@@ -180,19 +180,21 @@ void scene_update(scene* scene) {
     scene->data.viewproj = vp;
     
     scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
+}
 
-    // TODO: Place below hacks into a scene_render function or something
+void scene_render(scene* scene) {
+    renderer_state* state = scene->state;
 
     // HACK:TEMP: Better way to update scene buffer
     // Set the per frame scene data in state->scene_data_buffers[frame_index]
     void* mapped_scene_data;
-    vkMapMemory(
+    VK_CHECK(vkMapMemory(
         state->device.handle,
         state->scene_data[state->frame_index].memory,
         /* Offset: */ 0,
         sizeof(scene_data),
         /* Flags: */ 0,
-        &mapped_scene_data);
+        &mapped_scene_data));
     // Cast mapped memory to scene_data pointer to read and modify it
     scene_data* frame_scene_data = (scene_data*)mapped_scene_data;
     *frame_scene_data = scene->data;
@@ -201,13 +203,7 @@ void scene_update(scene* scene) {
         state->scene_data[state->frame_index].memory);
     // HACK:TEMP: END
 
-    // HACK: Renderer should be responsible for clearing draw context
-    dynarray_clear(state->main_draw_context.opaque_surfaces);
-    dynarray_clear(state->main_draw_context.transparent_surfaces);
-    // HACK: END
     scene_draw(scene, glms_mat4_identity(), &state->main_draw_context);
-
-    // TODO: END
 }
 
 void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx) {
