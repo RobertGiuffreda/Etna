@@ -5,7 +5,7 @@
             "type": "shell",
             "label": "CMake Build",
             "windows": {
-                "command": "CMake -DCMAKE_BUILD_TYPE=Debug .."
+                "command": "cmake -DCMAKE_BUILD_TYPE=Debug .."
             },
             "options": {
                 "cwd": "${workspaceFolder}/build"
