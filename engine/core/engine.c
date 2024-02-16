@@ -191,24 +191,20 @@ void engine_shutdown(void) {
     event_observer_deregister(EVENT_CODE_KEY_RELEASE, (void*)engine, engine_on_key_event);
     events_shutdown(engine->event_system);
 
-    // Shutdown log file
-    log_memory_metrics();
     
+    // Shutdown log file
     logger_shutdown();
     
     // Free memory used for the engine
     etfree(engine, sizeof(engine_t), MEMORY_TAG_ENGINE);
 
     // Close memory
+    print_memory_metrics();
     memory_shutdown();
 }
 
 b8 engine_on_resize(u16 event_code, void* engine_state, event_data data) {
-    if (EVENT_DATA_WIDTH(data) == 0 || EVENT_DATA_HEIGHT(data) == 0) {
-        engine->minimized = true;
-    } else {
-        engine->minimized = false;
-    }
+    engine->minimized = EVENT_DATA_WIDTH(data) == 0 || EVENT_DATA_HEIGHT(data) == 0;
 
     // TODO: Register renderer for resizes using events
     renderer_on_resize(engine->renderer_state, EVENT_DATA_WIDTH(data), EVENT_DATA_HEIGHT(data));

@@ -30,7 +30,7 @@ b8 memory_initialize(void);
 
 void memory_shutdown(void);
 
-void log_memory_metrics(void);
+void print_memory_metrics(void);
 
 void* etallocate(u64 size, memory_tag tag);
 

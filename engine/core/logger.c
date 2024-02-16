@@ -114,6 +114,7 @@ void logger_shutdown(void) {
     if (logger->log_file) file_close(logger->log_file);
     if (logger->err_file) file_close(logger->err_file);
     etfree(logger, sizeof(logger_state), MEMORY_TAG_LOGGER);
+    logger = NULL;
 }
 
 // TODO: Use etstring for string manipulation for the sake of it
@@ -147,11 +148,11 @@ void log_output(log_level level, const char* format, ...) {
     // Change the null terminator to a newline character so that it is printed to the log file.
     output[output_len] = '\n';
     u64 log_bytes_written = 0;
-    if (logger->log_file && !file_write(logger->log_file, sizeof(char) * (format_len + 1), (u8*)output + ansi_prefix_len, &log_bytes_written)) {
+    if (logger && logger->log_file && !file_write(logger->log_file, sizeof(char) * (format_len + 1), (u8*)output + ansi_prefix_len, &log_bytes_written)) {
         printf("Something went wrong when writing to the log file.");
     }
     u64 err_bytes_written = 0;
-    if (level < 2 && logger->err_file && !file_write(logger->err_file, sizeof(char) * (format_len + 1), (u8*)output + ansi_prefix_len, &err_bytes_written)) {
+    if (level < 2 && logger && logger->err_file && !file_write(logger->err_file, sizeof(char) * (format_len + 1), (u8*)output + ansi_prefix_len, &err_bytes_written)) {
         printf("Something went wrong when writing to the error file.");
     }
 

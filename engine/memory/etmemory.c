@@ -83,7 +83,7 @@ void* etcopy_memory(void* dest, const void* source, u64 size) {
 
 // TODO: Specific allocation function for memory allocated before memory_intialize() is called
 // TODO: Linear allocator for this purpose??
-void log_memory_metrics(void) {
+void print_memory_metrics(void) {
     const u64 gib = 1024 * 1024 * 1024;
     const u64 mib = 1024 * 1024;
     const u64 kib = 1024;

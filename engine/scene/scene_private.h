@@ -20,11 +20,9 @@ struct material_manager;
 typedef struct scene {
     char* name;
 
-    // TODO: Move managers to some project representation that contains scenes
     struct mesh_manager* mesh_bank;
     struct image_manager* image_bank;
     struct material_manager* material_bank;
-    // TODO: END
 
     node** top_nodes;
     u32 top_node_count;
@@ -38,10 +36,16 @@ typedef struct scene {
     node* nodes;
     u32 node_count;
 
+    // TODO: Put all sampler combos into renderer_state as
+    // defaults to avoid having them here. 
     u32 sampler_count;
     VkSampler* samplers;
+    // TODO: END
 
+    // TODO: Put into material manager and suballocate??
     buffer material_buffer;
+    // TODO: END
+
     // TEMP: END
 
     // For items that need to modified per frame
