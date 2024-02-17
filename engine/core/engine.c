@@ -17,24 +17,22 @@
 #include "application_types.h"
 
 // TODO: Add application name to config
-
 typedef struct engine_t {
     b8 is_running;
-    b8 minimized;
+    b8 is_minimized;
     clock frame_clk;
 
     // HACK:TEMP: Proper scene management
     scene* main_scene;
     // HACK:TEMP: END
 
-    // Application data
+    u64 app_size;
+    application_t* app;
     b8 (*app_initialize)(application_t* app);
     void (*app_shutdown)(application_t* app);
     b8 (*app_update)(application_t* app);
     b8 (*app_render)(application_t* app);
 
-    u64 app_size;
-    application_t* app;
     etwindow_t* window;
     events_t* event_system;
     input_t* input_state;
@@ -109,7 +107,7 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
-    engine->minimized = false;
+    engine->is_minimized = false;
 
     // Initialize renderer
     if (!renderer_initialize(&engine->renderer_state, engine->window, "App")) {
@@ -144,14 +142,15 @@ b8 engine_run(void) {
     engine->is_running = true;
 
     while (engine->is_running && !etwindow_should_close(engine->window)) {
-        if (!engine->minimized) {
-            engine->app_update(engine->app);
+        if (!engine->is_minimized) {
             scene_update(engine->main_scene);
+            engine->app_update(engine->app);
             
             if (renderer_prepare_frame(engine->renderer_state)) {
-                // Very rough frame timing mechanism
+                // TEMP: Very rough frame timing mechanism
                 clock_time(&engine->frame_clk);
                 clock_start(&engine->frame_clk);
+                // TEMP: END
 
                 scene_render(engine->main_scene);
                 engine->app_render(engine->app);
@@ -204,10 +203,12 @@ void engine_shutdown(void) {
 }
 
 b8 engine_on_resize(u16 event_code, void* engine_state, event_data data) {
-    engine->minimized = EVENT_DATA_WIDTH(data) == 0 || EVENT_DATA_HEIGHT(data) == 0;
+    engine->is_minimized = EVENT_DATA_WIDTH(data) == 0 || EVENT_DATA_HEIGHT(data) == 0;
 
     // TODO: Register renderer for resizes using events
     renderer_on_resize(engine->renderer_state, EVENT_DATA_WIDTH(data), EVENT_DATA_HEIGHT(data));
+    // TODO: END
+
     // Other events should handle this event code as well, so false
     return false;
 }

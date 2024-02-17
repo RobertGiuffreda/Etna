@@ -19,7 +19,7 @@ the array and not the newly allocated location.
 If this becomes an issue: Create implementation of something like a shared pointer.
 */
 
-/*
+/* 
  * Creates a dynamic array of (length) elements with a size of
  * (stride) each.
  * The end index used for pushing and popping is set to length
@@ -56,8 +56,6 @@ void dynarray_destroy(void* array);
 void dynarray_resize(void** array_ptr, u64 length);
 
 void dynarray_reserve(void** array_ptr, u64 capacity);
-
-void dynarray_length_set(void* array, u64 length);
 
 /*
  * To use this function the address of the array (pointer). &arr

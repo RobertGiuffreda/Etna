@@ -104,10 +104,6 @@ void dynarray_reserve(void** array_ptr, u64 capacity) {
     *array_ptr = (void*)(header + 1);
 }
 
-void dynarray_length_set(void* array, u64 length) {
-    ((dynarray*)array - 1)->length = length;
-}
-
 void dynarray_push(void** array_ptr, const void* element)
 {
     dynarray* header = (dynarray*)(*array_ptr) - 1;

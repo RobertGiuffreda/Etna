@@ -73,29 +73,42 @@
 struct logger_state {
     etfile* log_file;
     etfile* err_file;
+    b8 ansi;
 };
 
 static struct logger_state* logger;
 
-static char* ansi_prefix[LOG_LEVEL_MAX];
-static char* ansi_postfix[LOG_LEVEL_MAX];
+static char* log_prefix[LOG_LEVEL_MAX];
+static char* log_postfix[LOG_LEVEL_MAX];
+
+static u32 ansi_prefix_lens[LOG_LEVEL_MAX] = {
+    [LOG_FATAL] = sizeof(ANSI_FATAL_PREFIX) - 1,
+    [LOG_ERROR] = sizeof(ANSI_ERROR_PREFIX) - 1,
+    [LOG_WARN]  = sizeof(ANSI_WARN_PREFIX) - 1,
+    [LOG_INFO]  = sizeof(ANSI_INFO_PREFIX) - 1,
+    [LOG_DEBUG] = sizeof(ANSI_DEBUG_PREFIX) - 1,
+    [LOG_TRACE] = sizeof(ANSI_TRACE_PREFIX) - 1,
+};
 
 b8 logger_initialize(void) {
     b8 ansi = platform_init_ANSI_escape();
-    ansi_prefix[LOG_FATAL]  = (ansi) ? (ANSI_FATAL_PREFIX "[FATAL]: ")  : "[FATAL]: ";
-    ansi_prefix[LOG_ERROR]  = (ansi) ? (ANSI_ERROR_PREFIX "[ERROR]: ")  : "[ERROR]: ";
-    ansi_prefix[LOG_WARN]   = (ansi) ? (ANSI_WARN_PREFIX "[WARN]:  ")   : "[WARN]:  ";
-    ansi_prefix[LOG_INFO]   = (ansi) ? (ANSI_INFO_PREFIX "[INFO]:  ")   : "[INFO]:  ";
-    ansi_prefix[LOG_DEBUG]  = (ansi) ? (ANSI_DEBUG_PREFIX "[DEBUG]: ")  : "[DEBUG]: ";
-    ansi_prefix[LOG_TRACE]  = (ansi) ? (ANSI_TRACE_PREFIX "[TRACE]: ")  : "[TRACE]: ";
+    log_prefix[LOG_FATAL]  = (ansi) ? (ANSI_FATAL_PREFIX "[FATAL]: ")  : "[FATAL]: ";
+    log_prefix[LOG_ERROR]  = (ansi) ? (ANSI_ERROR_PREFIX "[ERROR]: ")  : "[ERROR]: ";
+    log_prefix[LOG_WARN]   = (ansi) ? (ANSI_WARN_PREFIX "[WARN]:  ")   : "[WARN]:  ";
+    log_prefix[LOG_INFO]   = (ansi) ? (ANSI_INFO_PREFIX "[INFO]:  ")   : "[INFO]:  ";
+    log_prefix[LOG_DEBUG]  = (ansi) ? (ANSI_DEBUG_PREFIX "[DEBUG]: ")  : "[DEBUG]: ";
+    log_prefix[LOG_TRACE]  = (ansi) ? (ANSI_TRACE_PREFIX "[TRACE]: ")  : "[TRACE]: ";
 
-    ansi_postfix[LOG_TRACE] = (ansi) ? (ANSI_TRACE_POSTFIX) : "";
-    ansi_postfix[LOG_ERROR] = (ansi) ? (ANSI_ERROR_POSTFIX) : "";
-    ansi_postfix[LOG_WARN]  = (ansi) ? (ANSI_WARN_POSTFIX)  : "";
-    ansi_postfix[LOG_INFO]  = (ansi) ? (ANSI_INFO_POSTFIX)  : "";
-    ansi_postfix[LOG_DEBUG] = (ansi) ? (ANSI_DEBUG_POSTFIX) : "";
-    ansi_postfix[LOG_FATAL] = (ansi) ? (ANSI_FATAL_POSTFIX) : "";
+    log_postfix[LOG_TRACE] = (ansi) ? (ANSI_TRACE_POSTFIX) : "";
+    log_postfix[LOG_ERROR] = (ansi) ? (ANSI_ERROR_POSTFIX) : "";
+    log_postfix[LOG_WARN]  = (ansi) ? (ANSI_WARN_POSTFIX)  : "";
+    log_postfix[LOG_INFO]  = (ansi) ? (ANSI_INFO_POSTFIX)  : "";
+    log_postfix[LOG_DEBUG] = (ansi) ? (ANSI_DEBUG_POSTFIX) : "";
+    log_postfix[LOG_FATAL] = (ansi) ? (ANSI_FATAL_POSTFIX) : "";
     if (ansi) printf(ETNA_BACKGROUND(05, 05, 14));
+
+    // If ansi not avalable zero the lengths used for file writing
+    if (!ansi) for (u32 i = 0; i < LOG_LEVEL_MAX; i++) ansi_prefix_lens[i] = 0;
 
     logger = etallocate(sizeof(logger_state), MEMORY_TAG_LOGGER);
     if (!file_open("etna_log.txt", FILE_WRITE_FLAG, &logger->log_file)) {
@@ -106,6 +119,7 @@ b8 logger_initialize(void) {
         logger->err_file = 0;
         ETERROR("Unable to intialize error file for writing.");
     }
+    logger->ansi = ansi;
 
     return true;
 }
@@ -119,8 +133,8 @@ void logger_shutdown(void) {
 
 // TODO: Use etstring for string manipulation for the sake of it
 void log_output(log_level level, const char* format, ...) {
-    u32 ansi_prefix_len = str_length(ansi_prefix[level]);
-    u32 ansi_postfix_len = str_length(ansi_postfix[level]);
+    u32 log_prefix_len = str_length(log_prefix[level]);
+    u32 log_postfix_len = str_length(log_postfix[level]);
 
     // HACK: Use vsnprintf to get the correct amount of bytes needed to store the string,
     // hacky work arround to avoid parsing the string or adding extraneous bytes
@@ -130,29 +144,38 @@ void log_output(log_level level, const char* format, ...) {
     format_len = vsnprintf(NULL, 0, format, list_len);
     va_end(list_len);
 
-    const u32 output_len = ansi_prefix_len + format_len + ansi_postfix_len;
+    const u32 output_len = log_prefix_len + format_len + log_postfix_len;
     char* output = etallocate(sizeof(char) * (output_len + 1), MEMORY_TAG_STRING);
 
     // Add one to postfix length to copy the null terminating character
-    etcopy_memory(output, ansi_prefix[level], ansi_prefix_len);
+    etcopy_memory(output, log_prefix[level], log_prefix_len);
     va_list list;
     va_start(list, format);
-    vsnprintf(output + ansi_prefix_len, format_len + 1, format, list);
+    vsnprintf(output + log_prefix_len, format_len + 1, format, list);
     va_end(list);
-    etcopy_memory((u8*)output + ansi_prefix_len + format_len, ansi_postfix[level], ansi_postfix_len + 1);
+    etcopy_memory((u8*)output + log_prefix_len + format_len, log_postfix[level], log_postfix_len + 1);
 
     // Standard output
     printf("%s\n", output);
 
-    // TODO: If log file fails to initialize then just dont write to log file
-    // Change the null terminator to a newline character so that it is printed to the log file.
-    output[output_len] = '\n';
+    // Add newline character before ansi postfix  
+    output[log_prefix_len + format_len] = '\n';
+    u64 file_write_len = sizeof(char) * ((log_prefix_len - ansi_prefix_lens[level]) + format_len + 1);
+
     u64 log_bytes_written = 0;
-    if (logger && logger->log_file && !file_write(logger->log_file, sizeof(char) * (format_len + 1), (u8*)output + ansi_prefix_len, &log_bytes_written)) {
+    if (logger &&
+        logger->log_file && 
+        !file_write(logger->log_file, file_write_len, (u8*)output + ansi_prefix_lens[level], &log_bytes_written)
+    ) {
         printf("Something went wrong when writing to the log file.");
     }
+    
     u64 err_bytes_written = 0;
-    if (level < 2 && logger && logger->err_file && !file_write(logger->err_file, sizeof(char) * (format_len + 1), (u8*)output + ansi_prefix_len, &err_bytes_written)) {
+    if (level < 2 &&
+        logger &&
+        logger->err_file && 
+        !file_write(logger->err_file, file_write_len, (u8*)output + ansi_prefix_lens[level], &err_bytes_written)
+    ) {
         printf("Something went wrong when writing to the error file.");
     }
 

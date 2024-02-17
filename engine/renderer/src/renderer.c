@@ -386,7 +386,7 @@ b8 renderer_prepare_frame(renderer_state* state) {
     return true;
 }
 
-b8 renderer_draw_frame(renderer_state* state) {   
+b8 renderer_draw_frame(renderer_state* state) {
     VkResult result;
 
     VkCommandBuffer frame_cmd = state->main_graphics_command_buffers[state->frame_index];
@@ -420,21 +420,21 @@ b8 renderer_draw_frame(renderer_state* state) {
         VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
 
-    // Draw the geometry
     draw_geometry(state, frame_cmd);
 
-    // Image barrier to transition render image to transfer source optimal layout
+    // Make render image optimal layout for transfer source to swapchain image
     image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
-    // Image barrier to transition swapchain image to transfer destination optimal
+    // Make swapchain image optimal for recieving render image data
     image_barrier(frame_cmd, state->swapchain_images[state->swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_ACCESS_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
 
+    // Copy render image to swapchain image
     blit_image2D_to_image2D(
         frame_cmd,
         state->render_image.handle,
@@ -443,16 +443,14 @@ b8 renderer_draw_frame(renderer_state* state) {
         state->window_extent,
         VK_IMAGE_ASPECT_COLOR_BIT);
 
-    // Image barrier to transition the swapchian image from transfer destination optimal to present khr
+    // Make swapchain image optimal for presentation
     image_barrier(frame_cmd, state->swapchain_images[state->swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_NONE,
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
 
-    // End command buffer recording
     VK_CHECK(vkEndCommandBuffer(frame_cmd));
 
-    // Begin command buffer submission
     VkSemaphoreSubmitInfo wait_submit = init_semaphore_submit_info(
         state->swapchain_semaphores[state->frame_index],
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
@@ -468,7 +466,6 @@ b8 renderer_draw_frame(renderer_state* state) {
         1, &cmd_submit,
         1, &signal_submit);
     
-    // Submit commands
     result = vkQueueSubmit2(
         state->device.graphics_queue, 
         /* submitCount */ 1,
@@ -476,7 +473,6 @@ b8 renderer_draw_frame(renderer_state* state) {
         state->render_fences[state->frame_index]);
     VK_CHECK(result);
 
-    // Present the image
     VkPresentInfoKHR present_info = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .pNext = 0,
@@ -492,7 +488,6 @@ b8 renderer_draw_frame(renderer_state* state) {
         recreate_swapchain(state);
     } else VK_CHECK(result);
 
-    // Move to the next frame
     state->frame_index = (state->frame_index + 1) % state->image_count;
     return true;
 }

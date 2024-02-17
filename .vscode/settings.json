@@ -182,9 +182,11 @@
         "swapchain.h": "c",
         "stdalign.h": "c",
         "scene.h": "c",
-        "gltfimporter.h": "c"
+        "gltfimporter.h": "c",
+        "functional": "c",
+        "typeinfo": "c"
     },
-    "C_Cpp.dimInactiveRegions": false,
+    "C_Cpp.dimInactiveRegions": true,
     "dotnet.defaultSolution": "disable",
     "cmake.configureOnOpen": false
 }
