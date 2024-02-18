@@ -51,11 +51,9 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
-    // Allocate engine engine memory
     engine = (engine_t*)etallocate(sizeof(engine_t), MEMORY_TAG_ENGINE);
     engine->is_running = false;
 
-    // Initialize the logger. When log file is implemented this is where it will initialized
     if (!logger_initialize()) {
         ETFATAL("Unable to initialize logger.");
         return false;
@@ -68,40 +66,21 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     ETDEBUG("Testing debug");
     ETTRACE("Testing trace");
 
-    // Check if the application passed the functions
-    b8 has_init, has_shutdown, has_update, has_render = false;
-    if (!(has_init = app_details.initialize) ||
-        !(has_shutdown = app_details.shutdown) ||
-        !(has_update = app_details.update) ||
-        !(has_render = app_details.render))
-    {
-        // A necessary function is missing. Exit
-        ETFATAL(
-            "Initialize: %u | Shutdown %u | Update: %u | Render: %u.",
-            has_init, has_shutdown, has_update, has_render
-        );
-    }
-
-    // Events
     events_initialize(&engine->event_system);
 
-    // Input
     input_initialize(&engine->input_state);
 
-    // Initialize platform
     if (!platform_initialize()) {
         ETFATAL("Platfrom failed to initialize.");
         return false;
     }
 
-    // Create window
     etwindow_config window_config = {
         .name = "Etna Window",
         .x_start_pos = engine_details.x_start_pos,
         .y_start_pos = engine_details.y_start_pos,
         .width = engine_details.width,
-        .height = engine_details.height
-    };
+        .height = engine_details.height};
     if (!etwindow_initialize(&window_config, &engine->window)) {
         ETFATAL("Window failed to initialize.");
         return false;
@@ -109,7 +88,6 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
 
     engine->is_minimized = false;
 
-    // Initialize renderer
     if (!renderer_initialize(&engine->renderer_state, engine->window, "App")) {
         ETFATAL("Renderer failed to initialize.");
         return false;
@@ -122,7 +100,17 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     event_observer_register(EVENT_CODE_KEY_RELEASE, (void*)engine, engine_on_key_event);
     event_observer_register(EVENT_CODE_RESIZE, (void*)engine, engine_on_resize);
 
-    // Transfer app information
+    b8 has_init = false, has_shutdown = false, has_update = false, has_render = false;
+    if (!(has_init = app_details.initialize) ||
+        !(has_shutdown = app_details.shutdown) ||
+        !(has_update = app_details.update) ||
+        !(has_render = app_details.render)
+    ) {
+        ETFATAL("Initialize: %u | Shutdown %u | Update: %u | Render: %u.",
+            has_init, has_shutdown, has_update, has_render);
+        return false;
+    }
+
     engine->app_initialize = app_details.initialize;
     engine->app_shutdown = app_details.shutdown;
     engine->app_update = app_details.update;
@@ -130,7 +118,6 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     engine->app_size = app_details.app_size;
     engine->app = (application_t*)etallocate(app_details.app_size, MEMORY_TAG_APPLICATION);
 
-    // Initialize application
     if (!engine->app_initialize(engine->app)) {
         ETFATAL("Unable to initialize application. application_initialize returned false.");
         return false;
@@ -166,38 +153,28 @@ b8 engine_run(void) {
 }
 
 void engine_shutdown(void) {
-    // Call the passed in shutdown function for the application
     engine->app_shutdown(engine->app);
 
-    // Free the app memory
     etfree(engine->app, engine->app_size, MEMORY_TAG_APPLICATION);
 
     scene_shutdown(engine->main_scene);
 
     renderer_shutdown(engine->renderer_state);
 
-    // Shutdown the window
     etwindow_shutdown(engine->window);
 
-    // Shutdown platform
     platform_shutdown();
 
-    // Shutdown input system
     input_shutdown(engine->input_state);
 
-    // Deregister engine events & Shutdown event system
     event_observer_deregister(EVENT_CODE_RESIZE, (void*)engine, engine_on_resize);
     event_observer_deregister(EVENT_CODE_KEY_RELEASE, (void*)engine, engine_on_key_event);
     events_shutdown(engine->event_system);
-
     
-    // Shutdown log file
     logger_shutdown();
     
-    // Free memory used for the engine
     etfree(engine, sizeof(engine_t), MEMORY_TAG_ENGINE);
 
-    // Close memory
     print_memory_metrics();
     memory_shutdown();
 }

@@ -166,9 +166,6 @@ void material_blueprint_destroy(renderer_state* state, material_blueprint* bluep
     unload_shader(state, &blueprint->vertex);
 }
 
-/** NOTE:
- * This function is meant to take generic 
- */
 material_instance material_blueprint_create_instance(
     renderer_state* state,
     material_blueprint* blueprint,

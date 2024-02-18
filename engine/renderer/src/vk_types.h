@@ -110,6 +110,23 @@ struct material_resources {
     VkBuffer data_buffer;
     u32 data_buffer_offset;
 };
+// TODO: END
+
+// TODO: Pass array of these when creating an instance from a blueprint
+typedef struct material_resource {
+    u32 binding;
+    union {
+        struct {
+            VkImageView view;
+            VkSampler sampler;
+        };
+        struct {
+            VkBuffer buffer;
+            u64 offset;
+        };
+    };
+} material_resource;
+// TODO: END
 
 // Default material type as importing GLTF file's is 
 // the only thing supported at the moment
@@ -121,7 +138,6 @@ typedef struct GLTF_MR {
 
     ds_writer writer;
 } GLTF_MR;
-// TODO: END
 
 typedef struct material {
     u32 id;
