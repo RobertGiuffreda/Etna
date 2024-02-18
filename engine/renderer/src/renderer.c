@@ -750,7 +750,7 @@ static void shutdown_default_material(renderer_state* state) {
 
 static b8 initialize_default_data(renderer_state* state) {
     // NOTE: For some reason the u32 is being interpreted as 
-    // 0xFFFFFFFF -- aabbggrr. Maybe gpu or computer specific
+    // 0xFFFFFFFF -- aabbggrr. Endianness doing something here
     u32 white = 0xFFFFFFFF;
     image2D_create_data(
         state,

@@ -53,7 +53,7 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
         }
     }
 
-    u32 max_binding = (v_max_binding > f_max_binding) ? v_max_binding : f_max_binding;
+    u32 binding_count = ((v_max_binding > f_max_binding) ? v_max_binding : f_max_binding) + 1;
 
     struct {
         b8 present;
@@ -63,11 +63,11 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
         VkShaderStageFlags stage_flags;
     }*binding_parameters;
 
-    binding_parameters = etallocate(sizeof(binding_parameters[0]) * (max_binding + 1), MEMORY_TAG_MATERIAL);
-    etzero_memory(binding_parameters, sizeof(binding_parameters[0]) * (max_binding + 1));
+    binding_parameters = etallocate(sizeof(binding_parameters[0]) * binding_count, MEMORY_TAG_MATERIAL);
+    etzero_memory(binding_parameters, sizeof(binding_parameters[0]) * binding_count);
 
     // NOTE: v_sets[v_i].bindings[i] & f_sets[f_i].bindings[i] is odd
-    for (u32 i = 0; i < (max_binding + 1); ++i) {
+    for (u32 i = 0; i < binding_count; ++i) {
         if (v_has_mat_set && i < v_sets[v_i].binding_count) {
             binding_layout* binding = &v_sets[v_i].bindings[i];
             binding_parameters[binding->index].present = true;
@@ -88,7 +88,7 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
 
     // Create descriptor set layout from binding parameters
     dsl_builder layout_builder = descriptor_set_layout_builder_create();
-    for (u32 i = 0; i < max_binding + 1; ++i) {
+    for (u32 i = 0; i < binding_count; ++i) {
         // If the descriptor index is not present in the layouts do not bind it
         if (!binding_parameters[i].present) continue;
         descriptor_set_layout_builder_add_binding(
@@ -101,7 +101,7 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
 
     blueprint->ds_layout = descriptor_set_layout_builder_build(&layout_builder, state);
     descriptor_set_layout_builder_destroy(&layout_builder);
-    etfree(binding_parameters, sizeof(binding_parameters[0]) * (max_binding + 1), MEMORY_TAG_MATERIAL);
+    etfree(binding_parameters, sizeof(binding_parameters[0]) * binding_count, MEMORY_TAG_MATERIAL);
 
     VkDescriptorSetLayout ds_layouts[] = {
         state->scene_data_descriptor_set_layout,
