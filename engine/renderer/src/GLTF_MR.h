@@ -8,5 +8,5 @@ material_instance GLTF_MR_create_instance(
     GLTF_MR* mat,
     renderer_state* state,
     material_pass pass,
-    const struct material_resources* resources,
+    const struct GLTF_MR_material_resources* resources,
     ds_allocator* descriptor_allocator);

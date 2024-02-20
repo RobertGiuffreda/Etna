@@ -22,7 +22,7 @@ b8 GLTF_MR_build_blueprint(GLTF_MR* mat, renderer_state* state) {
     }
 
     dsl_builder layout_builder = descriptor_set_layout_builder_create();
-    // Scene data binding
+    // material_data_block binding
     descriptor_set_layout_builder_add_binding(
         &layout_builder,
         /* Binding: */ 0,
@@ -120,7 +120,7 @@ material_instance GLTF_MR_create_instance(
     GLTF_MR* mat,
     renderer_state* state,
     material_pass pass,
-    const struct material_resources* resources,
+    const struct GLTF_MR_material_resources* resources,
     ds_allocator* descriptor_allocator)
 {
     material_instance mat_data;
@@ -139,7 +139,7 @@ material_instance GLTF_MR_create_instance(
         &mat->writer,
         /* Binding: */ 0,
         resources->data_buffer,
-        sizeof(struct material_constants),
+        sizeof(struct GLTF_MR_constants),
         resources->data_buffer_offset,
         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     descriptor_set_writer_write_image(

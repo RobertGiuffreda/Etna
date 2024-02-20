@@ -329,10 +329,9 @@ void renderer_shutdown(renderer_state* state) {
 }
 
 b8 renderer_prepare_frame(renderer_state* state) {
-        // Wait for the current frame to end rendering by waiting on its render fence
-    // Reset the render fence for reuse
     VkResult result;
 
+    // Wait for the current frame to end rendering by waiting on its render fence
     result = vkWaitForFences(
         state->device.handle,
         /* Fence count: */ 1,
@@ -374,6 +373,7 @@ b8 renderer_prepare_frame(renderer_state* state) {
         return false;
     } else VK_CHECK(result);
 
+    // Reset the render fence for reuse
     VK_CHECK(vkResetFences(
         state->device.handle,
         /* Fence count: */ 1,
@@ -550,7 +550,6 @@ static void destroy_frame_command_structures(renderer_state* state) {
         sizeof(VkCommandPool) * state->image_count,
         MEMORY_TAG_RENDERER);
 
-    // Destroy immediate command pool
     vkDestroyCommandPool(state->device.handle, state->imm_pool, state->allocator);
 }
 
@@ -624,7 +623,6 @@ static void destroy_frame_synchronization_structures(renderer_state* state) {
 }
 
 static void initialize_descriptors(renderer_state* state) {
-    // Update global allocator to growable version
     pool_size_ratio global_ratios[] = {
         { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 1},
         { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 1}};
@@ -655,7 +653,6 @@ static void initialize_descriptors(renderer_state* state) {
         { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3}};
     state->frame_allocators = etallocate(sizeof(ds_allocator) * state->image_count, MEMORY_TAG_RENDERER);
     for (u32 i = 0; i < state->image_count; ++i) {
-        // Initialize growable allocator for the frames
         descriptor_set_allocator_initialize(&state->frame_allocators[i], 1000, 4, frame_ratios, state);
     }
 
@@ -670,7 +667,6 @@ static void shutdown_descriptors(renderer_state* state) {
 
     vkDestroyDescriptorSetLayout(state->device.handle, state->draw_image_descriptor_set_layout, state->allocator);
 
-    // Shutdown growable descriptor set allocators
     for (u32 i = 0; i < state->image_count; ++i) {
         descriptor_set_allocator_shutdown(&state->frame_allocators[i], state);
     }
@@ -815,7 +811,7 @@ static b8 initialize_default_data(renderer_state* state) {
     sampler_info.minFilter = VK_FILTER_LINEAR;
     vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->default_sampler_linear);
 
-    struct material_resources mat_resources;
+    struct GLTF_MR_material_resources mat_resources;
     mat_resources.color_image = state->white_image;
     mat_resources.color_sampler = state->default_sampler_linear;
     mat_resources.metal_rough_image = state->white_image;
@@ -824,18 +820,18 @@ static b8 initialize_default_data(renderer_state* state) {
     // Create material_constants uniform buffer
     buffer_create(
         state,
-        sizeof(struct material_constants),
+        sizeof(struct GLTF_MR_constants),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &state->default_material_constants
     );
 
-    struct material_constants scene_uniform_data = {
+    struct GLTF_MR_constants scene_uniform_data = {
         .color_factors = (v4s){.raw = {1.f, 1.f, 1.f, 1.f}},
         .metal_rough_factors = (v4s){.raw = {1.f, .5f, 0.f, 0.f}},
     };
-    struct material_constants* mapped_data;
-    vkMapMemory(state->device.handle, state->default_material_constants.memory, 0, sizeof(struct material_constants), 0, (void**)&mapped_data);
+    struct GLTF_MR_constants* mapped_data;
+    vkMapMemory(state->device.handle, state->default_material_constants.memory, 0, sizeof(struct GLTF_MR_constants), 0, (void**)&mapped_data);
     *mapped_data = scene_uniform_data;
     vkUnmapMemory(state->device.handle, state->default_material_constants.memory);
 
@@ -925,6 +921,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
             &scene_descriptor_set,
             /* Dynamic offset count: */ 0,
             /* Dynamic offsets: */ 0);
+
         // Material descriptor set binding
         vkCmdBindDescriptorSets(cmd,
             VK_PIPELINE_BIND_POINT_GRAPHICS,

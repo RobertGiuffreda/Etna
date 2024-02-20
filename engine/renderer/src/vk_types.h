@@ -93,14 +93,14 @@ typedef struct material_instance {
     material_pass pass_type;
 } material_instance;
 
-// TODO: Make material_constants & material_resources generic structs to pass generic information
-struct material_constants {
+// TODO: Remove the padding and handle the alignment for binding ourselves with 
+struct GLTF_MR_constants {
     v4s color_factors;
     v4s metal_rough_factors;
     v4s padding[14];
 };
 
-struct material_resources {
+struct GLTF_MR_material_resources {
     image color_image;
     VkSampler color_sampler;
 
@@ -110,23 +110,6 @@ struct material_resources {
     VkBuffer data_buffer;
     u32 data_buffer_offset;
 };
-// TODO: END
-
-// TODO: Pass array of these when creating an instance from a blueprint
-typedef struct material_resource {
-    u32 binding;
-    union {
-        struct {
-            VkImageView view;
-            VkSampler sampler;
-        };
-        struct {
-            VkBuffer buffer;
-            u64 offset;
-        };
-    };
-} material_resource;
-// TODO: END
 
 // Default material type as importing GLTF file's is 
 // the only thing supported at the moment
@@ -136,13 +119,14 @@ typedef struct GLTF_MR {
 
     VkDescriptorSetLayout material_layout;
 
+    // TODO: ds_writer support descriptor count > 1
     ds_writer writer;
 } GLTF_MR;
 
 typedef struct material {
     u32 id;
     char* name;
-    material_instance data;
+    material_instance instance;
 } material;
 
 typedef struct surface {

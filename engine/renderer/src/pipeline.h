@@ -3,9 +3,12 @@
 #include "renderer/src/vk_types.h"
 #include "renderer/src/renderer.h"
 
+#define DEFAULT_GRAPHICS_PIPELINE_STAGE_COUNT 2
+#define DEFAULT_VERTEX_STAGE_INDEX 0
+#define DEFAULT_FRAGMENT_STAGE_INDEX 1
+
 typedef struct pipeline_builder {
-    // Dynarray
-    VkPipelineShaderStageCreateInfo* stages;
+    VkPipelineShaderStageCreateInfo stages[DEFAULT_GRAPHICS_PIPELINE_STAGE_COUNT];
     VkPipelineInputAssemblyStateCreateInfo input_assembly;
     VkPipelineRasterizationStateCreateInfo rasterizer;
     VkPipelineColorBlendAttachmentState color_blend_attachment;

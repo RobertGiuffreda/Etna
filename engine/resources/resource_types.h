@@ -25,6 +25,7 @@
 typedef struct mesh mesh;
 typedef struct image image;
 typedef struct material material;
+typedef struct material_resource material_resource;
 
 typedef struct mesh_manager mesh_manager;
 typedef struct image_manager image_manager;

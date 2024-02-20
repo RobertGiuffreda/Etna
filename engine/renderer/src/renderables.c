@@ -150,7 +150,7 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
             .index_count = s->index_count,
             .first_index = s->start_index,
             .index_buffer = node->mesh->buffers.index_buffer.handle,
-            .material = &s->material->data,
+            .material = &s->material->instance,
             .transform = node_matrix,
             .vertex_buffer_address = node->mesh->buffers.vertex_buffer_address,
 
@@ -159,7 +159,7 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
             .material_name = s->material->name
         };
 
-        if (s->material->data.pass_type == MATERIAL_PASS_TRANSPARENT) {
+        if (s->material->instance.pass_type == MATERIAL_PASS_TRANSPARENT) {
             dynarray_push((void**)&ctx->transparent_surfaces, &def);
         }
         else {

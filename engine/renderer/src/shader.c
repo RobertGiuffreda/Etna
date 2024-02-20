@@ -100,7 +100,7 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
                 binding->image.dim = spv_dim_to_image_dim(spv_binding->image.dim);
                 binding->image.depth = spv_binding->image.depth;
                 binding->image.array = spv_binding->image.arrayed;
-                binding->image.ms = spv_binding->image.ms;
+                binding->image.multisampling = spv_binding->image.ms;
                 binding->image.sampled = spv_binding->image.sampled;
             } else {
                 reflect_block_variables(&binding->block, &spv_binding->block);
@@ -239,7 +239,7 @@ void print_binding_layout(binding_layout* binding) {
     if (is_descriptor_type_image(binding->descriptor_type)) {
         ETINFO("Image depth: %lu", binding->image.depth);
         ETINFO("Image array: %lu", binding->image.array);
-        ETINFO("Image multi sampled: %lu", binding->image.ms);
+        ETINFO("Image multi sampled: %lu", binding->image.multisampling);
         ETINFO("Image sampled: %lu", binding->image.sampled);
     } else {
         print_block_variables(&binding->block);

@@ -76,7 +76,6 @@ struct block_variable {
         u32 stride;
     } matrix;
 
-    // Array traits
     struct {
         u32 dim_count;
         u32 dim_lengths[32];
@@ -97,7 +96,7 @@ typedef struct binding_layout {
         image_dim dim;
         u32 depth;
         u32 array;
-        u32 ms;
+        u32 multisampling;
         u32 sampled;
         // image_format format;
     } image;
@@ -106,6 +105,7 @@ typedef struct binding_layout {
     u32 accessed;
 } binding_layout;
 
+// TODO: Add image count, buffer count
 typedef struct set_layout {
     u32 index;
     u32 binding_count;
@@ -113,13 +113,10 @@ typedef struct set_layout {
 } set_layout;
 
 typedef struct shader {
-    // NOTE: Vulkan stuff
     VkShaderModule module;
     VkShaderStageFlagBits stage;
     char* entry_point;
-    // NOTE: END
 
-    // NOTE: Reflection info
     // DescriptorSet information
     u32 set_count;
     set_layout* sets;
@@ -127,7 +124,6 @@ typedef struct shader {
     // Push constant information
     u32 push_block_count;
     block_variable* push_blocks;
-    // NOTE: END
 } shader;
 
 // NOTE: Reflection only tested with Vulkan GLSL

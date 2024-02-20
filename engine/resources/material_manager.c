@@ -76,7 +76,7 @@ b8 material_manager_submit(material_manager* manager, material_config* config) {
     new_material->id = manager->material_count;
     new_material->name = str_duplicate_allocate(config->name);
 
-    new_material->data = material_blueprint_create_instance(
+    new_material->instance = material_blueprint_create_instance(
         manager->state,
         &manager->blueprint,
         config->pass_type,

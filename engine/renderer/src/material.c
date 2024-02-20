@@ -13,6 +13,7 @@
 VkDescriptorType vk_descriptor_type_from_descriptor_type(descriptor_type type);
 
 b8 material_blueprint_create(renderer_state* state, const char* vertex_path, const char* fragment_path, material_blueprint* blueprint) {
+    // TODO: Create load material shaders function that loads shaders and merges the bindings information together
     if (!load_shader(state, vertex_path, &blueprint->vertex)) {
         ETERROR("Unable to load vertex shader %s.", vertex_path);
         return false;
@@ -24,7 +25,9 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
         return false;
     }
 
-    // Find the material set within the shaders
+    // Begin merging material set binding information from the two shaders
+
+    // Check for presence of designed material set in the shaders
     set_layout* v_sets = blueprint->vertex.sets;
     u32 v_set_count = blueprint->vertex.set_count;
     u32 v_i = 0;
@@ -37,75 +40,165 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
     while (f_i < f_set_count && f_sets[f_i].index != MATERIAL_SET_INDEX) ++f_i;
     b8 f_has_mat_set = (f_i != f_set_count);
 
-    u32 v_max_binding = 0;
+    u32 max_binding = 0;
     if (v_has_mat_set) {
         binding_layout* v_bindings = v_sets[v_i].bindings;
         for (u32 i = 0; i < v_sets[v_i].binding_count; ++i) {
-            if (v_bindings[i].index > v_max_binding) v_max_binding = v_bindings[i].index;
+            if (v_bindings[i].index > max_binding) max_binding = v_bindings[i].index;
         }
     }
 
-    u32 f_max_binding = 0;
     if (f_has_mat_set) {
         binding_layout* f_bindings = f_sets[f_i].bindings;
         for (u32 i = 0; i < f_sets[f_i].binding_count; ++i) {
-            if (f_bindings[i].index > f_max_binding) f_max_binding = f_bindings[i].index;
+            if (f_bindings[i].index > max_binding) max_binding = f_bindings[i].index;
         }
     }
 
-    u32 binding_count = ((v_max_binding > f_max_binding) ? v_max_binding : f_max_binding) + 1;
+    // Want to index into an array with the binding 
+    // number from shader information.
+    u32 bindings_array_length = max_binding + 1;
 
-    struct {
+    struct mat_binding_params {
         b8 present;
-        u32 binding;
         u32 count;
-        VkDescriptorType type;
+        descriptor_type type;
+        union {
+            u64 buffer_range;
+            VkImageLayout image_layout;
+        };
         VkShaderStageFlags stage_flags;
-    }*binding_parameters;
+    }* binding_parameters;
 
-    binding_parameters = etallocate(sizeof(binding_parameters[0]) * binding_count, MEMORY_TAG_MATERIAL);
-    etzero_memory(binding_parameters, sizeof(binding_parameters[0]) * binding_count);
+    binding_parameters = etallocate(sizeof(binding_parameters[0]) * bindings_array_length, MEMORY_TAG_MATERIAL);
+    etzero_memory(binding_parameters, sizeof(struct mat_binding_params) * bindings_array_length);
 
-    // NOTE: v_sets[v_i].bindings[i] & f_sets[f_i].bindings[i] is odd
-    for (u32 i = 0; i < binding_count; ++i) {
-        if (v_has_mat_set && i < v_sets[v_i].binding_count) {
-            binding_layout* binding = &v_sets[v_i].bindings[i];
-            binding_parameters[binding->index].present = true;
-            binding_parameters[binding->index].count = binding->count;
-            binding_parameters[binding->index].binding = binding->index;
-            binding_parameters[binding->index].type = vk_descriptor_type_from_descriptor_type(binding->descriptor_type);
-            binding_parameters[binding->index].stage_flags |= VK_SHADER_STAGE_VERTEX_BIT;
+    if (v_has_mat_set) {
+        for (u32 i = 0; i < v_sets[v_i].binding_count; ++i) {
+            binding_layout binding = v_sets[v_i].bindings[i];
+            binding_parameters[binding.index].present = true;
+            binding_parameters[binding.index].count = binding.count;
+            binding_parameters[binding.index].type = binding.descriptor_type;
+            binding_parameters[binding.index].stage_flags |= VK_SHADER_STAGE_VERTEX_BIT;
+            switch (binding.descriptor_type)
+            {
+            case DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+                binding_parameters[binding.index].image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                break;
+            case DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+                binding_parameters[binding.index].buffer_range = binding.block.size;
+                break;
+            }
         }
-        if (f_has_mat_set && i < f_sets[f_i].binding_count) {
-            binding_layout* binding = &f_sets[f_i].bindings[i];
-            binding_parameters[binding->index].present = true;
-            binding_parameters[binding->index].count = binding->count;
-            binding_parameters[binding->index].binding = binding->index;
-            binding_parameters[binding->index].type = vk_descriptor_type_from_descriptor_type(binding->descriptor_type);
-            binding_parameters[binding->index].stage_flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+    }
+    if (f_has_mat_set) {
+        for (u32 i = 0; i < f_sets[f_i].binding_count; ++i) {
+            binding_layout binding = f_sets[f_i].bindings[i];
+            binding_parameters[binding.index].present = true;
+            binding_parameters[binding.index].count = binding.count;
+            binding_parameters[binding.index].type = binding.descriptor_type;
+            binding_parameters[binding.index].stage_flags |= VK_SHADER_STAGE_FRAGMENT_BIT;
+            switch (binding.descriptor_type)
+            {
+            case DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+                binding_parameters[binding.index].image_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                break;
+            case DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+                binding_parameters[binding.index].buffer_range = binding.block.size;
+                break;
+            }
         }
     }
 
-    // Create descriptor set layout from binding parameters
+    // Info for descriptor set writing
+    u32 binding_count = 0;
+    u32 image_count = 0;
+    u32 buffer_count = 0;
+
     dsl_builder layout_builder = descriptor_set_layout_builder_create();
-    for (u32 i = 0; i < binding_count; ++i) {
-        // If the descriptor index is not present in the layouts do not bind it
+    for (u32 i = 0; i < bindings_array_length; ++i) {
         if (!binding_parameters[i].present) continue;
         descriptor_set_layout_builder_add_binding(
             &layout_builder,
-            binding_parameters[i].binding,
+            /* Binding: */ i,
             binding_parameters[i].count,
-            binding_parameters[i].type,
-            binding_parameters[i].stage_flags);
+            vk_descriptor_type_from_descriptor_type(binding_parameters[i].type),
+            binding_parameters[i].stage_flags
+        );
+
+        // Info for descriptor set writes
+        ++binding_count;
+        switch (binding_parameters[i].type)
+        {
+        case DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+            image_count += binding_parameters[i].count;
+            break;
+        case DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+            buffer_count += binding_parameters[i].count;
+            break;
+        }
     }
 
     blueprint->ds_layout = descriptor_set_layout_builder_build(&layout_builder, state);
     descriptor_set_layout_builder_destroy(&layout_builder);
-    etfree(binding_parameters, sizeof(binding_parameters[0]) * binding_count, MEMORY_TAG_MATERIAL);
+
+    VkWriteDescriptorSet* writes = etallocate(sizeof(VkWriteDescriptorSet) * binding_count, MEMORY_TAG_MATERIAL);
+    VkDescriptorImageInfo* image_infos = etallocate(sizeof(VkDescriptorImageInfo) * image_count, MEMORY_TAG_MATERIAL);
+    VkDescriptorBufferInfo* buffer_infos = etallocate(sizeof(VkDescriptorBufferInfo) * buffer_count, MEMORY_TAG_MATERIAL);
+    
+    blueprint->binding_count = binding_count;
+    blueprint->image_count = image_count;
+    blueprint->buffer_count = buffer_count;
+
+    u32 write_index = 0;
+    u32 image_info_index = 0;
+    u32 buffer_info_index = 0;
+    for (u32 i = 0; i < bindings_array_length; ++i) {
+        if (!binding_parameters[i].present) continue;
+        VkWriteDescriptorSet descriptor_write = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = 0,
+            .dstBinding = i,
+            .dstSet = VK_NULL_HANDLE,
+            .descriptorCount = binding_parameters[i].count,
+            .descriptorType = vk_descriptor_type_from_descriptor_type(binding_parameters[i].type),
+            .pImageInfo = image_infos + image_info_index,
+            .pBufferInfo = buffer_infos + buffer_info_index,
+        };
+        writes[write_index++] = descriptor_write;
+
+        switch (binding_parameters[i].type)
+        {
+        case DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+            VkDescriptorImageInfo image_info = {
+                .imageLayout = binding_parameters[i].image_layout,
+            };
+            for (u32 j = 0; j < binding_parameters[i].count; ++j) {
+                image_infos[j + image_info_index] = image_info;
+            }
+            image_info_index += binding_parameters[i].count;
+            break;
+        case DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+            VkDescriptorBufferInfo buffer_info = {
+                .range = binding_parameters[i].buffer_range,
+            };
+            for (u32 j = 0; j < binding_parameters[i].count; ++j) {
+                buffer_infos[j + buffer_info_index] = buffer_info;
+            }
+            buffer_info_index += binding_parameters[i].count;
+            break;
+        }
+    }
+    blueprint->writes = writes;
+    blueprint->image_infos = image_infos;
+    blueprint->buffer_infos = buffer_infos;
+
+    etfree(binding_parameters, sizeof(struct mat_binding_params) * bindings_array_length, MEMORY_TAG_MATERIAL);
 
     VkDescriptorSetLayout ds_layouts[] = {
         state->scene_data_descriptor_set_layout,
-        blueprint->ds_layout};
+        blueprint->ds_layout
+    };
 
     // NOTE: Push constants are used by the engine to send the 
     // vertex buffer address and model matrix for each draw call
@@ -149,30 +242,31 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
 
     pipeline_builder_destroy(&builder);
 
-    descriptor_set_writer_initialize(&blueprint->writer);
-
     return true;
 }
 
 void material_blueprint_destroy(renderer_state* state, material_blueprint* blueprint) {
     // NOTE: material_blueprint opaque pipeline and transparent pipeline have the 
     // same layout at this point in time so only one vkDestroyPipelineLayout call is used
-    descriptor_set_writer_shutdown(&blueprint->writer);
     vkDestroyPipeline(state->device.handle, blueprint->transparent_pipeline.pipeline, state->allocator);
     vkDestroyPipeline(state->device.handle, blueprint->opaque_pipeline.pipeline, state->allocator);
     vkDestroyPipelineLayout(state->device.handle, blueprint->opaque_pipeline.layout, state->allocator);
     vkDestroyDescriptorSetLayout(state->device.handle, blueprint->ds_layout, state->allocator);
     unload_shader(state, &blueprint->fragment);
     unload_shader(state, &blueprint->vertex);
+
+    etfree(blueprint->writes, sizeof(VkWriteDescriptorSet) * blueprint->binding_count, MEMORY_TAG_MATERIAL);
+    etfree(blueprint->image_infos, sizeof(VkDescriptorImageInfo) * blueprint->image_count, MEMORY_TAG_MATERIAL);
+    etfree(blueprint->buffer_infos, sizeof(VkDescriptorBufferInfo) * blueprint->buffer_count, MEMORY_TAG_MATERIAL);
 }
 
 material_instance material_blueprint_create_instance(
     renderer_state* state,
     material_blueprint* blueprint,
     material_pass pass,
-    const struct material_resources* resources,
-    ds_allocator* allocator)
-{
+    const material_resource* resources,
+    ds_allocator* allocator
+) {
     material_instance instance;
     instance.pass_type = pass;
     if (pass == MATERIAL_PASS_TRANSPARENT) {
@@ -184,31 +278,41 @@ material_instance material_blueprint_create_instance(
     instance.material_set = descriptor_set_allocator_allocate(
         allocator, blueprint->ds_layout, state);
 
-    descriptor_set_writer_clear(&blueprint->writer);
-
-    descriptor_set_writer_write_buffer(
-        &blueprint->writer,
-        /* Binding: */ 0,
-        resources->data_buffer,
-        sizeof(struct material_constants),
-        resources->data_buffer_offset,
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    descriptor_set_writer_write_image(
-        &blueprint->writer,
-        /* Binding: */ 1,
-        resources->color_image.view,
-        resources->color_sampler,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    descriptor_set_writer_write_image(
-        &blueprint->writer,
-        /* Binding: */ 2,
-        resources->metal_rough_image.view,
-        resources->metal_rough_sampler,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    descriptor_set_writer_update_set(&blueprint->writer, instance.material_set, state);
-
+    u32 resource_index = 0;
+    u32 image_index = 0;
+    u32 buffer_index = 0;
+    for (u32 i = 0; i < blueprint->binding_count; ++i) {
+        blueprint->writes[i].dstSet = instance.material_set;
+        u32 j = 0;
+        switch (blueprint->writes[i].descriptorType)
+        {
+        case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+            while (j < blueprint->writes[i].descriptorCount) {
+                blueprint->image_infos[image_index + j].sampler = resources[resource_index + j].sampler;
+                blueprint->image_infos[image_index + j].imageView = resources[resource_index + j].view;
+                ++j;
+            }
+            resource_index += j;
+            image_index += j;
+            break;
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+            while (j < blueprint->writes[i].descriptorCount) {
+                blueprint->buffer_infos[buffer_index + j].buffer = resources[resource_index + j].buffer;
+                blueprint->buffer_infos[buffer_index + j].offset = resources[resource_index + j].offset;
+                ++j;
+            }
+            resource_index += j;
+            buffer_index += j;
+            break;
+        }
+    }
+    vkUpdateDescriptorSets(
+        state->device.handle,
+        blueprint->binding_count,
+        blueprint->writes,
+        /* descriptorCopyCount: */ 0,
+        /* pDescriptorCopies: */ 0
+    );
     return instance;
 }
 

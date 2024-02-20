@@ -29,7 +29,7 @@
 #include "renderer/src/descriptor.h"
 #include "renderer/src/buffer.h"
 #include "renderer/src/image.h"
-
+#include "renderer/src/material.h"
 #include "renderer/src/GLTF_MR.h"
 
 #include "renderer/src/renderables.h"
@@ -63,6 +63,11 @@ static void gltf_combine_paths(char* path, const char* base, const char* uri);
 static VkFilter gltf_filter_to_vk_filter(cgltf_int filter);
 static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter);
 
+// TODO: Import function is currently taking advantage of how the manager structures work when submiting resources
+// As well as the fact that no resources are loaded when this function called at the moment.
+// Need to return an ID from the managers and create a mapping from the GLTF index to the 
+// ID returned from the managers
+
 // TODO: Handle loading other parts of gltf, like skeletal animation and cameras 
 b8 import_gltf(scene* scene, const char* path, renderer_state* state) {    
     // Attempt to load gltf file data with cgltf library
@@ -82,9 +87,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         return false;
     }
 
-
-
-    // Create samplers
+    // Samplers
     scene->samplers = etallocate(sizeof(VkSampler) * data->samplers_count, MEMORY_TAG_SCENE);
     for (u32 i = 0; i < data->samplers_count; ++i) {
         cgltf_sampler* gltf_sampler = (data->samplers + i);
@@ -100,11 +103,14 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             state->device.handle,
             &sampler_info,
             state->allocator,
-            &scene->samplers[i]));
+            &scene->samplers[i]
+        ));
     }
     scene->sampler_count = data->samplers_count;
 
+    // Images
     for (u32 i = 0; i < data->images_count; ++i) {
+        // TODO: Create an image loader 
         int width, height, channels;
         void* image_data = load_image_data(
             &data->images[i],
@@ -123,12 +129,14 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             stbi_image_free(image_data);
         } else {
             image_manager_increment(scene->image_bank);
-            ETERROR("Error loading image %s. from gltf file %s", data->images[i].name, path);
+            ETERROR("Error loading image %s from gltf file %s. Using default.", data->images[i].name, path);
         }
     }
 
+    // Materials, TODO: Since this is importing a GLTF, we should use the default GLTF_MR material & shaders for it
+    // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
     buffer_create(state,
-        sizeof(struct material_constants) * data->materials_count,
+        sizeof(struct GLTF_MR_constants) * data->materials_count,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &scene->material_buffer
@@ -138,17 +146,18 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         state->device.handle,
         scene->material_buffer.memory,
         /* offset: */ 0,
-        sizeof(struct material_constants) * data->materials_count,
+        sizeof(struct GLTF_MR_constants) * data->materials_count,
         /* flags: */ 0,
-        &mapped_memory));
-    struct material_constants* material_constants = (struct material_constants*)mapped_memory;
+        &mapped_memory
+    ));
+    struct GLTF_MR_constants* material_constants = (struct GLTF_MR_constants*)mapped_memory;
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material* i_material = (data->materials + i);
 
         // TODO: Check for cgltf_pbr_metallic_roughness beforehand
         // if not present use some default values
         cgltf_pbr_metallic_roughness gltf_pbr_mr = i_material->pbr_metallic_roughness;
-        struct material_constants constants = {
+        struct GLTF_MR_constants constants = {
             .color_factors = {
                 .r = gltf_pbr_mr.base_color_factor[0],
                 .g = gltf_pbr_mr.base_color_factor[1],
@@ -160,23 +169,32 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 .y = gltf_pbr_mr.roughness_factor
             }
         };
+        // TODO: Handle minUniformBufferOffsetAlignment here
         material_constants[i] = constants;
-
 
         material_pass pass_type = MATERIAL_PASS_MAIN_COLOR;
         if (i_material->alpha_mode == cgltf_alpha_mode_blend) {
             pass_type = MATERIAL_PASS_TRANSPARENT;
         }
 
-        // Create material resources with defaults
-        struct material_resources material_resources = {
-            .color_image = state->white_image,
-            .color_sampler = state->default_sampler_linear,
-            .metal_rough_image = state->white_image,
-            .metal_rough_sampler = state->default_sampler_linear,
-
-            .data_buffer = scene->material_buffer.handle,
-            .data_buffer_offset = sizeof(struct material_constants) * i
+        // TODO: Handle minUniformBufferOffsetAlignment here
+        // Default values
+        material_resource material_resources_2[] = {
+            [0] = {
+                .binding = 0,
+                .buffer = scene->material_buffer.handle,
+                .offset = sizeof(struct GLTF_MR_constants) * i,
+            },
+            [1] = {
+                .binding = 1,
+                .sampler = state->default_sampler_linear,
+                .view = state->white_image.view,
+            },
+            [2] = {
+                .binding = 2,
+                .sampler = state->default_sampler_linear,
+                .view = state->white_image.view,
+            },
         };
 
         if (i_material->has_pbr_metallic_roughness) {
@@ -185,28 +203,29 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, color_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, color_tex->sampler);
 
-                material_resources.color_image = *image_manager_get(scene->image_bank, img_index);
-                material_resources.color_sampler = scene->samplers[smpl_index];
+                material_resources_2[1].view = image_manager_get(scene->image_bank, img_index)->view;
+                material_resources_2[1].sampler = scene->samplers[smpl_index];
             }
             if (i_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
                 cgltf_texture* mr_tex = i_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, mr_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, mr_tex->sampler);
 
-                material_resources.metal_rough_image = *image_manager_get(scene->image_bank, img_index);
-                material_resources.metal_rough_sampler = scene->samplers[smpl_index];
+                material_resources_2[2].view = image_manager_get(scene->image_bank, img_index)->view;
+                material_resources_2[2].sampler = scene->samplers[smpl_index];
             }
         }
-
-        material_config config = {
+        
+        material_config config_2 = {
             .name = i_material->name,
             .pass_type = pass_type,
-            .resources = &material_resources
+            .resources = material_resources_2,
         };
-        material_manager_submit(scene->material_bank, &config);
+        material_manager_submit(scene->material_bank, &config_2);
     }
     vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
 
+    // Meshes
     vertex* vertices = dynarray_create(1, sizeof(vertex));
     u32* indices = dynarray_create(1, sizeof(u32));
     for (u32 i = 0; i < data->meshes_count; ++i) {
@@ -345,6 +364,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
     mesh_manager_uploads_wait(scene->mesh_bank);
 
+    // Nodes
     // Count up needed mesh_nodes & needed nodes. Then allocate backing memory for them
     u32 node_count = 0;
     u32 mesh_node_count = 0;

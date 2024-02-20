@@ -7,16 +7,14 @@
 #include "memory/etmemory.h"
 #include "core/logger.h"
 
-#define DEFAULT_PIPELINE_STAGE_COUNT 2
-
 // TODO: Expand to support multiple color attachments
 
 pipeline_builder pipeline_builder_create(void) {
     pipeline_builder builder = {0};
-    builder.stages = dynarray_create(
-        DEFAULT_PIPELINE_STAGE_COUNT,
-        sizeof(VkPipelineShaderStageCreateInfo));
-    
+    for (u32 i = 0; i < DEFAULT_GRAPHICS_PIPELINE_STAGE_COUNT; ++i) {
+        builder.stages[i] = init_pipeline_shader_stage_create_info();
+    }
+
     builder.input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     
     builder.rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -32,15 +30,11 @@ pipeline_builder pipeline_builder_create(void) {
 
 void pipeline_builder_clear(pipeline_builder* builder) {
     dynarray_destroy(builder->stages);
-    builder->stages = 0;
     
     *builder = pipeline_builder_create();
 }
 
-void pipeline_builder_destroy(pipeline_builder* builder) {
-    dynarray_destroy(builder->stages);
-    builder->stages = 0;
-}
+void pipeline_builder_destroy(pipeline_builder* builder) {}
 
 VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* state) {
     VkPipelineViewportStateCreateInfo viewport_state = {
@@ -104,20 +98,15 @@ VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* sta
     return new_pipeline;
 }
 
+// NOTE: Just vertex & fragment shaders supported for now
 void pipeline_builder_set_shaders(pipeline_builder* builder, shader vertex, shader fragment) {
-    // TODO: Loop & input an array & count or dynarray
-    VkPipelineShaderStageCreateInfo vertex_stage = init_pipeline_shader_stage_create_info();
-    vertex_stage.stage = vertex.stage;
-    vertex_stage.module = vertex.module;
-    vertex_stage.pName = vertex.entry_point;
+    builder->stages[DEFAULT_VERTEX_STAGE_INDEX].stage = vertex.stage;
+    builder->stages[DEFAULT_VERTEX_STAGE_INDEX].module = vertex.module;
+    builder->stages[DEFAULT_VERTEX_STAGE_INDEX].pName = vertex.entry_point;
 
-    VkPipelineShaderStageCreateInfo fragment_stage = init_pipeline_shader_stage_create_info();
-    fragment_stage.stage = fragment.stage;
-    fragment_stage.module = fragment.module;
-    fragment_stage.pName = fragment.entry_point;
-
-    dynarray_push((void**)&builder->stages, &vertex_stage);
-    dynarray_push((void**)&builder->stages, &fragment_stage);
+    builder->stages[DEFAULT_FRAGMENT_STAGE_INDEX].stage = fragment.stage;
+    builder->stages[DEFAULT_FRAGMENT_STAGE_INDEX].module = fragment.module;
+    builder->stages[DEFAULT_FRAGMENT_STAGE_INDEX].pName = fragment.entry_point;
 }
 
 void pipeline_builder_set_input_topology(pipeline_builder* builder, VkPrimitiveTopology topology) {
