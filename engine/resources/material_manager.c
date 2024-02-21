@@ -33,7 +33,7 @@ b8 material_manager_initialize(material_manager** manager, struct renderer_state
     pool_size_ratio ratios[] = {
         {.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3},
         {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
-        {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 1}
+        {.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 1},
     };
     descriptor_set_allocator_initialize(
         &new_manager->ds_allocator,

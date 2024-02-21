@@ -13,6 +13,7 @@
 #include "renderer/src/shader.h"
 #include "renderer/src/descriptor.h"
 #include "renderer/src/GLTF_MR.h"
+#include "renderer/src/material.h"
 #include "renderer/src/renderables.h"
 
 #include "window/renderer_window.h"
@@ -268,6 +269,15 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
         ETERROR("Could not initialize default material.");
         return false;
     }
+
+    material_blueprint test_blueprint = {0};
+    material_blueprint_create(
+        state,
+        "build/assets/shaders/bindless_mesh_mat.vert.spv",
+        "build/assets/shaders/bindless_mesh_mat.frag.spv",
+        &test_blueprint
+    );
+    material_blueprint_destroy(state, &test_blueprint);
 
     if (!initialize_default_data(state)) {
         ETFATAL("Error intializing data.");

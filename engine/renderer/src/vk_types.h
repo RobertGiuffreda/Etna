@@ -6,6 +6,7 @@
 #include "math/math_types.h"
 #include "renderer/renderer_types.h"
 #include "resources/resource_types.h"
+
 #define VK_ENABLE_BETA_EXTENSIONS
 #include <vulkan/vulkan.h>
 
@@ -67,6 +68,10 @@ typedef struct mesh_buffers {
     VkDeviceAddress vertex_buffer_address;
 } mesh_buffers;
 
+// NOTE: Moving away from this when possible
+// Push constants are used by the engine to send the 
+// vertex buffer address and model matrix for each draw call
+// So its hard coded for now.
 typedef struct gpu_draw_push_constants {
     m4s render_matrix;
     VkDeviceAddress vertex_buffer;
@@ -82,6 +87,8 @@ typedef struct scene_data {
     v4s view_pos;
 } scene_data;
 
+// TODO: Remove material pipeline and just have 
+// VkPipeline & VkPipelineLayout in material_instance & in material blueprint
 typedef struct material_pipeline {
     VkPipeline pipeline;
     VkPipelineLayout layout;
@@ -90,10 +97,13 @@ typedef struct material_pipeline {
 typedef struct material_instance {
     material_pipeline* pipeline;
     VkDescriptorSet material_set;
+
+    // TODO: Move to surface
     material_pass pass_type;
 } material_instance;
 
-// TODO: Remove the padding and handle the alignment for binding ourselves with 
+// TODO: Remove the padding and handle 
+// the alignment for binding myself 
 struct GLTF_MR_constants {
     v4s color_factors;
     v4s metal_rough_factors;
@@ -123,6 +133,7 @@ typedef struct GLTF_MR {
     ds_writer writer;
 } GLTF_MR;
 
+// Move material pass into this
 typedef struct material {
     u32 id;
     char* name;
@@ -133,7 +144,6 @@ typedef struct surface {
     u32 start_index;
     u32 index_count;
 
-    // Reference
     material* material;
 } surface;
 
@@ -141,7 +151,7 @@ typedef struct mesh {
     u32 id;
     char* name;
 
-    // TODO: Stop using dynamic array here
+    // TODO: Stop using dynarray here
     surface* surfaces;  // Dynarray
     mesh_buffers buffers;
 } mesh;

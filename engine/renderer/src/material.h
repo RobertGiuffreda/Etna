@@ -35,8 +35,8 @@ typedef struct material_blueprint {
     shader vertex;
     shader fragment;
 
-    // NOTE: Only needed for memory allocation metrics in free function
     u32 binding_count;
+    // NOTE: Only needed for memory allocation metrics in free function
     u32 image_count;
     u32 buffer_count;
     // NOTE: END

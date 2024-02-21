@@ -195,22 +195,26 @@ b8 material_blueprint_create(renderer_state* state, const char* vertex_path, con
 
     etfree(binding_parameters, sizeof(struct mat_binding_params) * bindings_array_length, MEMORY_TAG_MATERIAL);
 
-    VkDescriptorSetLayout ds_layouts[] = {
-        state->scene_data_descriptor_set_layout,
-        blueprint->ds_layout
+    b8 v_has_push_constant = blueprint->vertex.push_block_count != 0;
+    b8 f_has_push_constant = blueprint->fragment.push_block_count != 0;
+
+    VkPushConstantRange matrix_range = {
+        .offset = 0,
+        .size = ((v_has_push_constant) ? blueprint->vertex.push_blocks->size :
+                 (f_has_push_constant) ? blueprint->fragment.push_blocks->size : 0),
+        .stageFlags = (v_has_push_constant && f_has_push_constant) ? VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT :
+                      (v_has_push_constant) ? VK_SHADER_STAGE_VERTEX_BIT :
+                      (f_has_push_constant) ? VK_SHADER_STAGE_FRAGMENT_BIT : 0,
     };
 
-    // NOTE: Push constants are used by the engine to send the 
-    // vertex buffer address and model matrix for each draw call
-    // So its hard coded 
-    VkPushConstantRange matrix_range;
-    matrix_range.offset = 0;
-    matrix_range.size = sizeof(gpu_draw_push_constants);
-    matrix_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    VkDescriptorSetLayout ds_layouts[] = {
+        state->scene_data_descriptor_set_layout,
+        blueprint->ds_layout,
+    };
 
     VkPipelineLayoutCreateInfo pipeline_layout_info = init_pipeline_layout_create_info();
-    pipeline_layout_info.pushConstantRangeCount = 1;
-    pipeline_layout_info.pPushConstantRanges = &matrix_range;
+    pipeline_layout_info.pushConstantRangeCount = (v_has_push_constant || f_has_push_constant) ? 1 : 0;
+    pipeline_layout_info.pPushConstantRanges = (v_has_push_constant || f_has_push_constant) ? &matrix_range : NULL;
     pipeline_layout_info.setLayoutCount = 2;
     pipeline_layout_info.pSetLayouts = ds_layouts;
 

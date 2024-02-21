@@ -184,7 +184,8 @@
         "scene.h": "c",
         "gltfimporter.h": "c",
         "functional": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "resource_private.h": "c"
     },
     "C_Cpp.dimInactiveRegions": true,
     "dotnet.defaultSolution": "disable",

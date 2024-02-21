@@ -71,7 +71,7 @@ VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* sta
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &builder->render_info,
-        .stageCount = dynarray_length(builder->stages),
+        .stageCount = DEFAULT_GRAPHICS_PIPELINE_STAGE_COUNT,
         .pStages = builder->stages,
         .pVertexInputState = &vertex_input_info,
         .pInputAssemblyState = &builder->input_assembly,

@@ -24,9 +24,24 @@ typedef struct physical_device_requirements {
     // Required features
     // Features
     b8 sampler_anisotropy;
-    
+    b8 int64;
+    b8 int16;
+
     // Vulkan12Features
     b8 buffer_device_address;
+    b8 descriptor_indexing;
+    b8 shaderUniformBufferArrayNonUniformIndexing;
+    b8 shaderSampledImageArrayNonUniformIndexing;
+    b8 shaderStorageBufferArrayNonUniformIndexing;
+    b8 shaderStorageImageArrayNonUniformIndexing;
+    b8 descriptorBindingUniformBufferUpdateAfterBind;
+    b8 descriptorBindingSampledImageUpdateAfterBind;
+    b8 descriptorBindingStorageImageUpdateAfterBind;
+    b8 descriptorBindingStorageBufferUpdateAfterBind;
+    b8 descriptorBindingUpdateUnusedWhilePending;
+    b8 descriptorBindingPartiallyBound;
+    b8 descriptorBindingVariableDescriptorCount;
+    b8 runtimeDescriptorArray;
 
     // Vulkan13Features
     b8 dynamic_rendering;
@@ -62,9 +77,25 @@ b8 device_create(renderer_state* state, device* out_device) {
     gpu_reqs requirements = {
         .device_extension_count = 1,
         .device_extensions = &required_extensions,
+
         .sampler_anisotropy = true,
+        .int64 = true,
+        .int16 = true,
 
         .buffer_device_address = true,
+        .descriptor_indexing = true,
+        .shaderUniformBufferArrayNonUniformIndexing = true,
+        .shaderSampledImageArrayNonUniformIndexing = true,
+        .shaderStorageBufferArrayNonUniformIndexing = true,
+        .shaderStorageImageArrayNonUniformIndexing = true,
+        .descriptorBindingUniformBufferUpdateAfterBind = true,
+        .descriptorBindingSampledImageUpdateAfterBind = true,
+        .descriptorBindingStorageImageUpdateAfterBind = true,
+        .descriptorBindingStorageBufferUpdateAfterBind = true,
+        .descriptorBindingUpdateUnusedWhilePending = true,
+        .descriptorBindingPartiallyBound = true,
+        .descriptorBindingVariableDescriptorCount = true,
+        .runtimeDescriptorArray = true,
 
         .dynamic_rendering = true,
         .synchronization2 = true,
@@ -152,12 +183,30 @@ b8 device_create(renderer_state* state, device* out_device) {
     VkPhysicalDeviceVulkan12Features enabled_features12 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
         .pNext = &enabled_features13,
-        .bufferDeviceAddress = requirements.buffer_device_address};
+        .bufferDeviceAddress = requirements.buffer_device_address,
+        .descriptorIndexing = requirements.descriptor_indexing,
+        .shaderUniformBufferArrayNonUniformIndexing = requirements.shaderUniformBufferArrayNonUniformIndexing,
+        .shaderSampledImageArrayNonUniformIndexing = requirements.shaderSampledImageArrayNonUniformIndexing,
+        .shaderStorageBufferArrayNonUniformIndexing = requirements.shaderStorageBufferArrayNonUniformIndexing,
+        .shaderStorageImageArrayNonUniformIndexing = requirements.shaderStorageImageArrayNonUniformIndexing,
+        .descriptorBindingUniformBufferUpdateAfterBind = requirements.descriptorBindingUniformBufferUpdateAfterBind,
+        .descriptorBindingSampledImageUpdateAfterBind = requirements.descriptorBindingSampledImageUpdateAfterBind,
+        .descriptorBindingStorageImageUpdateAfterBind = requirements.descriptorBindingStorageImageUpdateAfterBind,
+        .descriptorBindingStorageBufferUpdateAfterBind = requirements.descriptorBindingStorageBufferUpdateAfterBind,
+        .descriptorBindingUpdateUnusedWhilePending = requirements.descriptorBindingUpdateUnusedWhilePending,
+        .descriptorBindingPartiallyBound = requirements.descriptorBindingPartiallyBound,
+        .descriptorBindingVariableDescriptorCount = requirements.descriptorBindingVariableDescriptorCount,
+        .runtimeDescriptorArray = requirements.runtimeDescriptorArray,
+    };
     VkPhysicalDeviceFeatures2 enabled_features2 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .pNext = &enabled_features12,
         .features = {
-            .samplerAnisotropy = requirements.sampler_anisotropy}};
+            .samplerAnisotropy = requirements.sampler_anisotropy,
+            .shaderInt16 = requirements.int16,
+            .shaderInt64 = requirements.int64,
+        },
+    };
 
     VkDeviceCreateInfo device_cinfo = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -317,26 +366,97 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
         .pNext = &features12,
     };
     vkGetPhysicalDeviceFeatures2(device, &features2);
-    VkPhysicalDeviceFeatures* features = &features2.features;
-    if (requirements->sampler_anisotropy && !features->samplerAnisotropy) {
+    VkPhysicalDeviceFeatures features = features2.features;
+
+    b8 supported = true;
+
+    // Features
+    if (requirements->sampler_anisotropy && !features.samplerAnisotropy) {
         ETFATAL("Feature Sampler anisotropy is required & not supported on this device.");
-        return false;
+        supported = false;
     }
+    if (requirements->int16 && !features.shaderInt16) {
+        ETFATAL("Feature shaderInt16 is required & not supported on this device.");
+        supported = false;
+    }
+    if (requirements->int64 && !features.shaderInt64) {
+        ETFATAL("Feature shaderInt64 is required & not supported on this device.");
+        supported = false;
+    }
+
+    // Features 12
     if (requirements->buffer_device_address && !features12.bufferDeviceAddress) {
         ETFATAL("Feature Buffer Device Address is required & not supported on this device.");
-        return false;
+        supported = false;
     }
+    if (requirements->descriptor_indexing && !features12.descriptorIndexing) {
+        ETFATAL("Feature descriptor indexing is required & not supported on this device.");
+        supported = false;
+    }
+    if (requirements->shaderUniformBufferArrayNonUniformIndexing && !features12.shaderUniformBufferArrayNonUniformIndexing) { 
+        ETFATAL("Feature shaderUniformBufferArrayNonUniformIndexing is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->shaderSampledImageArrayNonUniformIndexing && !features12.shaderSampledImageArrayNonUniformIndexing) { 
+        ETFATAL("Feature shaderSampledImageArrayNonUniformIndexing is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->shaderStorageBufferArrayNonUniformIndexing && !features12.shaderStorageBufferArrayNonUniformIndexing) { 
+        ETFATAL("Feature shaderStorageBufferArrayNonUniformIndexing is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->shaderStorageImageArrayNonUniformIndexing && !features12.shaderStorageImageArrayNonUniformIndexing) { 
+        ETFATAL("Feature shaderStorageImageArrayNonUniformIndexing is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->descriptorBindingUniformBufferUpdateAfterBind && !features12.descriptorBindingUniformBufferUpdateAfterBind) { 
+        ETFATAL("Feature descriptorBindingUniformBufferUpdateAfterBind is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->descriptorBindingSampledImageUpdateAfterBind && !features12.descriptorBindingSampledImageUpdateAfterBind) { 
+        ETFATAL("Feature descriptorBindingSampledImageUpdateAfterBind is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->descriptorBindingStorageImageUpdateAfterBind && !features12.descriptorBindingStorageImageUpdateAfterBind) { 
+        ETFATAL("Feature descriptorBindingStorageImageUpdateAfterBind is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->descriptorBindingStorageBufferUpdateAfterBind && !features12.descriptorBindingStorageBufferUpdateAfterBind) { 
+        ETFATAL("Feature descriptorBindingStorageBufferUpdateAfterBind is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->descriptorBindingUpdateUnusedWhilePending && !features12.descriptorBindingUpdateUnusedWhilePending) { 
+        ETFATAL("Feature descriptorBindingUpdateUnusedWhilePending is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->descriptorBindingPartiallyBound && !features12.descriptorBindingPartiallyBound) { 
+        ETFATAL("Feature descriptorBindingPartiallyBound is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->descriptorBindingVariableDescriptorCount && !features12.descriptorBindingVariableDescriptorCount) { 
+        ETFATAL("Feature descriptorBindingVariableDescriptorCount is required and not supported on this device.");
+        supported = false;
+    }
+    if (requirements->runtimeDescriptorArray && !features12.runtimeDescriptorArray) {
+        ETFATAL("Feature runtimeDescriptorArray is required and not supported on this device.");
+        supported = false;
+    }
+
+    // Features 13
     if (requirements->dynamic_rendering && !features13.dynamicRendering) {
         ETFATAL("Feature Dynamic Rendering is required & not supported on this device.");
-        return false;
+        supported = false;
     }
     if (requirements->synchronization2 && !features13.synchronization2) {
         ETFATAL("Feature Dynamic Rendering is required & not supported on this device.");
-        return false;
+        supported = false;
     }
     if (requirements->maintenance4 && !features13.maintenance4) {
         ETFATAL("Feature maintenance4 is required & not supported on this device.");
+        supported = false;
     }
+
+    if (!supported) return false;
 
     // Enumerate supported extnesions
     u32 supported_extension_count = 0;
