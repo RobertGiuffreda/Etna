@@ -14,7 +14,8 @@
 
 // TEMP: Until descriptor set management refactor
 typedef struct descriptor_set_layout_builder {
-    VkDescriptorSetLayoutBinding* bindings;  // Dynarray
+    VkDescriptorSetLayoutCreateInfo layout_info;
+    VkDescriptorSetLayoutBinding* binding_infos;  // Dynarray
 } dsl_builder;
 
 typedef struct descriptor_set_writer {
@@ -62,6 +63,7 @@ typedef struct buffer {
 } buffer;
 // TEMP: END
 
+// TEMP: Refactor this for bindless
 typedef struct mesh_buffers {
     buffer index_buffer;
     buffer vertex_buffer;
@@ -87,6 +89,13 @@ typedef struct scene_data {
     v4s view_pos;
 } scene_data;
 
+typedef struct draw_command {
+    VkDrawIndexedIndirectCommand draw;
+    u32 material_instance_id;
+    u32 transform_id;
+    u32 padding;
+} draw_command;
+
 // TODO: Remove material pipeline and just have 
 // VkPipeline & VkPipelineLayout in material_instance & in material blueprint
 typedef struct material_pipeline {
@@ -97,8 +106,6 @@ typedef struct material_pipeline {
 typedef struct material_instance {
     material_pipeline* pipeline;
     VkDescriptorSet material_set;
-
-    // TODO: Move to surface
     material_pass pass_type;
 } material_instance;
 
@@ -135,8 +142,8 @@ typedef struct GLTF_MR {
 
 // Move material pass into this
 typedef struct material {
-    u32 id;
     char* name;
+    u32 id;
     material_instance instance;
 } material;
 
@@ -164,16 +171,16 @@ typedef struct render_object {
     u32 first_index;
     VkBuffer index_buffer;
 
-    material_instance* material;
+    material_pipeline pipeline;
+    VkDescriptorSet material_set;
 
     m4s transform;
     VkDeviceAddress vertex_buffer_address;
 } render_object;
 
 typedef struct draw_context {
-    // Dynarrays
-    render_object* opaque_surfaces;
-    render_object* transparent_surfaces;
+    render_object* opaque_surfaces;         // Dynarray
+    render_object* transparent_surfaces;    // Dynarray
 } draw_context;
 
 /** TEMP:TODO:

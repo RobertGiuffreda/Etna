@@ -179,7 +179,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
         // TODO: Handle minUniformBufferOffsetAlignment here
         // Default values
-        material_resource material_resources_2[] = {
+        material_resource material_resources[] = {
             [0] = {
                 .binding = 0,
                 .buffer = scene->material_buffer.handle,
@@ -203,27 +203,206 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, color_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, color_tex->sampler);
 
-                material_resources_2[1].view = image_manager_get(scene->image_bank, img_index)->view;
-                material_resources_2[1].sampler = scene->samplers[smpl_index];
+                material_resources[1].view = image_manager_get(scene->image_bank, img_index)->view;
+                material_resources[1].sampler = scene->samplers[smpl_index];
             }
             if (i_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
                 cgltf_texture* mr_tex = i_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, mr_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, mr_tex->sampler);
 
-                material_resources_2[2].view = image_manager_get(scene->image_bank, img_index)->view;
-                material_resources_2[2].sampler = scene->samplers[smpl_index];
+                material_resources[2].view = image_manager_get(scene->image_bank, img_index)->view;
+                material_resources[2].sampler = scene->samplers[smpl_index];
             }
         }
         
-        material_config config_2 = {
+        material_config config = {
             .name = i_material->name,
             .pass_type = pass_type,
-            .resources = material_resources_2,
+            .resources = material_resources,
         };
-        material_manager_submit(scene->material_bank, &config_2);
+        material_manager_submit(scene->material_bank, &config);
     }
     vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
+
+    // TEMP: Big scene index and vertex buffer
+    // Per mesh index into scene surface buffer    
+    vertex* scene_vertices = dynarray_create(1, sizeof(vertex));
+    u32* scene_indices = dynarray_create(1, sizeof(u32));
+
+    surface_2* scene_surfaces = dynarray_create(1, sizeof(surface_2));
+    mesh_2* scene_meshes = dynarray_create(data->meshes_count, sizeof(mesh_2));
+    
+    for (u32 i = 0; i < data->meshes_count; ++i) {
+        cgltf_mesh* gltf_mesh = &data->meshes[i];
+
+        u32 surface_count = dynarray_length(scene_surfaces);
+        dynarray_resize((void**)&scene_surfaces, surface_count + gltf_mesh->primitives_count);
+
+        scene_meshes[i].start_surface = surface_count;
+        scene_meshes[i].surface_count = gltf_mesh->primitives_count;
+
+        for (u32 j = 0; j < gltf_mesh->primitives_count; ++j) {
+            cgltf_primitive* gltf_primitive = &gltf_mesh->primitives[j];
+            
+            surface_2* new_surface = &scene_surfaces[surface_count + j];
+            new_surface->start_index = dynarray_length(scene_indices);
+            new_surface->index_count = gltf_primitive->indices->count;
+
+            u64 initial_vertex = dynarray_length(scene_vertices);
+            cgltf_accessor* index_accessor = gltf_primitive->indices;
+            dynarray_reserve((void**)&scene_indices, dynarray_length(scene_indices) + index_accessor->count);
+
+            for (u32 k = 0; k < index_accessor->count; ++k) {
+                u32 index = initial_vertex + cgltf_accessor_read_index(index_accessor, k);
+                dynarray_push((void**)&scene_indices, &index);
+            }
+
+            // Load position information
+            cgltf_accessor* position = get_accessor_from_attributes(
+                gltf_primitive->attributes, gltf_primitive->attributes_count, "POSITION");
+            if (!position) {
+                ETERROR("Attempted to load mesh without vertex positions.");
+                return false;
+            }
+
+            dynarray_resize((void**)&scene_vertices, dynarray_length(scene_vertices) + position->count);
+            cgltf_size pos_element_size = cgltf_calc_size(position->type, position->component_type);
+            for (u32 k = 0; k < position->count; k++) {
+                vertex new_v = {
+                    .position = (v3s){.raw = {0.f, 0.f, 0.f}},
+                    .normal = (v3s){.raw = {1.f, 0.f, 0.f}},
+                    .color = (v4s){.raw = {1.f, 1.f, 1.f, 1.f}},
+                    .uv_x = 0,
+                    .uv_y = 0,
+                };
+                
+                if (!cgltf_accessor_read_float(position, k, new_v.position.raw, pos_element_size)) {
+                    ETERROR("Error attempting to read position value from %s.", path);
+                    return false;
+                }
+                scene_vertices[initial_vertex + k] = new_v;
+            }
+            // Load normal information
+            cgltf_accessor* normal = get_accessor_from_attributes(
+                gltf_primitive->attributes, gltf_primitive->attributes_count, "NORMAL");
+            if (!normal) {
+                ETERROR("Attempt to load mesh without vertex normals.");
+                return false;
+            }
+
+            cgltf_size norm_element_size = cgltf_calc_size(normal->type, normal->component_type);
+            for (u32 k = 0; k < normal->count; ++k) {
+                vertex* v = &scene_vertices[initial_vertex + k];
+                if (!cgltf_accessor_read_float(normal, k, v->normal.raw, norm_element_size)) {
+                    ETERROR("Error attempting to read normal value from %s.", path);
+                }
+            }
+
+            // Load texture coordinates, UVs
+            cgltf_accessor* uv = get_accessor_from_attributes(
+                gltf_primitive->attributes, gltf_primitive->attributes_count, "TEXCOORD_0");
+            if (uv) {
+                cgltf_size uv_element_size = cgltf_calc_size(uv->type, uv->component_type);
+                for (u32 k = 0; k < uv->count; ++k) {
+                    vertex* v = &scene_vertices[initial_vertex + k];
+
+                    v2s uvs = {.raw = {0.f, 0.f}};
+                    if (!cgltf_accessor_read_float(uv, k, uvs.raw, uv_element_size)) {
+                        ETERROR("Error attempting to read uvs from %s.", path);
+                        return false;
+                    }
+
+                    v->uv_x = uvs.x;
+                    v->uv_y = uvs.y;
+                }
+            }
+            // else {
+            //     ETWARN("Loading mesh %s primitive %lu without vertex coordinates.", gltf_mesh->name, j);
+            // }
+
+            // Load vertex color information
+            cgltf_accessor* color = get_accessor_from_attributes(
+                gltf_primitive->attributes, gltf_primitive->attributes_count, "COLOR_0");
+            if (color) {
+                cgltf_size element_size = cgltf_calc_size(color->type, color->component_type);
+                for (u32 k = 0; k < color->count; ++k) {
+                    vertex* v = &scene_vertices[initial_vertex + k];
+                    if (!cgltf_accessor_read_float(color, k, v->color.raw, element_size)) {
+                        ETERROR("Error attempting to read color value from %s.", path);
+                        return false;
+                    }
+                }
+            }
+            // else {
+            //     ETWARN("Loading mesh %s primitive %lu without vertex colors.", gltf_mesh->name, j);
+            // }
+
+            // TEMP: Blueprint ID is hardcoded at the moment
+            if (gltf_primitive->material) {
+                u64 mat_index = CGLTF_ARRAY_INDEX(cgltf_material, data->materials, gltf_primitive->material);
+                new_surface->material = scene_material_get_instance_bindless(scene, (material_id){.blueprint_id = 0, .instance_id = mat_index});
+            } else {
+                new_surface->material = scene_material_get_instance_bindless(scene, (material_id){.blueprint_id = 0, .instance_id = 0});
+            }
+            // TEMP: END
+        }
+    }
+
+    // Init Shared buffers
+    mesh_buffers scene_shared_buffers = upload_mesh_immediate(
+        state,
+        dynarray_length(scene_indices),
+        scene_indices,
+        dynarray_length(scene_vertices),
+        scene_vertices
+    );
+    dynarray_destroy(scene_vertices);
+    dynarray_destroy(scene_indices);
+    
+    // Move data to scene class:
+    scene->index_buffer = scene_shared_buffers.index_buffer;
+    scene->vertex_buffer = scene_shared_buffers.vertex_buffer;
+    scene->vb_addr = scene_shared_buffers.vertex_buffer_address;
+    scene->surfaces = scene_surfaces;
+    scene->meshes = scene_meshes;
+
+    // TEMP: cgltf calculates the world transform for us so I can temporary use
+    // that function to get a quick and dirty mesh transform buffer to stop using 
+    // updating the push constants for each object draw call
+    object* scene_objects = dynarray_create(1, sizeof(object));
+    m4s* scene_transforms = dynarray_create(1, sizeof(m4s));
+
+    for (u32 i = 0; i < data->nodes_count; ++i) {
+        if (data->nodes[i].mesh) {
+            u32 mesh_index = CGLTF_ARRAY_INDEX(cgltf_mesh, data->meshes, data->nodes[i].mesh);
+            object new_object = {
+                .mesh_index = mesh_index,
+                .transform_index = dynarray_length(scene_transforms),
+            };
+            dynarray_push((void**)&scene_objects, &new_object);
+
+            m4s new_transform = {0};
+            cgltf_node_transform_world(&data->nodes[i], (cgltf_float*)new_transform.raw);
+            dynarray_push((void**)&scene_transforms, &new_transform);
+        }
+    }
+
+    // Move data to scene class:
+    scene->transforms = scene_transforms;
+    scene->objects = scene_objects;
+
+    // Create transform buffer & get address
+    buffer_create_data(
+        state,
+        scene_transforms,
+        sizeof(m4s) * dynarray_length(scene_transforms),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &scene->transform_buffer
+    );
+    scene->tb_addr = buffer_get_address(state, &scene->transform_buffer);
+    // TEMP: END
 
     // Meshes
     vertex* vertices = dynarray_create(1, sizeof(vertex));
@@ -231,9 +410,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     for (u32 i = 0; i < data->meshes_count; ++i) {
         cgltf_mesh* gltf_mesh = &data->meshes[i];
 
-        // Allocate memory for mesh surfaces:
-        // TODO: Store the amount of surfaces and use that instead of dynarray
-        // I want to use dynarrays when they are needed. Not just convinient
         surface* surfaces = etallocate(sizeof(surface) * gltf_mesh->primitives_count, MEMORY_TAG_SCENE);
 
         dynarray_clear(indices);
@@ -390,10 +566,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
     } else scene->nodes = 0;
     
-    // TEMP: Testing lighting situation
-    b8 once = true;
-    // TEMP: END
-
     node** nodes_by_index = etallocate(sizeof(node*) * data->nodes_count, MEMORY_TAG_SCENE);
     for (u32 m_node_i = 0, node_i = 0; (m_node_i + node_i) < data->nodes_count;) {
         u32 i = m_node_i + node_i;

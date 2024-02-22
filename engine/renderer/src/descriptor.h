@@ -4,6 +4,7 @@
 
 dsl_builder descriptor_set_layout_builder_create(void);
 void descriptor_set_layout_builder_clear(dsl_builder* builder);
+void descriptor_set_layout_builder_set_flags(dsl_builder* builder, VkDescriptorSetLayoutCreateFlags flags);
 void descriptor_set_layout_builder_destroy(dsl_builder* builder);
 void descriptor_set_layout_builder_add_binding(dsl_builder* builder, u32 binding, u32 count, VkDescriptorType type, VkShaderStageFlags stage_flags);
 VkDescriptorSetLayout descriptor_set_layout_builder_build(dsl_builder* builder, renderer_state* state);

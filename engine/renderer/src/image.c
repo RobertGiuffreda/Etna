@@ -25,8 +25,8 @@ void image2D_create(
     VkImageUsageFlags usage_flags,
     VkImageAspectFlags aspect_flags,
     VkMemoryPropertyFlags memory_flags,
-    image* out_image)
-{
+    image* out_image
+) {
     VkImageCreateInfo image_info = init_image2D_create_info(format, usage_flags, extent);
     VK_CHECK(vkCreateImage(state->device.handle, &image_info, state->allocator, &out_image->handle));
 
@@ -68,8 +68,8 @@ void image2D_create_data(
     VkImageUsageFlags usage_flags,
     VkImageAspectFlags aspect_flags,
     VkMemoryPropertyFlags memory_flags,
-    image* out_image)
-{
+    image* out_image
+) {
     // Create staging buffer and upload data to it
     u64 data_size = extent.width * extent.height * extent.depth * 4;
     buffer staging = {0};
@@ -98,7 +98,8 @@ void image2D_create_data(
         usage_flags | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         aspect_flags,
         memory_flags,
-        out_image);
+        out_image
+    );
     
     IMMEDIATE_SUBMIT(state, cmd, {
         // Transition image to optimal transfer destination layout
@@ -149,10 +150,10 @@ void image_destroy(renderer_state* state, image* image) {
     image->aspects = VK_IMAGE_ASPECT_NONE;
 
     vkDestroyImageView(state->device.handle, image->view, state->allocator);
-    image->view = 0;
     vkFreeMemory(state->device.handle, image->memory, state->allocator);
-    image->memory = 0;
     vkDestroyImage(state->device.handle, image->handle, state->allocator);
+    image->view = 0;
+    image->memory = 0;
     image->handle = 0;
 }
 
@@ -160,8 +161,8 @@ void blit_image2D_to_image2D(
     VkCommandBuffer cmd,
     VkImage src, VkImage dst,
     VkExtent3D src_size, VkExtent3D dst_size,
-    VkImageAspectFlags aspect_flags)
-{
+    VkImageAspectFlags aspect_flags
+) {
     VkImageBlit2 blit = {0};
     blit.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2;
     blit.pNext = 0;
@@ -197,6 +198,8 @@ void blit_image2D_to_image2D(
     vkCmdBlitImage2(cmd, &blit_info);
 }
 
+// TODO: This function should return VkImageMemoryBarrier2 
+// struct and have the caller submit the barrier
 void image_barrier(
     VkCommandBuffer cmd,
     VkImage image,
@@ -206,8 +209,8 @@ void image_barrier(
     VkAccessFlags2 src_access_mask,
     VkAccessFlags2 dst_access_mask,
     VkPipelineStageFlags2 src_stage_mask,
-    VkPipelineStageFlags2 dst_stage_mask)
-{
+    VkPipelineStageFlags2 dst_stage_mask
+) {
     VkImageSubresourceRange subresource_range = {
         .aspectMask = aspects,
         .baseMipLevel = 0,

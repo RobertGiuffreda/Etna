@@ -3,6 +3,7 @@
 #include "data_structures/dynarray.h"
 
 #include "core/logger.h"
+#include "memory/etmemory.h"
 
 #include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/renderer.h"
@@ -20,44 +21,59 @@
 // } test[2];
 
 dsl_builder descriptor_set_layout_builder_create(void) {
-    dsl_builder builder;
-    builder.bindings = dynarray_create(0, sizeof(VkDescriptorSetLayoutBinding));
+    dsl_builder builder = {
+        .layout_info = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = 0,
+            .bindingCount = 0,
+        },
+        .binding_infos = dynarray_create(0, sizeof(VkDescriptorSetLayoutBinding)),
+    };
     return builder;
 }
 
 void descriptor_set_layout_builder_clear(dsl_builder* builder) {
-    dynarray_clear(builder->bindings);
+    builder->layout_info.bindingCount = 0;
+    builder->layout_info.flags = 0;
+    dynarray_clear(builder->binding_infos);
 }
 
+
 void descriptor_set_layout_builder_destroy(dsl_builder* builder) {
-    dynarray_destroy(builder->bindings);
+    dynarray_destroy(builder->binding_infos);
 }
+
+// TEMP: Should set flags on creation of dsl_buiolder
+void descriptor_set_layout_builder_set_flags(dsl_builder* builder, VkDescriptorSetLayoutCreateFlags flags) {
+    builder->layout_info.flags = flags;
+}
+// TEMP: Should set flags on creation of dsl_buiolder
 
 void descriptor_set_layout_builder_add_binding(
     dsl_builder* builder,
     u32 binding,
     u32 count,
     VkDescriptorType type,
-    VkShaderStageFlags stage_flags)
-{
+    VkShaderStageFlags stage_flags
+) {
     VkDescriptorSetLayoutBinding bind = {
         .binding = binding,
         .descriptorCount = count,
         .descriptorType = type,
         .stageFlags = stage_flags};
-    dynarray_push((void**)&builder->bindings, &bind);
+    dynarray_push((void**)&builder->binding_infos, &bind);
+    builder->layout_info.bindingCount++;
 }
 
 VkDescriptorSetLayout descriptor_set_layout_builder_build(dsl_builder* builder, renderer_state* state) {
-    VkDescriptorSetLayoutCreateInfo layout_info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .pNext = 0,
-        .bindingCount = dynarray_length(builder->bindings),
-        .pBindings = builder->bindings,
-        .flags = 0};
-    VkDescriptorSetLayout layout;
-    VK_CHECK(vkCreateDescriptorSetLayout(state->device.handle, &layout_info, state->allocator, &layout));
-    return layout;
+    builder->layout_info.pBindings = builder->binding_infos;
+    VkDescriptorSetLayout new_layout;
+    VK_CHECK(vkCreateDescriptorSetLayout(
+        state->device.handle,
+        &builder->layout_info,
+        state->allocator,
+        &new_layout));
+    return new_layout;
 }
 
 ds_writer descriptor_set_writer_create_initialize(void) {

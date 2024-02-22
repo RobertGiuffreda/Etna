@@ -10,8 +10,6 @@
 #include "renderer/src/renderables.h"
 #include "renderer/src/shader.h"
 
-#include "scene/scene_private.h"
-
 // TODO: Remove, this is deprecated
 typedef struct loaded_gltf {
     char* name;

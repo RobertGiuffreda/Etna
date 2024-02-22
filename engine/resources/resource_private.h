@@ -6,8 +6,13 @@
 #include "renderer/src/material.h"
 
 #define MAX_MESH_COUNT 512
+#define MAX_MATERIAL_BLUEPRINT_COUNT 8
 #define MAX_MATERIAL_COUNT 256
 #define MAX_IMAGE_COUNT 128
+
+// Big index buffer and vertex buffer
+// Add bindless functionality 
+// Remove regular
 
 struct image_manager {
     renderer_state* state;

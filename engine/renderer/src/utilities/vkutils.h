@@ -43,7 +43,6 @@ do {                                            \
     _immediate_end(state);                      \
 } while(0);                                     \
 
-// TODO: Old function, still here just in case/testing
 mesh_buffers upload_mesh_immediate(
     renderer_state* state,
     u32 index_count, u32* indices, 

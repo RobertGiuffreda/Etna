@@ -16,8 +16,6 @@
  * This currently only works for the material blueprint:
  * GLTF_MR.
  * 
- * TODO: Extend to handle different material blueprints
- * 
  * TODO: Modify initialize to take the initial count
  * for descriptor_set_allocator_initialize 
  * as a function parameter instead of using MAX_MATERIAL_COUNT
@@ -42,6 +40,7 @@ b8 material_manager_initialize(material_manager** manager, struct renderer_state
         ratios,
         state);
 
+    // TODO: Initialize material_blueprint function
     material_blueprint_create(state,
         "build/assets/shaders/mesh_mat.vert.spv",
         "build/assets/shaders/mesh_mat.frag.spv",
@@ -65,6 +64,7 @@ void material_manager_shutdown(material_manager* manager) {
 }
 
 material* material_manager_get(material_manager* manager, u32 id) {
+    // TODO: Assert id is not invalid
     return &manager->materials[id];
 }
 

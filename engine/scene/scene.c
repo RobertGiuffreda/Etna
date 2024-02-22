@@ -33,6 +33,12 @@ static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 // HACK: Seems wrong
 static void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx);
 
+// TEMP: Bindless testing
+static void scene_init_bindless(scene* scene);
+static void scene_shutdown_bindless(scene* scene);
+static void scene_draw_bindless(scene* scene);
+// TEMP: END
+
 /** NOTE: Implementation details
  * Currently the scene descriptor set is hardcoded as a singular
  * uniform buffer that matches struct scene_data.
@@ -49,6 +55,10 @@ b8 scene_initalize(scene** scn, renderer_state* state) {
     mesh_manager_initialize(&new_scene->mesh_bank, state);
     image_manager_initialize(&new_scene->image_bank, state);
     material_manager_initialize(&new_scene->material_bank, state);
+
+    // TEMP: Bindless
+    scene_init_bindless(new_scene);
+    // TEMP: END
 
     // pool_size_ratio ps_ratios[] = {
     //     { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 3},
@@ -121,13 +131,15 @@ void scene_shutdown(scene* scene) {
     // HACK: END
 
     mesh_manager_shutdown(scene->mesh_bank);
-    buffer_destroy(state, &scene->material_buffer);
     material_manager_shutdown(scene->material_bank);
+    buffer_destroy(state, &scene->material_buffer);
     image_manager_shutdown(scene->image_bank);
 
     for (u32 i = 0; i < scene->sampler_count; ++i)
         vkDestroySampler(state->device.handle, scene->samplers[i], state->allocator);
     etfree(scene->samplers, sizeof(VkSampler) * scene->sampler_count, MEMORY_TAG_SCENE);
+
+    scene_shutdown_bindless(scene);
 
     camera_destroy(&scene->cam);
 
@@ -210,6 +222,134 @@ void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx) {
         node_draw(scene->top_nodes[i], top_matrix, ctx);
     }
 }
+
+// TEMP: Bindless testing
+void scene_init_bindless(scene* scene) {
+    scene->opaque_draws = dynarray_create(1, sizeof(draw_command));
+    scene->transparent_draws = dynarray_create(1, sizeof(draw_command));
+
+    
+
+    // Set 0: Scene set layout (engine specific). The set itself will be allocated on the fly
+    dsl_builder scene_builder = descriptor_set_layout_builder_create();
+    descriptor_set_layout_builder_add_binding(
+        &scene_builder,
+        /* Binding: */ 0,
+        /* Count: */ 1,
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    descriptor_set_layout_builder_add_binding(
+        &scene_builder,
+        /* Binding: */ 1,
+        /* Count: */ 1,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    scene->scene_layout = descriptor_set_layout_builder_build(
+        &scene_builder,
+        scene->state);
+    descriptor_set_layout_builder_destroy(&scene_builder);
+
+    // TODO: Read from shader reflection data
+    // Set 1: Material layout (material specific). Arrays of each element
+    dsl_builder mat_builder = descriptor_set_layout_builder_create();
+    descriptor_set_layout_builder_add_binding(
+        &mat_builder,
+        /* Binding: */ 0,
+        /* Count: */ MAX_MATERIAL_COUNT,
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    descriptor_set_layout_builder_add_binding(
+        &mat_builder,
+        /* Binding: */ 1,
+        /* Count: */ MAX_MATERIAL_COUNT,
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    descriptor_set_layout_builder_add_binding(
+        &mat_builder,
+        /* Binding: */ 2,
+        /* Count: */ MAX_MATERIAL_COUNT,
+        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    descriptor_set_layout_builder_destroy(&mat_builder);
+
+    scene->material_count = 0;
+    for (u32 i = 0; i < MAX_MATERIAL_COUNT; ++i) {
+        scene->materials[i] = (material_2){.id = {.blueprint_id = INVALID_ID, .instance_id = INVALID_ID}, .pass = MATERIAL_PASS_OTHER};
+    }
+}
+
+void scene_shutdown_bindless(scene* scene) {
+    renderer_state* state = scene->state;
+    dynarray_destroy(scene->objects);
+    dynarray_destroy(scene->transforms);
+    dynarray_destroy(scene->meshes);
+    dynarray_destroy(scene->surfaces);
+
+    buffer_destroy(state, &scene->index_buffer);
+    buffer_destroy(state, &scene->vertex_buffer);
+    buffer_destroy(state, &scene->transform_buffer);
+
+    vkDestroyDescriptorSetLayout(
+        state->device.handle,
+        scene->scene_layout,
+        state->allocator);
+
+    dynarray_destroy(scene->transparent_draws);
+    dynarray_destroy(scene->opaque_draws);
+}
+
+void scene_draw_bindless(scene* scene) {
+    dynarray_clear(scene->opaque_draws);
+    dynarray_clear(scene->transparent_draws);
+
+    surface_2* surfaces = scene->surfaces;
+    mesh_2* meshes = scene->meshes;
+    object* objects = scene->objects;
+
+    u64 object_count = dynarray_length(scene->objects);
+    for (u64 i = 0; i < object_count; ++i) {
+        mesh_2 mesh = meshes[objects[i].mesh_index];
+        for (u32 j = mesh.start_surface; j < mesh.start_surface + mesh.surface_count; ++j) {
+            draw_command draw = {
+                .draw = {
+                    .firstIndex = surfaces[j].start_index,
+                    .instanceCount = 1,
+                    .indexCount = surfaces[j].index_count,
+                    .vertexOffset = 0,
+                    .firstInstance = 0,
+                },
+                .material_instance_id = surfaces[j].material.pass,
+                .transform_id = objects[i].transform_index,
+            };
+            switch (surfaces[j].material.pass)
+            {
+            case MATERIAL_PASS_MAIN_COLOR:
+                dynarray_push((void**)&scene->opaque_draws, &draw);                
+                break;
+            case MATERIAL_PASS_TRANSPARENT:
+                dynarray_push((void**)&scene->transparent_draws, &draw);                
+                break;
+            default:
+                ETERROR("Unknown material pass type.");
+                break;
+            }
+        } 
+    }
+}
+
+void scene_material_set_instance_bindless(scene* scene, material_pass pass_type, struct GLTF_MR_material_resources* resources) {
+    // TODO: Update the material set based on the amount of material instances
+}
+
+material_2 scene_material_get_instance_bindless(scene* scene, material_id id) {
+    if (id.instance_id > scene->material_count || scene->materials[id.instance_id].id.instance_id == INVALID_ID) {
+        ETERROR("Material not present. Returning invalid material.");
+        // TODO: Create a default material to return a material_2 struct for
+        return (material_2){.id = {.blueprint_id = INVALID_ID, .instance_id = INVALID_ID}, .pass = MATERIAL_PASS_OTHER};
+    }
+    return scene->materials[id.instance_id];
+}
+// TEMP: END
 
 static b8 scene_on_key_event(u16 code, void* scne, event_data data) {
     scene* s = (scene*)scne;

@@ -1,4 +1,4 @@
-#version 450
+#version 460
 #extension GL_GOOGLE_include_directive : require
 
 #include "bindless_input_structures.glsl"
@@ -10,6 +10,7 @@ layout (location = 0) in vec3 in_position;
 layout (location = 1) in vec3 in_normal;
 layout (location = 2) in vec3 in_color;
 layout (location = 3) in vec2 in_uv;
+layout (location = 4) flat in uint in_material_id;
 
 layout(location = 0) out vec4 out_frag_color;
 
@@ -17,31 +18,13 @@ const vec3 specular_color = vec3(0.3f, 0.3f, 0.3f);
 const float shininess = 32;
 const float screen_gamma = 2.2;
 
-struct vertex {
-    vec3 position;
-    float uv_x;
-    vec3 normal;
-    float uv_y;
-    vec4 color;
-};
-
-layout(buffer_reference, std430) readonly buffer vertex_buffer {
-    vertex v;
-};
-
-layout (push_constant) uniform constants {
-    mat4 render_matrix;
-    vertex_buffer v_buffer;
-    uint instance_index;
-} push_constants;
-
 void main() {
     // Ambient lighting color & power gotten from the scene data
     vec3 ambient = scene_data.ambient_color.rgb * scene_data.ambient_color.w;
 
     // In color is the vertex colors applied to the texture
-    vec3 diffuse_constants = material_data[nonuniformEXT(push_constants.instance_index)].color_factors.rgb;
-    vec3 diffuse_color = diffuse_constants * texture(color_textures[nonuniformEXT(push_constants.instance_index)], in_uv).rgb;
+    vec3 diffuse_constants = material_data[nonuniformEXT(in_material_id)].color_factors.rgb;
+    vec3 diffuse_color = diffuse_constants * texture(color_textures[nonuniformEXT(in_material_id)], in_uv).rgb;
 
     // From fragment position to light position direction
     vec3 light_dir = scene_data.light_position.xyz - in_position;

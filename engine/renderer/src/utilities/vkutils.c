@@ -82,7 +82,8 @@ mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* 
         | VK_BUFFER_USAGE_TRANSFER_DST_BIT
         | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &new_surface.vertex_buffer);
+        &new_surface.vertex_buffer
+    );
     
     VkBufferDeviceAddressInfo device_address_info = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
@@ -95,10 +96,10 @@ mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* 
     buffer_create(
         state,
         index_buffer_size,
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT
-        | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &new_surface.index_buffer);
+        &new_surface.index_buffer
+    );
     
     // Create staging buffer to transfer memory from VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT to VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     buffer staging;
@@ -107,7 +108,8 @@ mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* 
         vertex_buffer_size + index_buffer_size,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &staging);
+        &staging
+    );
 
     void* mapped_memory;
     vkMapMemory(state->device.handle, staging.memory, 0, vertex_buffer_size + index_buffer_size, 0, &mapped_memory);

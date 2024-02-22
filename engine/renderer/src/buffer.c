@@ -1,17 +1,19 @@
 #include "buffer.h"
 
 #include "core/logger.h"
+#include "memory/etmemory.h"
 
 #include "renderer/src/renderer.h"
 #include "renderer/src/utilities/vkinit.h"
+#include "renderer/src/utilities/vkutils.h"
 
 void buffer_create(
     renderer_state* state,
     u64 size,
     VkBufferUsageFlags usage_flags,
     VkMemoryPropertyFlags memory_property_flags,
-    buffer* out_buffer)
-{
+    buffer* out_buffer
+) {
     // Does buffer create need an initializer or does this 
     // needlessly obfuscate buffer creation
     VkBufferCreateInfo buffer_info = init_buffer_create_info(usage_flags, size);
@@ -46,6 +48,61 @@ void buffer_create(
     VkBindBufferMemoryInfo bind_info = init_bind_buffer_memory_info(out_buffer->handle, out_buffer->memory, 0);
     VK_CHECK(vkBindBufferMemory2(state->device.handle, 1, &bind_info));
     out_buffer->size = memory_requirements.size;
+}
+
+void buffer_create_data(
+    renderer_state* state,
+    void* data,
+    u64 size,
+    VkBufferUsageFlags usage_flags,
+    VkMemoryPropertyFlags memory_property_flags,
+    buffer* out_buffer
+) {
+    buffer staging;
+    buffer_create(
+        state,
+        size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+        &staging
+    );
+    void* mapped_memory = 0;
+    VK_CHECK(vkMapMemory(
+        state->device.handle,
+        staging.memory,
+        /* Offset: */ 0,
+        size,
+        /* Flags: */ 0,
+        &mapped_memory));
+    etcopy_memory(mapped_memory, data, size);
+    vkUnmapMemory(state->device.handle, staging.memory);
+
+    // Create destination buffer
+    buffer_create(
+        state,
+        size,
+        usage_flags | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        memory_property_flags,
+        out_buffer
+    );
+
+    IMMEDIATE_SUBMIT(state, cmd,
+        VkBufferCopy buffer_copy = {
+            .dstOffset = 0,
+            .srcOffset = 0,
+            .size = size};
+        vkCmdCopyBuffer(cmd, staging.handle, out_buffer->handle, 1, &buffer_copy);
+    );
+
+    buffer_destroy(state, &staging);
+}
+
+VkDeviceAddress buffer_get_address(renderer_state* state, buffer* buffer) {
+    VkBufferDeviceAddressInfo device_address_info = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+        .pNext = 0,
+        .buffer = buffer->handle};
+    return vkGetBufferDeviceAddress(state->device.handle, &device_address_info);
 }
 
 void buffer_destroy(renderer_state* state, buffer* buffer) {

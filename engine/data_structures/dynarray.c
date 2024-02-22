@@ -12,6 +12,7 @@
 #define DYNARRAY_RESIZE_FACTOR 2
 #define RESIZE_CAPACITY(curr_capacity) ((curr_capacity + 1) * DYNARRAY_RESIZE_FACTOR)
 
+// Currently aligned to 64 bytes
 typedef struct dynarray {
     u64 capacity;
     u64 length;

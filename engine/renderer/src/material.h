@@ -48,11 +48,21 @@ typedef struct material_blueprint {
 
 b8 material_blueprint_create(renderer_state* state, const char* vertex_path, const char* fragment_path, material_blueprint* blueprint);
 
+b8 material_blueprint_create_bindless(renderer_state* state, const char* vertex_path, const char* fragment_path, u32 instance_count, material_blueprint* blueprint);
+
 void material_blueprint_destroy(renderer_state* state, material_blueprint* blueprint);
 
 material_instance material_blueprint_create_instance(
     renderer_state* state,
     material_blueprint* blueprint,
     material_pass pass,
+    const material_resource* resources,
+    ds_allocator* allocator);
+
+material_instance material_blueprint_create_instance_bindless(
+    renderer_state* state,
+    material_blueprint* blueprint,
+    material_pass pass,
+    u32 instance_index,
     const material_resource* resources,
     ds_allocator* allocator);

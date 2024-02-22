@@ -36,3 +36,30 @@ typedef enum material_pass {
     MATERIAL_PASS_TRANSPARENT,
     MATERIAL_PASS_OTHER
 } material_pass;
+
+typedef struct material_id {
+    u32 blueprint_id;
+    u32 instance_id;
+} material_id;
+
+typedef struct material_2 {
+    material_pass pass;
+    material_id id;
+} material_2;
+
+typedef struct surface_2 {
+    u32 start_index;
+    u32 index_count;
+
+    material_2 material;
+} surface_2;
+
+typedef struct mesh_2 {
+    u32 start_surface;
+    u32 surface_count;
+} mesh_2;
+
+typedef struct object {
+    u32 mesh_index;
+    u32 transform_index;
+} object;

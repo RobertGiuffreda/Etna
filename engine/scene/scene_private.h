@@ -1,28 +1,57 @@
 #pragma once
-
-/** TEMP: 
- * This file is a temporary measure to avoid exposing vulkan to 
- * the rest of the engine before I have some manager data structures
- * fully defined and implemented in scene
- */
-
 #include "defines.h"
+
 #include "core/camera.h"
 #include "math/math_types.h"
 #include "renderer/src/vk_types.h"
 #include "renderer/src/renderables.h"
-#include "resources/resource_types.h"
 
-struct mesh_manager;
-struct image_manager;
-struct material_manager;
+#include "resources/resource_private.h"
 
 typedef struct scene {
     char* name;
 
-    struct mesh_manager* mesh_bank;
-    struct image_manager* image_bank;
-    struct material_manager* material_bank;
+    // TEMP: Until bindless has taken over
+    buffer index_buffer;
+    buffer vertex_buffer;
+    VkDeviceAddress vb_addr;    // Vertex buffer address
+    buffer transform_buffer;
+    VkDeviceAddress tb_addr;    // Transform buffer address
+
+    surface_2* surfaces;    // dynarray
+    mesh_2* meshes;         // dynarray
+    m4s* transforms;        // dynarray
+    object* objects;        // dynarray
+
+    // Bindless & indirect descriptor set layout is different so this is here until bindless takeover
+    VkDescriptorSetLayout scene_layout;
+
+    // Material blueprint(one uber shader) information for bindless instances:
+    VkPipeline opaque_pipeline;
+    VkPipeline transparent_pipeline;
+    VkPipelineLayout pipeline_layout;
+
+    VkDescriptorSetLayout material_layout;
+    VkDescriptorSet material_set;
+
+    VkDescriptorImageInfo* image_infos;
+    VkDescriptorBufferInfo* buffer_infos;
+    VkWriteDescriptorSet* writes;
+
+    material_2 materials[MAX_MATERIAL_COUNT];
+    u32 material_count;
+    
+    // TEMP: Hardcoded for now, rework when materials get abstraction back
+    ds_allocator ds_allocator;
+
+    // Draw commands for indirect bindless.
+    draw_command* opaque_draws;
+    draw_command* transparent_draws;
+    // TEMP: END
+
+    image_manager* image_bank;
+    material_manager* material_bank;
+    mesh_manager* mesh_bank;
 
     node** top_nodes;
     u32 top_node_count;
@@ -54,3 +83,8 @@ typedef struct scene {
 
     renderer_state* state;
 } scene;
+
+// TEMP: Bindless testing
+void scene_material_set_instance_bindless(scene* scene, material_pass pass_type, struct GLTF_MR_material_resources* resources);
+material_2 scene_material_get_instance_bindless(scene* scene, material_id id);
+// TEMP: END

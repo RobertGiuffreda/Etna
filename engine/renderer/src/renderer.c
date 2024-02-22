@@ -270,15 +270,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
         return false;
     }
 
-    material_blueprint test_blueprint = {0};
-    material_blueprint_create(
-        state,
-        "build/assets/shaders/bindless_mesh_mat.vert.spv",
-        "build/assets/shaders/bindless_mesh_mat.frag.spv",
-        &test_blueprint
-    );
-    material_blueprint_destroy(state, &test_blueprint);
-
     if (!initialize_default_data(state)) {
         ETFATAL("Error intializing data.");
         return false;
@@ -760,7 +751,7 @@ static b8 initialize_default_data(renderer_state* state) {
     u32 white = 0xFFFFFFFF;
     image2D_create_data(
         state,
-        (void*)&white,
+        &white,
         (VkExtent3D){.width = 1, .height = 1, .depth = 1},
         VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -772,7 +763,7 @@ static b8 initialize_default_data(renderer_state* state) {
     u32 grey = 0xFFAAAAAA;
     image2D_create_data(
         state,
-        (void*)&grey,
+        &grey,
         (VkExtent3D){.width = 1, .height = 1, .depth = 1},
         VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -784,7 +775,7 @@ static b8 initialize_default_data(renderer_state* state) {
     u32 black = 0xFF000000;
     image2D_create_data(
         state,
-        (void*)&black,
+        &black,
         (VkExtent3D){.width = 1, .height = 1, .depth = 1},
         VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -802,7 +793,7 @@ static b8 initialize_default_data(renderer_state* state) {
     }
     image2D_create_data(
         state,
-        (void*)&pixels[0],
+        &pixels[0],
         (VkExtent3D){.width = 16, .height = 16, .depth = 1},
         VK_FORMAT_R8G8B8A8_UNORM,
         VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -920,12 +911,12 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
     for (u32 i = 0; i < dynarray_length(state->main_draw_context.opaque_surfaces); ++i) {
         render_object* draw = &state->main_draw_context.opaque_surfaces[i];
 
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->material->pipeline->pipeline);
+        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->pipeline.pipeline);
 
         // Scene data/Global data descriptor set binding
         vkCmdBindDescriptorSets(cmd,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
-            draw->material->pipeline->layout, 
+            draw->pipeline.layout, 
             /* First Set: */ 0,
             /* Descriptor Set Count: */ 1,
             &scene_descriptor_set,
@@ -935,10 +926,10 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
         // Material descriptor set binding
         vkCmdBindDescriptorSets(cmd,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
-            draw->material->pipeline->layout,
+            draw->pipeline.layout,
             /* First Set: */ 1,
             /* Descriptor Set Count: */ 1,
-            &draw->material->material_set,
+            &draw->material_set,
             /* Dynamic offset count: */ 0,
             /* Dynamic offsets: */ 0);
         
@@ -947,7 +938,7 @@ static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
         gpu_draw_push_constants push_constants = {
             .vertex_buffer = draw->vertex_buffer_address,
             .render_matrix = draw->transform};
-        vkCmdPushConstants(cmd, draw->material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants);
+        vkCmdPushConstants(cmd, draw->pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants);
 
         vkCmdDrawIndexed(cmd, draw->index_count, 1, draw->first_index, 0, 0);
     }
@@ -969,8 +960,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageTypes,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-    void* pUserData) 
-{
+    void* pUserData
+) {
     switch(messageSeverity)
     {
         default:

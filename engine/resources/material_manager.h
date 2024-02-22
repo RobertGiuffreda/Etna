@@ -10,11 +10,9 @@ void material_manager_shutdown(material_manager* manager);
 
 material* material_manager_get(material_manager* manager, u32 id);
 
-// NOTE: material_resource array expects every resource the material blueprint
+// NOTE: material_resource array expects every resource the material blueprint has to be present
 typedef struct material_config {
     char* name;
     material_pass pass_type;
     material_resource* resources;
 } material_config;
-
-b8 material_manager_submit(material_manager* manager, material_config* config);
