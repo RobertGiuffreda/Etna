@@ -551,6 +551,8 @@ b8 material_blueprint_create_bindless(renderer_state* state, const char* vertex_
     pipeline_builder_enable_blending_additive(&builder);
     pipeline_builder_enable_depthtest(&builder, false, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
+    blueprint->transparent_pipeline.pipeline = pipeline_builder_build(&builder, state);
+
     pipeline_builder_destroy(&builder);
 
     return true;

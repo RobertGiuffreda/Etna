@@ -23,8 +23,13 @@
 #include "renderer/src/buffer.h"
 #include "renderer/src/descriptor.h"
 #include "renderer/src/shader.h"
+#include "renderer/src/pipeline.h"
 #include "renderer/src/renderables.h"
 #include "resources/importers/gltfimporter.h"
+// TEMP: END
+
+// TEMP: Bindless draw commands stuff
+#define MAX_DRAW_COMMANDS 8192
 // TEMP: END
 
 // TEMP: Until events refactor
@@ -197,6 +202,8 @@ void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx) {
 
 // TEMP: Bindless testing
 void scene_init_bindless(scene* scene) {
+    scene->op_draws_count = 0;
+    scene->tp_draws_count = 0;
     scene->opaque_draws = dynarray_create(1, sizeof(draw_command));
     scene->transparent_draws = dynarray_create(1, sizeof(draw_command));
 
@@ -273,7 +280,7 @@ void scene_init_bindless(scene* scene) {
     descriptor_set_layout_builder_add_binding(
         &mat_builder,
         /* Binding: */ 0,
-        scene->state->device.properties_12.maxDescriptorSetUpdateAfterBindUniformBuffers,
+        scene->state->device.properties_12.maxDescriptorSetUpdateAfterBindUniformBuffers - 30,  // HACK:TEMP: FIX THIS
         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     const VkDescriptorBindingFlags mat_binding_flags[] = {
@@ -320,7 +327,6 @@ void scene_init_bindless(scene* scene) {
         &scene->bindless_pool 
     ));
 
-    // TEMP: Test layout
     scene->scene_sets = etallocate(
         sizeof(VkDescriptorSet) * scene->state->image_count,
         MEMORY_TAG_SCENE
@@ -352,7 +358,72 @@ void scene_init_bindless(scene* scene) {
         &scene_set_alloc_info,
         scene->scene_sets
     ));
-    // TEMP: END
+
+    // Create buffers
+    scene->draws_buffer = etallocate(sizeof(buffer) * scene->state->image_count, MEMORY_TAG_SCENE);
+    scene->scene_uniforms = etallocate(sizeof(buffer) * scene->state->image_count, MEMORY_TAG_SCENE);
+    for (u32 i = 0; i < scene->state->image_count; ++i) {
+        buffer_create(
+            scene->state,
+            sizeof(scene_data),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &scene->scene_uniforms[i]
+        );
+        // TEMP: Better way of getting the length for the draw commands buffer & device local bit
+        buffer_create(
+            scene->state,
+            sizeof(draw_command) * MAX_DRAW_COMMANDS * 2,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &scene->draws_buffer[i]);
+        // TEMP: END
+    }
+
+    // Write buffers to DescriptorSets
+    for (u32 i = 0; i < scene->state->image_count; ++i) {
+        VkDescriptorBufferInfo uniform_buffer_info = {
+            .buffer = scene->scene_uniforms[i].handle,
+            .offset = 0,
+            .range = VK_WHOLE_SIZE,
+        };
+        VkWriteDescriptorSet uniform_write = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = 0,
+            .descriptorCount = 1,
+            .dstArrayElement = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .dstSet = scene->scene_sets[i],
+            .dstBinding = 0,
+            .pBufferInfo = &uniform_buffer_info,
+        };
+        VkDescriptorBufferInfo draws_buffer_info = {
+            .buffer = scene->draws_buffer[i].handle,
+            .offset = 0,
+            .range = VK_WHOLE_SIZE,
+        };
+        VkWriteDescriptorSet draws_buffer_write = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .pNext = 0,
+            .descriptorCount = 1,
+            .dstArrayElement = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .dstSet = scene->scene_sets[i],
+            .dstBinding = 1,
+            .pBufferInfo = &draws_buffer_info,
+        };
+        VkWriteDescriptorSet writes[] = {
+            [0] = uniform_write,
+            [1] = draws_buffer_write,
+        };
+        vkUpdateDescriptorSets(
+            scene->state->device.handle,
+            /* writeCount: */ 2,
+            writes,
+            /* copyCount: */ 0,
+            /* copies: */ 0 
+        );
+    }
 
     // Material Descriptor Set
     u32 material_uniform_buffer_count = MAX_MATERIAL_COUNT;
@@ -379,9 +450,68 @@ void scene_init_bindless(scene* scene) {
         scene->materials[i] = (material_2){.id = {.blueprint_id = INVALID_ID, .instance_id = INVALID_ID}, .pass = MATERIAL_PASS_OTHER};
     }
 
-    // Create pipelines for the bindless shaders
-    
+    // Load bindless shaders
+    const char* vertex_path = "build/assets/shaders/bindless_mesh_mat.vert.spv";
+    const char* fragment_path = "build/assets/shaders/bindless_mesh_mat.frag.spv";
 
+    shader bindless_vertex;
+    if (!load_shader(scene->state, vertex_path, &bindless_vertex)) {
+        ETERROR("Error loading shader %s.", vertex_path);
+        return;
+    }
+
+    shader bindless_fragment;
+    if (!load_shader(scene->state, fragment_path, &bindless_fragment)) {
+        ETERROR("Error loading shader %s.", fragment_path);
+        return;
+    }
+
+    // Create Pipeline for bindless shaders
+    VkDescriptorSetLayout pipeline_ds_layouts[] = {
+        [0] = scene->scene_layout,
+        [1] = scene->material_layout,
+    };
+    VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = 0,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &scene->push_constant,
+        .setLayoutCount = 2,
+        .pSetLayouts = pipeline_ds_layouts,
+    };
+    VK_CHECK(vkCreatePipelineLayout(
+        scene->state->device.handle,
+        &pipeline_layout_create_info,
+        scene->state->allocator,
+        &scene->pipeline_layout
+    ));
+
+    // Opaque pipeline
+    pipeline_builder builder = pipeline_builder_create();
+    pipeline_builder_set_shaders(&builder, bindless_vertex, bindless_fragment);
+    pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipeline_builder_set_multisampling_none(&builder);
+    pipeline_builder_disable_blending(&builder);
+    pipeline_builder_enable_depthtest(&builder, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+
+    pipeline_builder_set_color_attachment_format(&builder, scene->state->render_image.format);
+    pipeline_builder_set_depth_attachment_format(&builder, scene->state->depth_image.format);
+    builder.layout = scene->pipeline_layout;
+    scene->opaque_pipeline = pipeline_builder_build(&builder, scene->state);
+    
+    // Transparent pipeline
+    pipeline_builder_enable_blending_additive(&builder);
+    pipeline_builder_enable_depthtest(&builder, false, VK_COMPARE_OP_GREATER_OR_EQUAL);
+
+    scene->transparent_pipeline = pipeline_builder_build(&builder, scene->state);
+
+    pipeline_builder_destroy(&builder);
+
+    // Unload shaders
+    unload_shader(scene->state, &bindless_vertex);
+    unload_shader(scene->state, &bindless_fragment);
 }
 
 void scene_shutdown_bindless(scene* scene) {
@@ -395,6 +525,18 @@ void scene_shutdown_bindless(scene* scene) {
     buffer_destroy(state, &scene->index_buffer);
     buffer_destroy(state, &scene->vertex_buffer);
     buffer_destroy(state, &scene->transform_buffer);
+
+    vkDestroyPipeline(state->device.handle, scene->opaque_pipeline, state->allocator);
+    vkDestroyPipeline(state->device.handle, scene->transparent_pipeline, state->allocator);
+    vkDestroyPipelineLayout(state->device.handle, scene->pipeline_layout, state->allocator);
+
+    for (u32 i = 0; i < state->image_count; ++i) {
+        buffer_destroy(state, scene->scene_uniforms + i);
+        buffer_destroy(state, scene->draws_buffer + i);
+    }
+
+    etfree(scene->scene_uniforms, sizeof(buffer) * state->image_count, MEMORY_TAG_SCENE); 
+    etfree(scene->draws_buffer, sizeof(buffer) * state->image_count, MEMORY_TAG_SCENE);
 
     vkDestroyDescriptorPool(
         state->device.handle,
@@ -420,9 +562,6 @@ void scene_shutdown_bindless(scene* scene) {
 }
 
 void scene_draw_bindless(scene* scene) {
-    dynarray_clear(scene->opaque_draws);
-    dynarray_clear(scene->transparent_draws);
-
     surface_2* surfaces = scene->surfaces;
     mesh_2* meshes = scene->meshes;
     object* objects = scene->objects;
@@ -456,6 +595,45 @@ void scene_draw_bindless(scene* scene) {
             }
         } 
     }
+}
+
+b8 scene_render_bindless(scene* scene) {
+    renderer_state* state = scene->state;
+
+    // Copy scene data to the current frames uniform buffer
+    void* mapped_uniform;
+    vkMapMemory(
+        state->device.handle,
+        scene->scene_uniforms[state->frame_index].memory,
+        /* Offset: */ 0,
+        VK_WHOLE_SIZE,
+        /* Flags: */ 0,
+        &mapped_uniform);
+    etcopy_memory(mapped_uniform, &scene->data, sizeof(scene_data));
+    vkUnmapMemory(state->device.handle, scene->scene_uniforms[state->frame_index].memory);
+
+    // Copy created draws over to the draws buffer for indirect drawing
+    // TODO: Stop draw count from going over the temporary max draw count value
+    u64 op_draws_size = sizeof(draw_command) * (scene->op_draws_count = dynarray_length(scene->opaque_draws));
+    u64 tp_draws_size = sizeof(draw_command) * (scene->tp_draws_count = dynarray_length(scene->transparent_draws));
+    // TODO: END
+
+    void* mapped_draws;
+    vkMapMemory(
+        state->device.handle,
+        scene->draws_buffer[state->frame_index].memory,
+        /* Offset: */ 0,
+        op_draws_size + tp_draws_size,
+        /* Flags: */ 0,
+        &mapped_draws);
+    etcopy_memory(mapped_draws, scene->opaque_draws, op_draws_size);
+    etcopy_memory((u8*)mapped_draws + op_draws_size, scene->opaque_draws, tp_draws_size);
+    vkUnmapMemory(state->device.handle, scene->draws_buffer[state->frame_index].memory);
+
+    // Clear draws after copied to draws buffer
+    dynarray_clear(scene->opaque_draws);
+    dynarray_clear(scene->transparent_draws);
+    return false;
 }
 
 b8 scene_material_set_instance_bindless(scene* scene, material_pass pass_type, struct bindless_material_resources* resources) {

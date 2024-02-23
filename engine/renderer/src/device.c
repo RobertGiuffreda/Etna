@@ -24,8 +24,11 @@ typedef struct physical_device_requirements {
     // Required features
     // Features
     b8 sampler_anisotropy;
-    b8 int64;
-    b8 int16;
+    b8 shaderint64;
+    b8 shaderint16;
+
+    // Vulkan11Features
+    b8 shaderDrawParameters;
 
     // Vulkan12Features
     b8 buffer_device_address;
@@ -79,8 +82,10 @@ b8 device_create(renderer_state* state, device* out_device) {
         .device_extensions = &required_extensions,
 
         .sampler_anisotropy = true,
-        .int64 = true,
-        .int16 = true,
+        .shaderint64 = true,
+        .shaderint16 = true,
+
+        .shaderDrawParameters = true,
 
         .buffer_device_address = true,
         .descriptor_indexing = true,
@@ -198,13 +203,18 @@ b8 device_create(renderer_state* state, device* out_device) {
         .descriptorBindingVariableDescriptorCount = requirements.descriptorBindingVariableDescriptorCount,
         .runtimeDescriptorArray = requirements.runtimeDescriptorArray,
     };
+    VkPhysicalDeviceVulkan11Features enabled_features11 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+        .pNext = &enabled_features12,
+        .shaderDrawParameters = requirements.shaderDrawParameters,
+    };
     VkPhysicalDeviceFeatures2 enabled_features2 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &enabled_features12,
+        .pNext = &enabled_features11,
         .features = {
             .samplerAnisotropy = requirements.sampler_anisotropy,
-            .shaderInt16 = requirements.int16,
-            .shaderInt64 = requirements.int64,
+            .shaderInt16 = requirements.shaderint16,
+            .shaderInt64 = requirements.shaderint64,
         },
     };
 
@@ -400,9 +410,13 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
         .pNext = &features13,
     };
+    VkPhysicalDeviceVulkan11Features features11 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+        .pNext = &features12,
+    };
     VkPhysicalDeviceFeatures2 features2 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &features12,
+        .pNext = &features11,
     };
     vkGetPhysicalDeviceFeatures2(device, &features2);
     VkPhysicalDeviceFeatures features = features2.features;
@@ -414,12 +428,18 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
         ETFATAL("Feature Sampler anisotropy is required & not supported on this device.");
         supported = false;
     }
-    if (requirements->int16 && !features.shaderInt16) {
+    if (requirements->shaderint16 && !features.shaderInt16) {
         ETFATAL("Feature shaderInt16 is required & not supported on this device.");
         supported = false;
     }
-    if (requirements->int64 && !features.shaderInt64) {
+    if (requirements->shaderint64 && !features.shaderInt64) {
         ETFATAL("Feature shaderInt64 is required & not supported on this device.");
+        supported = false;
+    }
+
+    // Features 11
+    if (requirements->shaderDrawParameters && !features11.shaderDrawParameters) {
+        ETFATAL("Feature shaderDrawParameters is required and not supported on this device.");
         supported = false;
     }
 

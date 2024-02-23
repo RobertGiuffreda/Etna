@@ -362,7 +362,7 @@ b8 renderer_prepare_frame(renderer_state* state) {
                 state->device.handle,
                 state->swapchain_semaphores[state->frame_index],
                 state->allocator);
-            VkSemaphoreCreateInfo info = init_semaphore_create_info(/* Create Flags: */ 0);
+            VkSemaphoreCreateInfo info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
             vkCreateSemaphore(
                 state->device.handle,
                 &info,
@@ -542,14 +542,16 @@ static void destroy_frame_command_structures(renderer_state* state) {
         vkDestroyCommandPool(
             state->device.handle,
             state->graphics_pools[i],
-            state->allocator);
+            state->allocator
+        );
     }
     etfree(state->main_graphics_command_buffers,
         sizeof(VkCommandBuffer) * state->image_count,
         MEMORY_TAG_RENDERER);
     etfree(state->graphics_pools,
         sizeof(VkCommandPool) * state->image_count,
-        MEMORY_TAG_RENDERER);
+        MEMORY_TAG_RENDERER
+    );
 
     vkDestroyCommandPool(state->device.handle, state->imm_pool, state->allocator);
 }

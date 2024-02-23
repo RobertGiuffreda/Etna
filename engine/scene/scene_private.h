@@ -32,9 +32,10 @@ typedef struct scene {
     buffer transform_buffer;
     VkDeviceAddress tb_addr;    // Transform buffer address
 
-    buffer* op_draws_buffer;    // Perframe
-    // buffer* tp_draws_buffer;    // Perframe
+    // HACK: Create on fly just to see if shaders work??
+    buffer* draws_buffer;    // Perframe
     buffer* scene_uniforms;     // Perframe
+    // HACK: END
 
     buffer bindless_material_buffer;
 
@@ -65,6 +66,9 @@ typedef struct scene {
     // TEMP: END
 
     // Draw commands for indirect bindless.
+    u64 op_draws_count;
+    u64 tp_draws_count;
+
     draw_command* opaque_draws;
     draw_command* transparent_draws;
     // TEMP: END

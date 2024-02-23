@@ -11,6 +11,6 @@ void scene_update(scene* scene);
 
 void scene_render(scene* scene);
 
-void scene_draw_bindless(scene* scene);
+b8 scene_render_bindless(scene* scene);
 
 void scene_shutdown(scene* scene);
