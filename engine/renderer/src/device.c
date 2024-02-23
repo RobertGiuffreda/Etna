@@ -265,6 +265,45 @@ b8 device_create(renderer_state* state, device* out_device) {
         &out_device->transfer_queue);
 
     ETINFO("Queues Obtained.");
+    
+    // Get properties and features to store
+    VkPhysicalDeviceVulkan13Features features_13 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+        .pNext = 0};
+    VkPhysicalDeviceVulkan12Features features_12 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+        .pNext = &features_13};
+    VkPhysicalDeviceVulkan11Features features_11 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+        .pNext = &features_12};
+    VkPhysicalDeviceFeatures2 features_2 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &features_11};
+    vkGetPhysicalDeviceFeatures2(out_device->gpu, &features_2);
+
+    out_device->features = features_2.features;
+    out_device->features_11 = features_11;
+    out_device->features_12 = features_12;
+    out_device->features_13 = features_13;
+
+    VkPhysicalDeviceVulkan13Properties properties_13 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES,
+        .pNext = 0};
+    VkPhysicalDeviceVulkan12Properties properties_12 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES,
+        .pNext = &properties_13};
+    VkPhysicalDeviceVulkan11Properties properties_11 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES,
+        .pNext = &properties_12};
+    VkPhysicalDeviceProperties2 properties_2 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        .pNext = &properties_11};
+    vkGetPhysicalDeviceProperties2(out_device->gpu, &properties_2);
+
+    out_device->properties = properties_2.properties;
+    out_device->properties_11 = properties_11;
+    out_device->properties_12 = properties_12;
+    out_device->properties_13 = properties_13;
 
     // Clean up allocated memory
     etfree(curr_queue_indices, sizeof(u32) * queue_family_count, MEMORY_TAG_RENDERER);
@@ -471,8 +510,8 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
         for (u32 j = 0; j < supported_extension_count; ++j) {
             if (strs_equal(
                 requirements->device_extensions[i], 
-                supported_extensions[j].extensionName))
-            {
+                supported_extensions[j].extensionName
+            )) {
                 found = true;
                 break;
             }

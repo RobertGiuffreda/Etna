@@ -8,6 +8,20 @@
 
 #include "resources/resource_private.h"
 
+/** Checklist:
+ * Write to image binding in scene descriptor sets
+ * Write to material set at index material instance
+ * 
+ * Do non indirect version
+ * 
+ * Indirect:
+ * Scene buffers
+ * Draw buffers
+ * 
+ * Indirect generated on GPU
+ * 
+ */
+
 typedef struct scene {
     char* name;
 
@@ -18,6 +32,12 @@ typedef struct scene {
     buffer transform_buffer;
     VkDeviceAddress tb_addr;    // Transform buffer address
 
+    buffer* op_draws_buffer;    // Perframe
+    // buffer* tp_draws_buffer;    // Perframe
+    buffer* scene_uniforms;     // Perframe
+
+    buffer bindless_material_buffer;
+
     surface_2* surfaces;    // dynarray
     mesh_2* meshes;         // dynarray
     m4s* transforms;        // dynarray
@@ -25,6 +45,9 @@ typedef struct scene {
 
     // Bindless & indirect descriptor set layout is different so this is here until bindless takeover
     VkDescriptorSetLayout scene_layout;
+    VkDescriptorSet* scene_sets;    // Per frame
+
+    VkPushConstantRange push_constant;
 
     // Material blueprint(one uber shader) information for bindless instances:
     VkPipeline opaque_pipeline;
@@ -34,15 +57,12 @@ typedef struct scene {
     VkDescriptorSetLayout material_layout;
     VkDescriptorSet material_set;
 
-    VkDescriptorImageInfo* image_infos;
-    VkDescriptorBufferInfo* buffer_infos;
-    VkWriteDescriptorSet* writes;
-
     material_2 materials[MAX_MATERIAL_COUNT];
     u32 material_count;
     
     // TEMP: Hardcoded for now, rework when materials get abstraction back
-    ds_allocator ds_allocator;
+    VkDescriptorPool bindless_pool;
+    // TEMP: END
 
     // Draw commands for indirect bindless.
     draw_command* opaque_draws;
@@ -76,15 +96,12 @@ typedef struct scene {
     // TODO: END
 
     // TEMP: END
-
-    // For items that need to modified per frame
-    // ds_allocator* ds_allocators;
-    // buffer* scene_data_buffers;
-
     renderer_state* state;
 } scene;
 
-// TEMP: Bindless testing
-void scene_material_set_instance_bindless(scene* scene, material_pass pass_type, struct GLTF_MR_material_resources* resources);
+// TEMP: Bindless testing. Jank
+b8 scene_material_set_instance_bindless(scene* scene, material_pass pass_type, struct bindless_material_resources* resources);
 material_2 scene_material_get_instance_bindless(scene* scene, material_id id);
+
+void scene_image_set_bindless(scene* scene, u32 img_id, u32 sampler_id);
 // TEMP: END

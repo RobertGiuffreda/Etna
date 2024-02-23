@@ -101,8 +101,8 @@ void descriptor_set_writer_write_image(
     VkImageView view,
     VkSampler sampler,
     VkImageLayout layout,
-    VkDescriptorType type)
-{
+    VkDescriptorType type
+) {
     // NOTE: The destination set value is not set in this function
     // NOTE: Descriptor count is hard coded to one in this function
     VkDescriptorImageInfo image_info = {
@@ -129,8 +129,8 @@ void descriptor_set_writer_write_buffer(
     VkBuffer buffer,
     u64 size,
     u64 offset,
-    VkDescriptorType type)
-{
+    VkDescriptorType type
+) {
     VkDescriptorBufferInfo buffer_info = {
         .buffer = buffer,
         .offset = offset,
@@ -153,6 +153,7 @@ void descriptor_set_writer_clear(ds_writer* writer) {
     dynarray_clear(writer->buffer_infos);
     dynarray_clear(writer->writes);
 }
+
 void descriptor_set_writer_update_set(ds_writer* writer, VkDescriptorSet set, renderer_state* state) {
     for (u32 i = 0; i < dynarray_length(writer->writes); ++i) {
         writer->writes[i].dstSet = set;
@@ -166,8 +167,8 @@ void descriptor_set_allocator_initialize(
     u32 initial_sets,
     u32 pool_size_count,
     pool_size_ratio* pool_sizes,
-    renderer_state* state)
-{
+    renderer_state* state
+) {
     allocator->pool_size_count = pool_size_count;
     allocator->pool_sizes = etallocate(sizeof(pool_size_ratio) * pool_size_count, MEMORY_TAG_RENDERER);
     etcopy_memory(allocator->pool_sizes, pool_sizes, sizeof(pool_size_ratio) * pool_size_count);
@@ -185,8 +186,8 @@ void descriptor_set_allocator_initialize(
 
 void descriptor_set_allocator_shutdown(
     ds_allocator* allocator,
-    renderer_state* state)
-{
+    renderer_state* state
+) {
     descriptor_set_allocator_destroy_pools(allocator, state);
     etfree(allocator->pool_sizes, sizeof(pool_size_ratio) * allocator->pool_size_count, MEMORY_TAG_RENDERER);
     dynarray_destroy(allocator->ready_pools);
@@ -197,8 +198,8 @@ void descriptor_set_allocator_shutdown(
 
 void descriptor_set_allocator_clear_pools(
     ds_allocator* allocator,
-    renderer_state* state)
-{
+    renderer_state* state
+) {
     u32 rpool_len = dynarray_length(allocator->ready_pools);
     for (u32 i = 0; i < rpool_len; ++i) {
         VkDescriptorPool pool = allocator->ready_pools[i];
@@ -216,8 +217,8 @@ void descriptor_set_allocator_clear_pools(
 
 void descriptor_set_allocator_destroy_pools(
     ds_allocator* allocator,
-    renderer_state* state)
-{
+    renderer_state* state
+) {
     u32 rpool_len = dynarray_length(allocator->ready_pools);
     for (u32 i = 0; i < rpool_len; ++i) {
         VkDescriptorPool pool = allocator->ready_pools[i];
@@ -236,8 +237,8 @@ void descriptor_set_allocator_destroy_pools(
 VkDescriptorSet descriptor_set_allocator_allocate(
     ds_allocator* allocator,
     VkDescriptorSetLayout layout,
-    renderer_state* state)
-{
+    renderer_state* state
+) {
     VkDescriptorPool to_use = 
         descriptor_set_allocator_get_pool(allocator, state);
     VkDescriptorSetAllocateInfo alloc_info = init_descriptor_set_allocate_info();

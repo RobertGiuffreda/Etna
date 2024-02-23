@@ -15,6 +15,7 @@
 #include "resources/mesh_manager.h"
 #include "resources/image_manager.h"
 #include "resources/material_manager.h"
+#include "resources/resource_private.h"
 
 // TEMP: Make this renderer implementation agnostic
 #include "renderer/src/vk_types.h"
@@ -56,31 +57,6 @@ b8 scene_initalize(scene** scn, renderer_state* state) {
     image_manager_initialize(&new_scene->image_bank, state);
     material_manager_initialize(&new_scene->material_bank, state);
 
-    // TEMP: Bindless
-    scene_init_bindless(new_scene);
-    // TEMP: END
-
-    // pool_size_ratio ps_ratios[] = {
-    //     { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 3},
-    //     { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 3},
-    //     { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
-    //     { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3}};
-    // new_scene->ds_allocators = etallocate(sizeof(ds_allocator) * state->image_count, MEMORY_TAG_SCENE);
-    // new_scene->scene_data_buffers = etallocate(sizeof(buffer) * state->image_count, MEMORY_TAG_SCENE);
-    // for (u32 i = 0; i < state->image_count; ++i) {
-    //     buffer_create(
-    //         state,
-    //         sizeof(scene_data),
-    //         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    //         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    //         &new_scene->scene_data_buffers[i]);
-    //     descriptor_set_allocator_initialize(
-    //         &new_scene->ds_allocators[i],
-    //         /* Initial Sets: */ 1000,
-    //         /* pool size count: */ 4,
-    //         ps_ratios,
-    //         state);
-    // }
 
     camera_create(&new_scene->cam);
     new_scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
@@ -92,6 +68,9 @@ b8 scene_initalize(scene** scn, renderer_state* state) {
     new_scene->data.ambient_color = a_color;
     new_scene->data.light_color = l_color;
 
+    // TEMP: Bindless
+    scene_init_bindless(new_scene);
+    // TEMP: END
     // HACK:TEMP: Serialize and deserialization of a scene file
     if (!import_gltf(new_scene, path, state)) {
         ETERROR("Error loading gltf file initializing scene.");
@@ -142,13 +121,6 @@ void scene_shutdown(scene* scene) {
     scene_shutdown_bindless(scene);
 
     camera_destroy(&scene->cam);
-
-    // for (u32 i = 0; i < state->image_count; ++i) {
-    //     descriptor_set_allocator_shutdown(&scene->ds_allocators[i], state);
-    //     buffer_destroy(state, &scene->scene_data_buffers[i]);
-    // }
-    // etfree(scene->ds_allocators);
-    // etfree(scene->scene_data_buffers);
 
     str_duplicate_free(scene->name);
     
@@ -228,54 +200,188 @@ void scene_init_bindless(scene* scene) {
     scene->opaque_draws = dynarray_create(1, sizeof(draw_command));
     scene->transparent_draws = dynarray_create(1, sizeof(draw_command));
 
-    
+    // TODO: Read from shader reflection data. 
+    // Even though SET 0 is reserved for engine and draw calls,
+    // so I dont have to find all places to change when changing the engine.
 
+    // For use in VkDescriptorSetLayoutBindingFlagsCreateInfo for each set
+    const VkDescriptorBindingFlags flags = 
+        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
+        VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT;
+ 
     // Set 0: Scene set layout (engine specific). The set itself will be allocated on the fly
-    dsl_builder scene_builder = descriptor_set_layout_builder_create();
-    descriptor_set_layout_builder_add_binding(
-        &scene_builder,
-        /* Binding: */ 0,
-        /* Count: */ 1,
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    descriptor_set_layout_builder_add_binding(
-        &scene_builder,
-        /* Binding: */ 1,
-        /* Count: */ 1,
-        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    scene->scene_layout = descriptor_set_layout_builder_build(
-        &scene_builder,
-        scene->state);
-    descriptor_set_layout_builder_destroy(&scene_builder);
+    // TEMP: Test layout
+    VkDescriptorBindingFlags ssbf = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT;
+    VkDescriptorBindingFlags scene_set_binding_flags[] = {
+        [0] = ssbf,
+        [1] = ssbf,
+        [2] = ssbf | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT,
+    };
+    VkDescriptorSetLayoutBindingFlagsCreateInfo scene_binding_flags_create_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+        .pNext = 0,
+        .bindingCount = 3,
+        .pBindingFlags = scene_set_binding_flags,
+    };
+    VkDescriptorSetLayoutBinding scene_set_bindings[] = {
+        [0] = {
+            .binding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = NULL,
+        },
+        [1] = {
+            .binding = 1,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = NULL,
+        },
+        [2] = {
+            .binding = 2,
+            .descriptorCount = scene->state->device.properties_12.maxDescriptorSetUpdateAfterBindSampledImages,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = NULL,
+        },
+    };
+    VkDescriptorSetLayoutCreateInfo scene_layout_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = &scene_binding_flags_create_info,
+        .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
+        .bindingCount = 3,
+        .pBindings = scene_set_bindings,
+    };
+    VK_CHECK(vkCreateDescriptorSetLayout(
+        scene->state->device.handle,
+        &scene_layout_info,
+        scene->state->allocator,
+        &scene->scene_layout
+    ));
+    // TEMP: Test layout
 
-    // TODO: Read from shader reflection data
+    // Setup global descriptor
+    scene->push_constant.offset = 0;
+    scene->push_constant.size = sizeof(VkDeviceAddress) + sizeof(VkDeviceAddress);
+    scene->push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
     // Set 1: Material layout (material specific). Arrays of each element
     dsl_builder mat_builder = descriptor_set_layout_builder_create();
+    mat_builder.layout_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
     descriptor_set_layout_builder_add_binding(
         &mat_builder,
         /* Binding: */ 0,
-        /* Count: */ MAX_MATERIAL_COUNT,
+        scene->state->device.properties_12.maxDescriptorSetUpdateAfterBindUniformBuffers,
         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    descriptor_set_layout_builder_add_binding(
+    const VkDescriptorBindingFlags mat_binding_flags[] = {
+        [0] = flags | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT,
+    };
+    VkDescriptorSetLayoutBindingFlagsCreateInfo mat_binding_flags_cinfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+        .pNext = 0,
+        .bindingCount = 1,
+        .pBindingFlags = mat_binding_flags};
+    mat_builder.layout_info.pNext = &mat_binding_flags_cinfo;
+    scene->material_layout = descriptor_set_layout_builder_build(
         &mat_builder,
-        /* Binding: */ 1,
-        /* Count: */ MAX_MATERIAL_COUNT,
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    descriptor_set_layout_builder_add_binding(
-        &mat_builder,
-        /* Binding: */ 2,
-        /* Count: */ MAX_MATERIAL_COUNT,
-        VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+        scene->state);
     descriptor_set_layout_builder_destroy(&mat_builder);
+
+    // DescriptorPool
+    VkDescriptorPoolSize sizes[] = {
+        [0] = {
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = MAX_IMAGE_COUNT * 3,
+        },
+        [1] = {
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1000 + MAX_MATERIAL_COUNT,
+        },
+        [2] = {
+            .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorCount = 1000,
+        },
+    };
+    VkDescriptorPoolCreateInfo pool_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .pNext = 0,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
+        .maxSets = 4,
+        .poolSizeCount = 3,
+        .pPoolSizes = sizes
+    };
+    VK_CHECK(vkCreateDescriptorPool(
+        scene->state->device.handle,
+        &pool_info,
+        scene->state->allocator,
+        &scene->bindless_pool 
+    ));
+
+    // TEMP: Test layout
+    scene->scene_sets = etallocate(
+        sizeof(VkDescriptorSet) * scene->state->image_count,
+        MEMORY_TAG_SCENE
+    );
+    VkDescriptorSetLayout scene_layouts[] = {
+        [0] = scene->scene_layout,
+        [1] = scene->scene_layout,
+        [2] = scene->scene_layout,
+    };
+    u32 scene_image_counts[] = {
+        [0] = MAX_IMAGE_COUNT,
+        [1] = MAX_IMAGE_COUNT,
+        [2] = MAX_IMAGE_COUNT,
+    };
+    VkDescriptorSetVariableDescriptorCountAllocateInfo scene_descriptor_count_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+        .descriptorSetCount = 3,
+        .pDescriptorCounts = scene_image_counts,
+    };
+    VkDescriptorSetAllocateInfo scene_set_alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext = &scene_descriptor_count_info,
+        .descriptorPool = scene->bindless_pool,
+        .descriptorSetCount = 3,
+        .pSetLayouts = scene_layouts,
+    };
+    VK_CHECK(vkAllocateDescriptorSets(
+        scene->state->device.handle,
+        &scene_set_alloc_info,
+        scene->scene_sets
+    ));
+    // TEMP: END
+
+    // Material Descriptor Set
+    u32 material_uniform_buffer_count = MAX_MATERIAL_COUNT;
+    VkDescriptorSetVariableDescriptorCountAllocateInfo material_descriptor_count_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+        .descriptorSetCount = 1,
+        .pDescriptorCounts = &material_uniform_buffer_count,
+    };
+    VkDescriptorSetAllocateInfo mat_set_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext = &material_descriptor_count_info,
+        .descriptorPool = scene->bindless_pool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &scene->material_layout,
+    };
+    VK_CHECK(vkAllocateDescriptorSets(
+        scene->state->device.handle,
+        &mat_set_info,
+        &scene->material_set
+    ));
 
     scene->material_count = 0;
     for (u32 i = 0; i < MAX_MATERIAL_COUNT; ++i) {
         scene->materials[i] = (material_2){.id = {.blueprint_id = INVALID_ID, .instance_id = INVALID_ID}, .pass = MATERIAL_PASS_OTHER};
     }
+
+    // Create pipelines for the bindless shaders
+    
+
 }
 
 void scene_shutdown_bindless(scene* scene) {
@@ -285,10 +391,25 @@ void scene_shutdown_bindless(scene* scene) {
     dynarray_destroy(scene->meshes);
     dynarray_destroy(scene->surfaces);
 
+    buffer_destroy(state, &scene->bindless_material_buffer);
     buffer_destroy(state, &scene->index_buffer);
     buffer_destroy(state, &scene->vertex_buffer);
     buffer_destroy(state, &scene->transform_buffer);
 
+    vkDestroyDescriptorPool(
+        state->device.handle,
+        scene->bindless_pool,
+        state->allocator);
+    etfree(
+        scene->scene_sets,
+        sizeof(VkDescriptorSet) * scene->state->image_count,
+        MEMORY_TAG_SCENE
+    );
+
+    vkDestroyDescriptorSetLayout(
+        state->device.handle,
+        scene->material_layout,
+        state->allocator);
     vkDestroyDescriptorSetLayout(
         state->device.handle,
         scene->scene_layout,
@@ -337,8 +458,46 @@ void scene_draw_bindless(scene* scene) {
     }
 }
 
-void scene_material_set_instance_bindless(scene* scene, material_pass pass_type, struct GLTF_MR_material_resources* resources) {
+b8 scene_material_set_instance_bindless(scene* scene, material_pass pass_type, struct bindless_material_resources* resources) {
     // TODO: Update the material set based on the amount of material instances
+    if (scene->material_count >= MAX_MATERIAL_COUNT) {
+        ETERROR("Max material count reached.");
+        return false;
+    }
+
+    VkDescriptorBufferInfo buff_info = {
+        .buffer = resources->data_buff,
+        .offset = resources->data_buff_offset,
+        .range = sizeof(struct bindless_constants),
+    };
+    VkWriteDescriptorSet buffer_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .dstArrayElement = scene->material_count,
+        .dstSet = scene->material_set,
+        .dstBinding = 0,
+        .pBufferInfo = &buff_info,
+    };
+
+    vkUpdateDescriptorSets(
+        scene->state->device.handle,
+        /* WriteCount */ 1,
+        &buffer_write,
+        /* CopyCount: */ 0,
+        /* Copies: */ NULL
+    );
+
+    material_2 mat = {
+        .id = {
+            .blueprint_id = 0,
+            .instance_id = scene->material_count,
+        },
+        .pass = pass_type,
+    };
+    scene->materials[scene->material_count++] = mat;
+    return true;
 }
 
 material_2 scene_material_get_instance_bindless(scene* scene, material_id id) {
@@ -348,6 +507,52 @@ material_2 scene_material_get_instance_bindless(scene* scene, material_id id) {
         return (material_2){.id = {.blueprint_id = INVALID_ID, .instance_id = INVALID_ID}, .pass = MATERIAL_PASS_OTHER};
     }
     return scene->materials[id.instance_id];
+}
+
+void scene_image_set_bindless(scene* scene, u32 img_id, u32 sampler_id) {
+    image* img = image_manager_get(scene->image_bank, img_id);
+    VkDescriptorImageInfo image_info = {
+        .sampler = scene->samplers[sampler_id],
+        .imageView = img->view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+    VkWriteDescriptorSet img_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = img_id,
+        .dstBinding = 2,
+        .dstSet = VK_NULL_HANDLE,
+        .pImageInfo = &image_info,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    };
+
+    img_write.dstSet = scene->scene_sets[0];
+    vkUpdateDescriptorSets(
+        scene->state->device.handle,
+        /* WriteCount: */ 1,
+        &img_write,
+        /* CopyCount: */ 0,
+        /* Copies: */ NULL
+    );
+
+    img_write.dstSet = scene->scene_sets[1];
+    vkUpdateDescriptorSets(
+        scene->state->device.handle,
+        /* WriteCount: */ 1,
+        &img_write,
+        /* CopyCount: */ 0,
+        /* Copies: */ NULL
+    );
+
+    img_write.dstSet = scene->scene_sets[2];
+    vkUpdateDescriptorSets(
+        scene->state->device.handle,
+        /* WriteCount: */ 1,
+        &img_write,
+        /* CopyCount: */ 0,
+        /* Copies: */ NULL
+    );
 }
 // TEMP: END
 

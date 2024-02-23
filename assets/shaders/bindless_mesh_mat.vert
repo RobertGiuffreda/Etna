@@ -8,6 +8,7 @@ layout (location = 1) out vec3 out_normal;
 layout (location = 2) out vec3 out_color;
 layout (location = 3) out vec2 out_uv;
 layout (location = 4) flat out uint out_material_id;
+layout (location = 5) flat out uint out_color_id;
 
 void main() {
     draw_command draw = draws[gl_DrawID];
@@ -27,4 +28,5 @@ void main() {
     out_uv.y = v.uv_y;
 
     out_material_id = draw.material_id;
+    out_color_id = material_data[nonuniformEXT(draw.material_id)].color_index;
 }

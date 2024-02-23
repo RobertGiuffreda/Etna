@@ -128,6 +128,21 @@ struct GLTF_MR_material_resources {
     u32 data_buffer_offset;
 };
 
+struct bindless_constants {
+    v4s color;
+    v4s mr;
+    u32 color_id;
+    u32 mr_id;
+    u32 padd1;
+    u32 padd2;
+    v4s padding[13];
+};
+
+struct bindless_material_resources {
+    VkBuffer data_buff;
+    u32 data_buff_offset;
+};
+
 // Default material type as importing GLTF file's is 
 // the only thing supported at the moment
 typedef struct GLTF_MR {
@@ -213,6 +228,16 @@ typedef struct device {
     VkPhysicalDevice gpu;
     VkPhysicalDeviceLimits gpu_limits;
     VkPhysicalDeviceMemoryProperties gpu_memory_props;
+
+    VkPhysicalDeviceProperties properties;
+    VkPhysicalDeviceVulkan11Properties properties_11;
+    VkPhysicalDeviceVulkan12Properties properties_12;
+    VkPhysicalDeviceVulkan13Properties properties_13;
+
+    VkPhysicalDeviceFeatures features;
+    VkPhysicalDeviceVulkan11Features features_11;
+    VkPhysicalDeviceVulkan12Features features_12;
+    VkPhysicalDeviceVulkan13Features features_13;
 
     // NOTE: _qfi - queue family index
     i32 graphics_qfi;

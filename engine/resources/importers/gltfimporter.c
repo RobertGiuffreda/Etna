@@ -133,6 +133,26 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
     }
 
+    // TEMP: Bindless material buffer
+    buffer_create(
+        state,
+        sizeof(struct bindless_constants) * data->materials_count,
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &scene->bindless_material_buffer
+    );
+    void* bindless_mapped_memory;
+    VK_CHECK(vkMapMemory(
+        state->device.handle,
+        scene->bindless_material_buffer.memory,
+        /* offset: */ 0,
+        sizeof(struct bindless_constants) * data->materials_count,
+        /* flags: */ 0,
+        &bindless_mapped_memory
+    ));
+    struct bindless_constants* bindless_material_constants = (struct bindless_constants*)bindless_mapped_memory;
+    // TEMP: END
+
     // Materials, TODO: Since this is importing a GLTF, we should use the default GLTF_MR material & shaders for it
     // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
     buffer_create(state,
@@ -166,7 +186,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             },
             .metal_rough_factors = {
                 .x = gltf_pbr_mr.metallic_factor,
-                .y = gltf_pbr_mr.roughness_factor
+                .y = gltf_pbr_mr.roughness_factor,
             }
         };
         // TODO: Handle minUniformBufferOffsetAlignment here
@@ -197,6 +217,23 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             },
         };
 
+        // TEMP: Bindless
+        struct bindless_constants bindless_consts = {
+            .color = {
+                .r = gltf_pbr_mr.base_color_factor[0],
+                .g = gltf_pbr_mr.base_color_factor[1],
+                .b = gltf_pbr_mr.base_color_factor[2],
+                .a = gltf_pbr_mr.base_color_factor[3],
+            },
+            .mr = {
+                .x = gltf_pbr_mr.metallic_factor,
+                .y = gltf_pbr_mr.roughness_factor,
+            },
+            .color_id = 0,
+            .mr_id = 0,
+        };
+        // TEMP: END
+
         if (i_material->has_pbr_metallic_roughness) {
             if (i_material->pbr_metallic_roughness.base_color_texture.texture) {
                 cgltf_texture* color_tex = i_material->pbr_metallic_roughness.base_color_texture.texture;
@@ -205,6 +242,11 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
                 material_resources[1].view = image_manager_get(scene->image_bank, img_index)->view;
                 material_resources[1].sampler = scene->samplers[smpl_index];
+
+                // TEMP: Bindless
+                scene_image_set_bindless(scene, img_index, smpl_index);
+                bindless_consts.color_id = img_index;
+                // TEMP: END
             }
             if (i_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
                 cgltf_texture* mr_tex = i_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
@@ -213,8 +255,17 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
                 material_resources[2].view = image_manager_get(scene->image_bank, img_index)->view;
                 material_resources[2].sampler = scene->samplers[smpl_index];
+                
+                // TEMP: Bindless
+                scene_image_set_bindless(scene, img_index, smpl_index);
+                bindless_consts.mr_id = img_index;
+                // TEMP: END
             }
         }
+
+        // TEMP: Bindless
+        bindless_material_constants[i] = bindless_consts;
+        // TEMP: END
         
         material_config config = {
             .name = i_material->name,
@@ -222,16 +273,27 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             .resources = material_resources,
         };
         material_manager_submit(scene->material_bank, &config);
+        
+        // TEMP: Bindless
+        struct bindless_material_resources bindless_resources = {
+            .data_buff = scene->bindless_material_buffer.handle,
+            .data_buff_offset = sizeof(struct bindless_constants) * i,
+        };
+        scene_material_set_instance_bindless(scene, pass_type, &bindless_resources);
+        // TEMP: END
     }
     vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
+    vkUnmapMemory(state->device.handle, scene->bindless_material_buffer.memory);
 
-    // TEMP: Big scene index and vertex buffer
-    // Per mesh index into scene surface buffer    
+    // TEMP: Big scene index and vertex buffer, Bindless
     vertex* scene_vertices = dynarray_create(1, sizeof(vertex));
     u32* scene_indices = dynarray_create(1, sizeof(u32));
 
     surface_2* scene_surfaces = dynarray_create(1, sizeof(surface_2));
     mesh_2* scene_meshes = dynarray_create(data->meshes_count, sizeof(mesh_2));
+
+    u64 opaque_surface_count;
+    u64 transparent_surface_count;
     
     for (u32 i = 0; i < data->meshes_count; ++i) {
         cgltf_mesh* gltf_mesh = &data->meshes[i];
@@ -345,7 +407,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             } else {
                 new_surface->material = scene_material_get_instance_bindless(scene, (material_id){.blueprint_id = 0, .instance_id = 0});
             }
-            // TEMP: END
         }
     }
 
