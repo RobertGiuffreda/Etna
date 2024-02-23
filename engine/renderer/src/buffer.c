@@ -112,3 +112,15 @@ void buffer_destroy(renderer_state* state, buffer* buffer) {
     buffer->handle = 0;
     buffer->size = 0;
 }
+
+void buffer_barrier(
+    VkCommandBuffer cmd,
+    VkBuffer buffer,
+    VkAccessFlags2 src_access,
+    VkAccessFlags2 dst_access,
+    VkPipelineStageFlags2 src_flags,
+    VkPipelineStageFlags2 dst_flags
+) {
+    
+    return;
+}

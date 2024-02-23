@@ -411,15 +411,17 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     }
 
     // Init Shared buffers
+    scene->vertex_count = dynarray_length(scene_vertices);
+    scene->index_count = dynarray_length(scene_indices);
     mesh_buffers scene_shared_buffers = upload_mesh_immediate(
         state,
-        dynarray_length(scene_indices),
+        scene->index_count,
         scene_indices,
-        dynarray_length(scene_vertices),
+        scene->vertex_count,
         scene_vertices
     );
-    dynarray_destroy(scene_vertices);
-    dynarray_destroy(scene_indices);
+    scene->vertices = scene_vertices;
+    scene->indices = scene_indices;
     
     // Move data to scene class:
     scene->index_buffer = scene_shared_buffers.index_buffer;
@@ -427,6 +429,9 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     scene->vb_addr = scene_shared_buffers.vertex_buffer_address;
     scene->surfaces = scene_surfaces;
     scene->meshes = scene_meshes;
+
+    scene->surface_count = dynarray_length(scene_surfaces);
+    scene->mesh_count = dynarray_length(scene_meshes);
 
     // TEMP: cgltf calculates the world transform for us so I can temporary use
     // that function to get a quick and dirty mesh transform buffer to stop using 
@@ -451,7 +456,9 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
     // Move data to scene class:
     scene->transforms = scene_transforms;
+    scene->transform_count = dynarray_length(scene_transforms);
     scene->objects = scene_objects;
+    scene->object_count = dynarray_length(scene_objects);
 
     // Create transform buffer & get address
     buffer_create_data(

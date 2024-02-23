@@ -48,8 +48,9 @@ struct draw_command {
 
 	uint material_id;
 	uint transform_id;
+	uint padd;
 };
-layout(set = 0, binding = 1) readonly buffer draw_commands {
+layout(std430, set = 0, binding = 1) readonly buffer draw_commands {
 	draw_command draws[];
 };
 layout(set = 0, binding = 2) uniform sampler2D textures[];

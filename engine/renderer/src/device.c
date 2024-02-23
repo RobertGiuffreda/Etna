@@ -26,6 +26,7 @@ typedef struct physical_device_requirements {
     b8 sampler_anisotropy;
     b8 shaderint64;
     b8 shaderint16;
+    b8 multiDrawIndirect;
 
     // Vulkan11Features
     b8 shaderDrawParameters;
@@ -84,6 +85,7 @@ b8 device_create(renderer_state* state, device* out_device) {
         .sampler_anisotropy = true,
         .shaderint64 = true,
         .shaderint16 = true,
+        .multiDrawIndirect = true,
 
         .shaderDrawParameters = true,
 
@@ -215,6 +217,7 @@ b8 device_create(renderer_state* state, device* out_device) {
             .samplerAnisotropy = requirements.sampler_anisotropy,
             .shaderInt16 = requirements.shaderint16,
             .shaderInt64 = requirements.shaderint64,
+            .multiDrawIndirect = requirements.multiDrawIndirect,
         },
     };
 
@@ -434,6 +437,10 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
     }
     if (requirements->shaderint64 && !features.shaderInt64) {
         ETFATAL("Feature shaderInt64 is required & not supported on this device.");
+        supported = false;
+    }
+    if (requirements->multiDrawIndirect && !features.multiDrawIndirect) {
+        ETFATAL("Feature multiDrawIndirect is required and not supported on this device.");
         supported = false;
     }
 

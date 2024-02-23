@@ -20,6 +20,7 @@
 // TEMP: Make this renderer implementation agnostic
 #include "renderer/src/vk_types.h"
 #include "renderer/src/renderer.h"
+#include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/buffer.h"
 #include "renderer/src/descriptor.h"
 #include "renderer/src/shader.h"
@@ -42,7 +43,6 @@ static void scene_draw(scene* scene, const m4s top_matrix, draw_context* ctx);
 // TEMP: Bindless testing
 static void scene_init_bindless(scene* scene);
 static void scene_shutdown_bindless(scene* scene);
-static void scene_draw_bindless(scene* scene);
 // TEMP: END
 
 /** NOTE: Implementation details
@@ -61,7 +61,6 @@ b8 scene_initalize(scene** scn, renderer_state* state) {
     mesh_manager_initialize(&new_scene->mesh_bank, state);
     image_manager_initialize(&new_scene->image_bank, state);
     material_manager_initialize(&new_scene->material_bank, state);
-
 
     camera_create(&new_scene->cam);
     new_scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
@@ -570,6 +569,10 @@ void scene_draw_bindless(scene* scene) {
     for (u64 i = 0; i < object_count; ++i) {
         mesh_2 mesh = meshes[objects[i].mesh_index];
         for (u32 j = mesh.start_surface; j < mesh.start_surface + mesh.surface_count; ++j) {
+            ETASSERT(surfaces[j].start_index < scene->index_count && surfaces[j].start_index + surfaces[j].index_count <= scene->index_count);
+            for (u32 k = surfaces[j].start_index; k < surfaces[j].start_index + surfaces[j].index_count; ++k) {
+                ETASSERT(scene->indices[k] < scene->vertex_count);
+            }
             draw_command draw = {
                 .draw = {
                     .firstIndex = surfaces[j].start_index,
@@ -578,7 +581,7 @@ void scene_draw_bindless(scene* scene) {
                     .vertexOffset = 0,
                     .firstInstance = 0,
                 },
-                .material_instance_id = surfaces[j].material.pass,
+                .material_instance_id = surfaces[j].material.id.instance_id,
                 .transform_id = objects[i].transform_index,
             };
             switch (surfaces[j].material.pass)
@@ -600,40 +603,263 @@ void scene_draw_bindless(scene* scene) {
 b8 scene_render_bindless(scene* scene) {
     renderer_state* state = scene->state;
 
-    // Copy scene data to the current frames uniform buffer
+    // Copy scene data to the current frames uniform buffer:
     void* mapped_uniform;
-    vkMapMemory(
+    VK_CHECK(vkMapMemory(
         state->device.handle,
         scene->scene_uniforms[state->frame_index].memory,
         /* Offset: */ 0,
         VK_WHOLE_SIZE,
         /* Flags: */ 0,
-        &mapped_uniform);
+        &mapped_uniform));
     etcopy_memory(mapped_uniform, &scene->data, sizeof(scene_data));
     vkUnmapMemory(state->device.handle, scene->scene_uniforms[state->frame_index].memory);
 
-    // Copy created draws over to the draws buffer for indirect drawing
-    // TODO: Stop draw count from going over the temporary max draw count value
-    u64 op_draws_size = sizeof(draw_command) * (scene->op_draws_count = dynarray_length(scene->opaque_draws));
-    u64 tp_draws_size = sizeof(draw_command) * (scene->tp_draws_count = dynarray_length(scene->transparent_draws));
+    // Copy created draws over to the draws buffer for indirect drawing:
+    scene->op_draws_count = dynarray_length(scene->opaque_draws);
+    scene->tp_draws_count = dynarray_length(scene->transparent_draws);
+    
+    // TEMP: Stop draw count from going over the maximum draws count allocated for the draws buffer
+    scene->op_draws_count = (scene->op_draws_count > MAX_DRAW_COMMANDS) ? MAX_DRAW_COMMANDS : scene->op_draws_count;
+    scene->tp_draws_count = (scene->tp_draws_count > MAX_DRAW_COMMANDS) ? MAX_DRAW_COMMANDS : scene->tp_draws_count;
+
+    u64 op_draws_size = sizeof(draw_command) * scene->op_draws_count;
+    u64 tp_draws_size = sizeof(draw_command) * scene->tp_draws_count;
     // TODO: END
 
     void* mapped_draws;
-    vkMapMemory(
+    VK_CHECK(vkMapMemory(
         state->device.handle,
         scene->draws_buffer[state->frame_index].memory,
         /* Offset: */ 0,
         op_draws_size + tp_draws_size,
         /* Flags: */ 0,
-        &mapped_draws);
+        &mapped_draws));
     etcopy_memory(mapped_draws, scene->opaque_draws, op_draws_size);
-    etcopy_memory((u8*)mapped_draws + op_draws_size, scene->opaque_draws, tp_draws_size);
+    etcopy_memory((u8*)mapped_draws + op_draws_size, scene->transparent_draws, tp_draws_size);
     vkUnmapMemory(state->device.handle, scene->draws_buffer[state->frame_index].memory);
 
-    // Clear draws after copied to draws buffer
+    // Clear draws after copied to draws buffer:
     dynarray_clear(scene->opaque_draws);
     dynarray_clear(scene->transparent_draws);
-    return false;
+    return true;
+}
+
+b8 scene_frame_begin_bindless(scene* scene, renderer_state* state) {
+    VkResult result;
+
+    // Wait for the current frame to end rendering by waiting on its render fence
+    result = vkWaitForFences(
+        state->device.handle,
+        /* Fence count: */ 1,
+        &state->render_fences[state->frame_index],
+        VK_TRUE,
+        1000000000);
+    VK_CHECK(result);
+    
+    descriptor_set_allocator_clear_pools(&state->frame_allocators[state->frame_index], state);
+
+    result = vkAcquireNextImageKHR(
+        state->device.handle,
+        state->swapchain,
+        0xFFFFFFFFFFFFFFFF,
+        state->swapchain_semaphores[state->frame_index],
+        VK_NULL_HANDLE,
+        &state->swapchain_index);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        VK_CHECK(vkDeviceWaitIdle(state->device.handle));
+        state->swapchain_dirty = false;
+        
+        // NOTE: VK_SUBOPTIMAL_KHR means an image will be successfully
+        // acquired. Signalling the semaphore current semaphore when it is. 
+        // This unsignals the semaphore by recreating it.
+        if (result == VK_SUBOPTIMAL_KHR) {
+            vkDestroySemaphore(
+                state->device.handle,
+                state->swapchain_semaphores[state->frame_index],
+                state->allocator);
+            VkSemaphoreCreateInfo info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+            vkCreateSemaphore(
+                state->device.handle,
+                &info,
+                state->allocator,
+                &state->swapchain_semaphores[state->frame_index]
+            );
+        }
+        recreate_swapchain(state);
+        return false;
+    } else VK_CHECK(result);
+
+    // Reset the render fence for reuse
+    VK_CHECK(vkResetFences(
+        state->device.handle,
+        /* Fence count: */ 1,
+        &state->render_fences[state->frame_index]
+    ));
+
+    VK_CHECK(vkResetCommandBuffer(state->main_graphics_command_buffers[state->frame_index], 0));
+    VkCommandBufferBeginInfo begin_info = init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+    VK_CHECK(vkBeginCommandBuffer(state->main_graphics_command_buffers[state->frame_index], &begin_info));
+    return true;
+}
+
+void draw_geometry(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
+    VkRenderingAttachmentInfo color_attachment = init_color_attachment_info(
+    state->render_image.view, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingAttachmentInfo depth_attachment = init_depth_attachment_info(
+        state->depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+    VkExtent2D render_extent = {.width = state->render_extent.width, .height = state->render_extent.height};
+    VkRenderingInfo render_info = init_rendering_info(render_extent, &color_attachment, &depth_attachment);
+
+    vkCmdBeginRendering(cmd, &render_info);
+
+    VkViewport viewport = {0};
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width = render_extent.width;
+    viewport.height = render_extent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor = {0};
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent.width = render_extent.width;
+    scissor.extent.height = render_extent.height;
+
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    VkDescriptorSet sets[] = {
+        scene->scene_sets[state->frame_index],
+        scene->material_set
+    };
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->opaque_pipeline);
+    
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->pipeline_layout, 0, 2, sets, 0, NULL);
+
+    struct push {
+        VkDeviceAddress vertex_buff;
+        VkDeviceAddress transform_buff;
+    } push = {
+        .vertex_buff = scene->vb_addr,
+        .transform_buff = scene->tb_addr,
+    };
+    vkCmdPushConstants(cmd, scene->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(struct push), &push);
+
+    vkCmdBindIndexBuffer(cmd, scene->index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdDrawIndexedIndirect(cmd, scene->draws_buffer[state->frame_index].handle, 0, scene->op_draws_count, sizeof(draw_command));
+
+    vkCmdEndRendering(cmd);
+}
+
+b8 scene_frame_end_bindless(scene* scene, renderer_state* state) {
+    VkResult result;
+    VkCommandBuffer frame_cmd = state->main_graphics_command_buffers[state->frame_index];
+
+    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+        VK_ACCESS_2_NONE, VK_ACCESS_2_SHADER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_NONE, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+
+    // TEMP: Hardcode Gradient compute
+    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.pipeline);
+
+    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.layout, 0, 1, &state->draw_image_descriptor_set, 0, 0);
+
+    compute_push_constants pc = {
+        .data1 = (v4s){1.0f, 0.0f, 0.0f, 1.0f},
+        .data2 = (v4s){0.0f, 0.0f, 1.0f, 1.0f}};
+
+    vkCmdPushConstants(frame_cmd, state->gradient_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compute_push_constants), &pc);
+
+    vkCmdDispatch(frame_cmd, ceil(state->render_extent.width / 16.0f), ceil(state->render_extent.height / 16.0f), 1);
+    // TEMP: END
+
+    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
+        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+    image_barrier(frame_cmd, state->depth_image.handle, state->depth_image.aspects,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
+
+    draw_geometry(state, scene, frame_cmd);
+
+    // Make render image optimal layout for transfer source to swapchain image
+    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
+
+    // Make swapchain image optimal for recieving render image data
+    image_barrier(frame_cmd, state->swapchain_images[state->swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_ACCESS_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
+
+    // Copy render image to swapchain image
+    blit_image2D_to_image2D(
+        frame_cmd,
+        state->render_image.handle,
+        state->swapchain_images[state->swapchain_index],
+        state->render_extent,
+        state->window_extent,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+
+    // Make swapchain image optimal for presentation
+    image_barrier(frame_cmd, state->swapchain_images[state->swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_NONE,
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
+
+    VK_CHECK(vkEndCommandBuffer(frame_cmd));
+
+    VkSemaphoreSubmitInfo wait_submit = init_semaphore_submit_info(
+        state->swapchain_semaphores[state->frame_index],
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
+
+    VkCommandBufferSubmitInfo cmd_submit = init_command_buffer_submit_info(frame_cmd);
+    
+    VkSemaphoreSubmitInfo signal_submit = init_semaphore_submit_info(
+        state->render_semaphores[state->frame_index],
+        VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT);
+
+    VkSubmitInfo2 submit_info = init_submit_info2(
+        1, &wait_submit,
+        1, &cmd_submit,
+        1, &signal_submit);
+    
+    result = vkQueueSubmit2(
+        state->device.graphics_queue, 
+        /* submitCount */ 1,
+        &submit_info,
+        state->render_fences[state->frame_index]);
+    VK_CHECK(result);
+
+    VkPresentInfoKHR present_info = {
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext = 0,
+        .swapchainCount = 1,
+        .pSwapchains = &state->swapchain,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = &state->render_semaphores[state->frame_index],
+        .pImageIndices = &state->swapchain_index};
+    result = vkQueuePresentKHR(state->device.present_queue, &present_info);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || state->swapchain_dirty) {
+        VK_CHECK(vkDeviceWaitIdle(state->device.handle));
+        state->swapchain_dirty = false;
+        recreate_swapchain(state);
+    } else VK_CHECK(result);
+
+    state->frame_index = (state->frame_index + 1) % state->image_count;
+    return true;
 }
 
 b8 scene_material_set_instance_bindless(scene* scene, material_pass pass_type, struct bindless_material_resources* resources) {

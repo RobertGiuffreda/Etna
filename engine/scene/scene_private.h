@@ -9,9 +9,7 @@
 #include "resources/resource_private.h"
 
 /** Checklist:
- * Write to image binding in scene descriptor sets
- * Write to material set at index material instance
- * 
+ * Bind opaque pipeline and test
  * Do non indirect version
  * 
  * Indirect:
@@ -26,6 +24,11 @@ typedef struct scene {
     char* name;
 
     // TEMP: Until bindless has taken over
+    u64 vertex_count;
+    vertex* vertices;
+    u64 index_count;
+    u32* indices;
+
     buffer index_buffer;
     buffer vertex_buffer;
     VkDeviceAddress vb_addr;    // Vertex buffer address
@@ -43,6 +46,11 @@ typedef struct scene {
     mesh_2* meshes;         // dynarray
     m4s* transforms;        // dynarray
     object* objects;        // dynarray
+
+    u64 surface_count;
+    u64 mesh_count;
+    u64 transform_count;
+    u64 object_count;
 
     // Bindless & indirect descriptor set layout is different so this is here until bindless takeover
     VkDescriptorSetLayout scene_layout;

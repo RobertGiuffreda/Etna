@@ -160,6 +160,7 @@ void reflect_block_variables(block_variable* block, SpvReflectBlockVariable* spv
     block->matrix.stride = spv_block->numeric.matrix.stride;
 
     block->array.dim_count = spv_block->array.dims_count;
+    block->array.stride = spv_block->array.stride;
     etcopy_memory(block->array.dim_lengths, spv_block->array.dims, sizeof(u32) * spv_block->array.dims_count);
 
     block->flags = convert_spv_reflect_type_flags(spv_block->type_description->type_flags);

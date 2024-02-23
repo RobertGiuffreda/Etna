@@ -79,6 +79,7 @@ struct block_variable {
     struct {
         u32 dim_count;
         u32 dim_lengths[32];
+        u32 stride;
     } array;
 
     type_flags flags;    

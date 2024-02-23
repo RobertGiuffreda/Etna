@@ -184,7 +184,10 @@ b8 initialize_swapchain(renderer_state* state) {
             state->device.handle,
             &view_cinfo,
             state->allocator,
-            &state->swapchain_image_views[i]));
+            &state->swapchain_image_views[i]
+        ));
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->swapchain_images[i], "Swapchain Image");
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE_VIEW, state->swapchain_image_views[i], "Swapchain Image View");
     }
     ETINFO("Swapchain image views created");
     return true;

@@ -101,7 +101,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
 
     u32 required_layer_count = 0;
     const char** required_layers = 0;
-
 #ifdef _DEBUG
     const char* layers[] = {
         "VK_LAYER_KHRONOS_validation",
@@ -235,6 +234,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &state->render_image);
     ETINFO("Render image created");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->render_image.handle, "Main render image");
 
     // Depth attachment
     VkImageUsageFlags depth_image_usages = {0};
@@ -248,6 +248,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &state->depth_image);
     ETINFO("Depth image created");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->depth_image.handle, "Main depth image");
 
     // Per frame initializations
     create_frame_command_structures(state);
@@ -447,7 +448,7 @@ b8 renderer_draw_frame(renderer_state* state) {
     // Make swapchain image optimal for presentation
     image_barrier(frame_cmd, state->swapchain_images[state->swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        VK_ACCESS_2_TRANSFER_READ_BIT, VK_ACCESS_2_NONE,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_NONE,
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
 
     VK_CHECK(vkEndCommandBuffer(frame_cmd));
@@ -956,6 +957,10 @@ void renderer_on_resize(renderer_state* state, i32 width, i32 height) {
     // state->window_extent.width = (u32)width;
     // state->window_extent.height = (u32)height;
     state->swapchain_dirty = true;
+}
+
+void renderer_bindless_toggle(renderer_state* state) {
+    vkDeviceWaitIdle(state->device.handle);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

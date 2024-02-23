@@ -70,6 +70,10 @@ b8 image2D_submit(image_manager* manager, image_config* config) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         new_image
     );
+    
+    SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE, new_image->handle, new_image->name);
+    SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE_VIEW, new_image->view, new_image->name);
+
     manager->image_count++;
     return true;
 }
