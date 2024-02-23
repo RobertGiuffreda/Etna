@@ -24,9 +24,6 @@ typedef struct engine_t {
 
     // HACK:TEMP: Proper scene management
     scene* main_scene;
-
-    b8 toggle_bindless;
-    b8 bindless;
     // HACK:TEMP: END
 
     u64 app_size;
@@ -56,9 +53,7 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
 
     engine = (engine_t*)etallocate(sizeof(engine_t), MEMORY_TAG_ENGINE);
     engine->is_running = false;
-    engine->bindless = true;
-    engine->toggle_bindless = false;
-
+    
     if (!logger_initialize()) {
         ETFATAL("Unable to initialize logger.");
         return false;
@@ -137,40 +132,29 @@ b8 engine_run(void) {
         if (!engine->is_minimized) {
             scene_update(engine->main_scene);
             engine->app_update(engine->app);
+            scene_draw_bindless(engine->main_scene);
+            if (scene_frame_begin_bindless(engine->main_scene, engine->renderer_state)) {
+                // TEMP: Very rough frame timing mechanism
+                clock_time(&engine->frame_clk);
+                clock_start(&engine->frame_clk);
+                // TEMP: END
 
-            if (engine->toggle_bindless) {
-                renderer_bindless_toggle(engine->renderer_state);
-                engine->toggle_bindless = false;
-                engine->bindless = !engine->bindless;
-                continue;
+                scene_render_bindless(engine->main_scene);
+
+                scene_render(engine->main_scene);
+                engine->app_render(engine->app);
+                scene_frame_end_bindless(engine->main_scene, engine->renderer_state);
             }
+            // if (renderer_prepare_frame(engine->renderer_state)) {
+            //     // TEMP: Very rough frame timing mechanism
+            //     clock_time(&engine->frame_clk);
+            //     clock_start(&engine->frame_clk);
+            //     // TEMP: END
 
-            if (engine->bindless) {
-                scene_draw_bindless(engine->main_scene);
-                if (scene_frame_begin_bindless(engine->main_scene, engine->renderer_state)) {
-                    // TEMP: Very rough frame timing mechanism
-                    clock_time(&engine->frame_clk);
-                    clock_start(&engine->frame_clk);
-                    // TEMP: END
-
-                    scene_render_bindless(engine->main_scene);
-
-                    scene_render(engine->main_scene);
-                    engine->app_render(engine->app);
-                    scene_frame_end_bindless(engine->main_scene, engine->renderer_state);
-                }
-            } else {
-                if (renderer_prepare_frame(engine->renderer_state)) {
-                    // TEMP: Very rough frame timing mechanism
-                    clock_time(&engine->frame_clk);
-                    clock_start(&engine->frame_clk);
-                    // TEMP: END
-
-                    scene_render(engine->main_scene);
-                    engine->app_render(engine->app);
-                    renderer_draw_frame(engine->renderer_state);
-                }
-            }
+            //     scene_render(engine->main_scene);
+            //     engine->app_render(engine->app);
+            //     renderer_draw_frame(engine->renderer_state);
+            // }
         }
 
         input_update(engine->input_state);
@@ -229,9 +213,6 @@ b8 engine_on_key_event(u16 event_code, void* engine_state, event_data data) {
         case KEY_F:
             // HACK: I'm sorry, this is awful. But I don't want to implement a GUI before I am ready
             ETINFO("Last frame time: %llf ms.", engine->frame_clk.elapsed * 1000);
-            break;
-        case KEY_B:
-            engine->toggle_bindless = true;
             break;
         default:
             break;

@@ -519,6 +519,8 @@ void scene_shutdown_bindless(scene* scene) {
     dynarray_destroy(scene->transforms);
     dynarray_destroy(scene->meshes);
     dynarray_destroy(scene->surfaces);
+    dynarray_destroy(scene->indices);
+    dynarray_destroy(scene->vertices);
 
     buffer_destroy(state, &scene->bindless_material_buffer);
     buffer_destroy(state, &scene->index_buffer);
@@ -569,10 +571,6 @@ void scene_draw_bindless(scene* scene) {
     for (u64 i = 0; i < object_count; ++i) {
         mesh_2 mesh = meshes[objects[i].mesh_index];
         for (u32 j = mesh.start_surface; j < mesh.start_surface + mesh.surface_count; ++j) {
-            ETASSERT(surfaces[j].start_index < scene->index_count && surfaces[j].start_index + surfaces[j].index_count <= scene->index_count);
-            for (u32 k = surfaces[j].start_index; k < surfaces[j].start_index + surfaces[j].index_count; ++k) {
-                ETASSERT(scene->indices[k] < scene->vertex_count);
-            }
             draw_command draw = {
                 .draw = {
                     .firstIndex = surfaces[j].start_index,
@@ -625,7 +623,7 @@ b8 scene_render_bindless(scene* scene) {
 
     u64 op_draws_size = sizeof(draw_command) * scene->op_draws_count;
     u64 tp_draws_size = sizeof(draw_command) * scene->tp_draws_count;
-    // TODO: END
+    // TEMP: END
 
     void* mapped_draws;
     VK_CHECK(vkMapMemory(

@@ -9,14 +9,18 @@
 #include "resources/resource_private.h"
 
 /** Checklist:
- * Bind opaque pipeline and test
- * Do non indirect version
+ * Buffer barrier in buffer_create_data maybe??.
  * 
- * Indirect:
- * Scene buffers
- * Draw buffers
+ * Refactor:
+ * renderer_static, scene_renderer, window, engine_core, scene
  * 
- * Indirect generated on GPU
+ * Image, Material, Surface, Mesh, Object, resource managers
+ * 
+ * Features:
+ * Create material blueprint from Shader reflection data taking into account bindless design.
+ * Sort calls by different blueprints and by transparency: Mesh contains index into surfaces for opaque surface and transparent surfaces
+ * Genuine Instancing - Hardcoded MAX instance amount for each mesh, controlls offsets into transform buffer.
+ * Indirect generated on GPU - Compute buffer to cull & sort by material blueprint & instance & generate draw calls
  * 
  */
 
@@ -36,7 +40,7 @@ typedef struct scene {
     VkDeviceAddress tb_addr;    // Transform buffer address
 
     // HACK: Create on fly just to see if shaders work??
-    buffer* draws_buffer;    // Perframe
+    buffer* draws_buffer;       // Perframe
     buffer* scene_uniforms;     // Perframe
     // HACK: END
 
