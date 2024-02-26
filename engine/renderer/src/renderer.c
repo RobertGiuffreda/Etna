@@ -42,9 +42,6 @@ static void destroy_frame_synchronization_structures(renderer_state* state);
 static void initialize_descriptors(renderer_state* state);
 static void shutdown_descriptors(renderer_state* state);
 
-static void create_scene_data_buffers(renderer_state* state);
-static void destroy_scene_data_buffers(renderer_state* state);
-
 // TEMP: Until Compute effects framework. Meaning post processing effect
 static b8 initialize_compute_effects(renderer_state* state);
 static void shutdown_compute_effects(renderer_state* state);
@@ -58,8 +55,6 @@ static void shutdown_default_material(renderer_state* state);
 static b8 initialize_default_data(renderer_state* state);
 static void shutdown_default_data(renderer_state* state);
 
-static void draw_geometry(renderer_state* state, VkCommandBuffer cmd);
-
 VkBool32 vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageTypes,
@@ -70,21 +65,18 @@ VkBool32 vk_debug_callback(
 // This is fine for now as a return value of false is unrecoverable.
 // But if there is a situation in the future where we run the function again to try again
 // then we will be leaking memory 
-b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, const char* application_name) {
+b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
     renderer_state* state = etallocate(sizeof(renderer_state), MEMORY_TAG_RENDERER);
     etzero_memory(state, sizeof(renderer_state));
     
     state->allocator = 0;
-    state->swapchain_dirty = false;
-    state->swapchain = VK_NULL_HANDLE;
-    state->frame_index = 0;
-    state->swapchain_index = 0;
+    state->swapchain.swapchain = VK_NULL_HANDLE;
 
     VkApplicationInfo app_cinfo = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pApplicationName = application_name,
+        .pApplicationName = config.app_name,
         .applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
-        .pEngineName = "Etna",
+        .pEngineName = config.engine_name,
         .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
         .apiVersion = VK_API_VERSION_1_3};
 
@@ -174,9 +166,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
     PFN_vkCreateDebugUtilsMessengerEXT pfnCreateDebugUtilsMessengerEXT =
         (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(state->instance, "vkCreateDebugUtilsMessengerEXT");
 
-    PFN_vkDestroyDebugUtilsMessengerEXT pfnDestroyDebugUtilsMessengerEXT =
-        (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(state->instance, "vkDestroyDebugUtilsMessengerEXT");
-
     // Function to set an objects debug name. For debugging
     state->vkSetDebugUtilsObjectNameEXT = 
         (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(state->instance, "vkSetDebugUtilsObjectNameEXT");
@@ -192,10 +181,11 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
         .pfnUserCallback = vk_debug_callback,
         .pUserData = NULL};
     VK_CHECK(pfnCreateDebugUtilsMessengerEXT(state->instance, &callback1, NULL, &state->debug_messenger));
-    ETINFO("Vulkan debug messenger created.");
+    ETDEBUG("Vulkan debug messenger created.");
 #endif
 
-    if (!window_create_vulkan_surface(state, window)) {
+    // NOTE: Remove references to surface & swapchain from code in this block
+    if (!window_create_vulkan_surface(state, config.window)) {
         ETFATAL("Error creation vulkan surface");
         return false;
     }
@@ -209,12 +199,12 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
     // TODO: state->window_extent should be set before the swapchain in case the 
     // swapchain current extent is 0xFFFFFFFF. Special value to say the app is in
     // control of the size 
-    initialize_swapchain(state);
+    initialize_swapchain(state, &state->swapchain);
 
     // TEMP: HACK: TODO: Make render image resolution configurable from engine & not the window_extent
     VkExtent3D render_resolution = {
-        .width = state->window_extent.width,
-        .height = state->window_extent.height,
+        .width = state->swapchain.image_extent.width,
+        .height = state->swapchain.image_extent.height,
         .depth = 1};
     state->render_extent = render_resolution;
 
@@ -255,8 +245,6 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
     ETINFO("Frame command structures created.");
     create_frame_synchronization_structures(state);
     ETINFO("Frame synchronization structures created.");
-    create_scene_data_buffers(state);
-    ETINFO("Frame scene data buffers created");
 
     initialize_descriptors(state);
     ETINFO("Descriptors Initialized.");
@@ -277,6 +265,7 @@ b8 renderer_initialize(renderer_state** out_state, struct etwindow_t* window, co
     }
 
     *out_state = state;
+    // NOTE: END (Remove surface & swapchain references)
     return true;
 }
 
@@ -291,9 +280,6 @@ void renderer_shutdown(renderer_state* state) {
     shutdown_compute_effects(state);
     ETINFO("Compute effects shutdown.");
 
-    destroy_scene_data_buffers(state);
-    ETINFO("Scene data buffers destroyed.");
-
     shutdown_descriptors(state);
     ETINFO("Descriptors shutdown.");
 
@@ -307,15 +293,12 @@ void renderer_shutdown(renderer_state* state) {
     image_destroy(state, &state->render_image);
     ETINFO("Rendering attachments (color, depth) destroyed.");
 
-    shutdown_swapchain(state);
+    shutdown_swapchain(state, &state->swapchain);
     ETINFO("Swapchain shutdown.");
 
     device_destroy(state, &state->device);
     ETINFO("Vulkan device destroyed");
     
-    vkDestroySurfaceKHR(state->instance, state->surface, state->allocator);
-    ETINFO("Vulkan surface destroyed");
-
 #ifdef _DEBUG
     PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT =
         (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(state->instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -330,185 +313,22 @@ void renderer_shutdown(renderer_state* state) {
     etfree(state, sizeof(renderer_state), MEMORY_TAG_RENDERER);
 }
 
-b8 renderer_prepare_frame(renderer_state* state) {
-    VkResult result;
-
-    // Wait for the current frame to end rendering by waiting on its render fence
-    result = vkWaitForFences(
-        state->device.handle,
-        /* Fence count: */ 1,
-        &state->render_fences[state->frame_index],
-        VK_TRUE,
-        1000000000);
-    VK_CHECK(result);
-    
-    descriptor_set_allocator_clear_pools(&state->frame_allocators[state->frame_index], state);
-
-    result = vkAcquireNextImageKHR(
-        state->device.handle,
-        state->swapchain,
-        0xFFFFFFFFFFFFFFFF,
-        state->swapchain_semaphores[state->frame_index],
-        VK_NULL_HANDLE,
-        &state->swapchain_index);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        VK_CHECK(vkDeviceWaitIdle(state->device.handle));
-        state->swapchain_dirty = false;
-        
-        // NOTE: VK_SUBOPTIMAL_KHR means an image will be successfully
-        // acquired. Signalling the semaphore current semaphore when it is. 
-        // This unsignals the semaphore by recreating it.
-        if (result == VK_SUBOPTIMAL_KHR) {
-            vkDestroySemaphore(
-                state->device.handle,
-                state->swapchain_semaphores[state->frame_index],
-                state->allocator);
-            VkSemaphoreCreateInfo info = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-            vkCreateSemaphore(
-                state->device.handle,
-                &info,
-                state->allocator,
-                &state->swapchain_semaphores[state->frame_index]
-            );
-        }
-        recreate_swapchain(state);
-        return false;
-    } else VK_CHECK(result);
-
-    // Reset the render fence for reuse
-    VK_CHECK(vkResetFences(
-        state->device.handle,
-        /* Fence count: */ 1,
-        &state->render_fences[state->frame_index]
-    ));
-
-    VK_CHECK(vkResetCommandBuffer(state->main_graphics_command_buffers[state->frame_index], 0));
-    VkCommandBufferBeginInfo begin_info = init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    VK_CHECK(vkBeginCommandBuffer(state->main_graphics_command_buffers[state->frame_index], &begin_info));
-    return true;
-}
-
-b8 renderer_draw_frame(renderer_state* state) {
-    VkResult result;
-
-    VkCommandBuffer frame_cmd = state->main_graphics_command_buffers[state->frame_index];
-
-    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-        VK_ACCESS_2_NONE, VK_ACCESS_2_SHADER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_NONE, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
-
-    // TEMP: Hardcode Gradient compute
-    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.pipeline);
-
-    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.layout, 0, 1, &state->draw_image_descriptor_set, 0, 0);
-
-    compute_push_constants pc = {
-        .data1 = (v4s){1.0f, 0.0f, 0.0f, 1.0f},
-        .data2 = (v4s){0.0f, 0.0f, 1.0f, 1.0f}};
-
-    vkCmdPushConstants(frame_cmd, state->gradient_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compute_push_constants), &pc);
-
-    vkCmdDispatch(frame_cmd, ceil(state->render_extent.width / 16.0f), ceil(state->render_extent.height / 16.0f), 1);
-    // TEMP: END
-
-    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
-
-    image_barrier(frame_cmd, state->depth_image.handle, state->depth_image.aspects,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-        VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
-
-    draw_geometry(state, frame_cmd);
-
-    // Make render image optimal layout for transfer source to swapchain image
-    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
-        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
-
-    // Make swapchain image optimal for recieving render image data
-    image_barrier(frame_cmd, state->swapchain_images[state->swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_ACCESS_NONE, VK_ACCESS_2_TRANSFER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
-
-    // Copy render image to swapchain image
-    blit_image2D_to_image2D(
-        frame_cmd,
-        state->render_image.handle,
-        state->swapchain_images[state->swapchain_index],
-        state->render_extent,
-        state->window_extent,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-
-    // Make swapchain image optimal for presentation
-    image_barrier(frame_cmd, state->swapchain_images[state->swapchain_index], VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_NONE,
-        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
-
-    VK_CHECK(vkEndCommandBuffer(frame_cmd));
-
-    VkSemaphoreSubmitInfo wait_submit = init_semaphore_submit_info(
-        state->swapchain_semaphores[state->frame_index],
-        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
-
-    VkCommandBufferSubmitInfo cmd_submit = init_command_buffer_submit_info(frame_cmd);
-    
-    VkSemaphoreSubmitInfo signal_submit = init_semaphore_submit_info(
-        state->render_semaphores[state->frame_index],
-        VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT);
-
-    VkSubmitInfo2 submit_info = init_submit_info2(
-        1, &wait_submit,
-        1, &cmd_submit,
-        1, &signal_submit);
-    
-    result = vkQueueSubmit2(
-        state->device.graphics_queue, 
-        /* submitCount */ 1,
-        &submit_info,
-        state->render_fences[state->frame_index]);
-    VK_CHECK(result);
-
-    VkPresentInfoKHR present_info = {
-        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-        .pNext = 0,
-        .swapchainCount = 1,
-        .pSwapchains = &state->swapchain,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &state->render_semaphores[state->frame_index],
-        .pImageIndices = &state->swapchain_index};
-    result = vkQueuePresentKHR(state->device.present_queue, &present_info);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || state->swapchain_dirty) {
-        VK_CHECK(vkDeviceWaitIdle(state->device.handle));
-        state->swapchain_dirty = false;
-        recreate_swapchain(state);
-    } else VK_CHECK(result);
-
-    state->frame_index = (state->frame_index + 1) % state->image_count;
-    return true;
-}
-
 static void create_frame_command_structures(renderer_state* state) {
     state->graphics_pools = (VkCommandPool*)etallocate(
-        sizeof(VkCommandPool) * state->image_count,
+        sizeof(VkCommandPool) * state->swapchain.image_count,
         MEMORY_TAG_RENDERER);
     state->main_graphics_command_buffers = (VkCommandBuffer*)etallocate(
-        sizeof(VkCommandBuffer) * state->image_count,
+        sizeof(VkCommandBuffer) * state->swapchain.image_count,
         MEMORY_TAG_RENDERER);
-    for (u32 i= 0; i < state->image_count; ++i) {
+    for (u32 i= 0; i < state->swapchain.image_count; ++i) {
         VkCommandPoolCreateInfo gpool_info = init_command_pool_create_info(
             VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
             state->device.graphics_qfi);
         VK_CHECK(vkCreateCommandPool(state->device.handle,
             &gpool_info,
             state->allocator,
-            &state->graphics_pools[i]));
+            &state->graphics_pools[i]
+        ));
         
         // Allocate one primary
         VkCommandBufferAllocateInfo command_buffer_alloc_info = init_command_buffer_allocate_info(
@@ -516,7 +336,8 @@ static void create_frame_command_structures(renderer_state* state) {
         VK_CHECK(vkAllocateCommandBuffers(
             state->device.handle,
             &command_buffer_alloc_info,
-            &state->main_graphics_command_buffers[i]));
+            &state->main_graphics_command_buffers[i]
+        ));
     }
     // Immediate command pool & buffer
     VkCommandPoolCreateInfo imm_pool_info = init_command_pool_create_info(
@@ -539,7 +360,7 @@ static void create_frame_command_structures(renderer_state* state) {
 static void destroy_frame_command_structures(renderer_state* state) {
     // NOTE: Command buffers do not have to be freed to destroy the
     // associated command pool
-    for (u32 i = 0; i < state->image_count; ++i) {
+    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
         vkDestroyCommandPool(
             state->device.handle,
             state->graphics_pools[i],
@@ -547,10 +368,10 @@ static void destroy_frame_command_structures(renderer_state* state) {
         );
     }
     etfree(state->main_graphics_command_buffers,
-        sizeof(VkCommandBuffer) * state->image_count,
+        sizeof(VkCommandBuffer) * state->swapchain.image_count,
         MEMORY_TAG_RENDERER);
     etfree(state->graphics_pools,
-        sizeof(VkCommandPool) * state->image_count,
+        sizeof(VkCommandPool) * state->swapchain.image_count,
         MEMORY_TAG_RENDERER
     );
 
@@ -558,39 +379,20 @@ static void destroy_frame_command_structures(renderer_state* state) {
 }
 
 static void create_frame_synchronization_structures(renderer_state* state) {
-    state->swapchain_semaphores = (VkSemaphore*)etallocate(
-        sizeof(VkSemaphore) * state->image_count,
-        MEMORY_TAG_RENDERER);
-    state->render_semaphores = (VkSemaphore*)etallocate(
-        sizeof(VkSemaphore) * state->image_count,
-        MEMORY_TAG_RENDERER);
-    state->render_fences = (VkFence*)etallocate(
-        sizeof(VkFence) * state->image_count,
-        MEMORY_TAG_RENDERER);
-
-    VkSemaphoreCreateInfo semaphore_info = init_semaphore_create_info(0);
+    state->render_fences = etallocate(
+        sizeof(VkFence) * state->swapchain.image_count,
+        MEMORY_TAG_RENDERER
+    );
     VkFenceCreateInfo fence_info = init_fence_create_info(
-        VK_FENCE_CREATE_SIGNALED_BIT);
+        VK_FENCE_CREATE_SIGNALED_BIT
+    );
     
-    for (u32 i = 0; i < state->image_count; ++i) {
-        VK_CHECK(vkCreateSemaphore(
-            state->device.handle,
-            &semaphore_info,
-            state->allocator,
-            &state->swapchain_semaphores[i]));
-        const char swap_sem_name[] = "Swapchain semaphore";
-        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_SEMAPHORE, state->swapchain_semaphores[i], swap_sem_name);
-        VK_CHECK(vkCreateSemaphore(
-            state->device.handle, 
-            &semaphore_info, 
-            state->allocator, 
-            &state->render_semaphores[i]));
-        const char rend_sem_name[] = "Render semaphore";
-        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_SEMAPHORE, state->render_semaphores[i], rend_sem_name);
+    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
         VK_CHECK(vkCreateFence(state->device.handle,
             &fence_info,
             state->allocator,
-            &state->render_fences[i]));
+            &state->render_fences[i]
+        ));
     }
 
     // Create fence for synchronizing immediate command buffer submissions
@@ -598,29 +400,17 @@ static void create_frame_synchronization_structures(renderer_state* state) {
 }
 
 static void destroy_frame_synchronization_structures(renderer_state* state) {
-    for (u32 i = 0; i < state->image_count; ++i) {
-        vkDestroySemaphore(
-            state->device.handle,
-            state->swapchain_semaphores[i],
-            state->allocator);
-        vkDestroySemaphore(
-            state->device.handle,
-            state->render_semaphores[i],
-            state->allocator);
+    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
         vkDestroyFence(
             state->device.handle,
             state->render_fences[i],
-            state->allocator);
+            state->allocator
+        );
     }
-    etfree(state->swapchain_semaphores,
-        sizeof(VkSemaphore) * state->image_count,
-        MEMORY_TAG_RENDERER);
-    etfree(state->render_semaphores,
-        sizeof(VkSemaphore) * state->image_count,
-        MEMORY_TAG_RENDERER);
     etfree(state->render_fences,
-        sizeof(VkFence) * state->image_count,
-        MEMORY_TAG_RENDERER);
+        sizeof(VkFence) * state->swapchain.image_count,
+        MEMORY_TAG_RENDERER
+    );
 
     // Destroy fence for synchronizing the immediate command buffer
     vkDestroyFence(state->device.handle, state->imm_fence, state->allocator); 
@@ -649,54 +439,15 @@ static void initialize_descriptors(renderer_state* state) {
     descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
     state->scene_data_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
     descriptor_set_layout_builder_destroy(&dsl_builder);
-
-    pool_size_ratio frame_ratios[] = {
-        { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 3},
-        { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .ratio = 3},
-        { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 3},
-        { .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .ratio = 3}};
-    state->frame_allocators = etallocate(sizeof(ds_allocator) * state->image_count, MEMORY_TAG_RENDERER);
-    for (u32 i = 0; i < state->image_count; ++i) {
-        descriptor_set_allocator_initialize(&state->frame_allocators[i], 1000, 4, frame_ratios, state);
-    }
-
     ETINFO("Descriptors Initialized");
 }
 
 // TODO: Should be reverse order of creation just for uniformity
 static void shutdown_descriptors(renderer_state* state) {
     descriptor_set_allocator_shutdown(&state->global_ds_allocator, state);
-
     vkDestroyDescriptorSetLayout(state->device.handle, state->scene_data_descriptor_set_layout, state->allocator);
-
     vkDestroyDescriptorSetLayout(state->device.handle, state->draw_image_descriptor_set_layout, state->allocator);
-
-    for (u32 i = 0; i < state->image_count; ++i) {
-        descriptor_set_allocator_shutdown(&state->frame_allocators[i], state);
-    }
-    etfree(state->frame_allocators, sizeof(ds_allocator) * state->image_count, MEMORY_TAG_RENDERER);
-
     ETINFO("Descriptors shutdown");
-}
-
-static void create_scene_data_buffers(renderer_state* state) {
-    state->scene_data = etallocate(sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
-    for (u32 i = 0; i < state->image_count; ++i) {
-        buffer_create(
-            state,
-            sizeof(scene_data),
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            &state->scene_data[i]
-        );
-    }
-}
-
-static void destroy_scene_data_buffers(renderer_state* state) {
-    for (u32 i = 0; i < state->image_count; ++i) {
-        buffer_destroy(state, &state->scene_data[i]);
-    }
-    etfree(state->scene_data, sizeof(buffer) * state->image_count, MEMORY_TAG_RENDERER);
 }
 
 static b8 initialize_compute_effects(renderer_state* state) {
@@ -843,17 +594,10 @@ static b8 initialize_default_data(renderer_state* state) {
     mat_resources.data_buffer_offset = 0;
 
     state->default_material_instance = GLTF_MR_create_instance(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
-
-    // Create a dynarray to store the draw context surface render objects
-    state->main_draw_context.opaque_surfaces = dynarray_create(0, sizeof(render_object));
-    state->main_draw_context.transparent_surfaces = dynarray_create(0, sizeof(render_object));
     return true;
 }
 
 static void shutdown_default_data(renderer_state* state) {
-    dynarray_destroy(state->main_draw_context.transparent_surfaces);
-    dynarray_destroy(state->main_draw_context.opaque_surfaces);
-
     buffer_destroy(state, &state->default_material_constants);
 
     vkDestroySampler(state->device.handle, state->default_sampler_linear, state->allocator);
@@ -863,104 +607,6 @@ static void shutdown_default_data(renderer_state* state) {
     image_destroy(state, &state->black_image);
     image_destroy(state, &state->grey_image);
     image_destroy(state, &state->white_image);
-}
-
-static void draw_geometry(renderer_state* state, VkCommandBuffer cmd) {
-    VkRenderingAttachmentInfo color_attachment = init_color_attachment_info(
-        state->render_image.view, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    VkRenderingAttachmentInfo depth_attachment = init_depth_attachment_info(
-        state->depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-
-    VkExtent2D render_extent = {.width = state->render_extent.width, .height = state->render_extent.height};
-    VkRenderingInfo render_info = init_rendering_info(render_extent, &color_attachment, &depth_attachment);
-
-    vkCmdBeginRendering(cmd, &render_info);
-
-    VkViewport viewport = {0};
-    viewport.x = 0;
-    viewport.y = 0;
-    viewport.width = render_extent.width;
-    viewport.height = render_extent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    vkCmdSetViewport(cmd, 0, 1, &viewport);
-
-    VkRect2D scissor = {0};
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    scissor.extent.width = render_extent.width;
-    scissor.extent.height = render_extent.height;
-
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-    VkDescriptorSet scene_descriptor_set = descriptor_set_allocator_allocate(
-        &state->frame_allocators[state->frame_index],
-        state->scene_data_descriptor_set_layout,
-        state);
-    
-    ds_writer writer = descriptor_set_writer_create_initialize();
-    descriptor_set_writer_write_buffer(
-        &writer,
-        /* Binding: */ 0,
-        state->scene_data[state->frame_index].handle,
-        sizeof(scene_data),
-        /* Offset: */ 0,
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    descriptor_set_writer_update_set(&writer, scene_descriptor_set, state);
-    descriptor_set_writer_shutdown(&writer);
-
-    // TODO: record draw commands for transparent surfaces
-    for (u32 i = 0; i < dynarray_length(state->main_draw_context.opaque_surfaces); ++i) {
-        render_object* draw = &state->main_draw_context.opaque_surfaces[i];
-
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->pipeline.pipeline);
-
-        // Scene data/Global data descriptor set binding
-        vkCmdBindDescriptorSets(cmd,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            draw->pipeline.layout, 
-            /* First Set: */ 0,
-            /* Descriptor Set Count: */ 1,
-            &scene_descriptor_set,
-            /* Dynamic offset count: */ 0,
-            /* Dynamic offsets: */ 0);
-
-        // Material descriptor set binding
-        vkCmdBindDescriptorSets(cmd,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            draw->pipeline.layout,
-            /* First Set: */ 1,
-            /* Descriptor Set Count: */ 1,
-            &draw->material_set,
-            /* Dynamic offset count: */ 0,
-            /* Dynamic offsets: */ 0);
-        
-        vkCmdBindIndexBuffer(cmd, draw->index_buffer, 0, VK_INDEX_TYPE_UINT32);
-
-        gpu_draw_push_constants push_constants = {
-            .vertex_buffer = draw->vertex_buffer_address,
-            .render_matrix = draw->transform};
-        vkCmdPushConstants(cmd, draw->pipeline.layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(gpu_draw_push_constants), &push_constants);
-
-        vkCmdDrawIndexed(cmd, draw->index_count, 1, draw->first_index, 0, 0);
-    }
-
-    vkCmdEndRendering(cmd);
-
-    // Clear the renderer draw commands for the next frame  
-    dynarray_clear(state->main_draw_context.opaque_surfaces);
-    dynarray_clear(state->main_draw_context.transparent_surfaces);
-}
-
-void renderer_on_resize(renderer_state* state, i32 width, i32 height) {
-    // state->window_extent.width = (u32)width;
-    // state->window_extent.height = (u32)height;
-    state->swapchain_dirty = true;
-}
-
-void renderer_bindless_toggle(renderer_state* state) {
-    vkDeviceWaitIdle(state->device.handle);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

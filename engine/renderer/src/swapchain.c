@@ -1,28 +1,29 @@
 #include "swapchain.h"
 
 #include "data_structures/dynarray.h"
-
-#include "memory/etmemory.h"
 #include "core/logger.h"
-
+#include "memory/etmemory.h"
 #include "renderer/src/renderer.h"
 
-b8 initialize_swapchain(renderer_state* state) {
+b8 initialize_swapchain(renderer_state* state, swapchain* swapchain) {
     // Surface format detection & selection
     VkFormat image_format;
     VkColorSpaceKHR color_space;
+
+    swapchain->image_index = 0;
+    swapchain->frame_index = 0;
     
     u32 format_count = 0;
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
         state->device.gpu,
-        state->surface,
+        swapchain->surface,
         &format_count,
         0));
     // TODO: Change from dynarray to regular allocation
     VkSurfaceFormatKHR* formats = dynarray_create(format_count, sizeof(VkSurfaceFormatKHR));
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
         state->device.gpu,
-        state->surface,
+        swapchain->surface,
         &format_count,
         formats));
 
@@ -47,13 +48,13 @@ b8 initialize_swapchain(renderer_state* state) {
     VkSurfaceCapabilitiesKHR surface_capabilities;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
         state->device.gpu,
-        state->surface,
+        swapchain->surface,
         &surface_capabilities));
 
     VkExtent2D swapchain_extent;
     if (surface_capabilities.currentExtent.width == 0xFFFFFFFF) {
-        swapchain_extent.width = state->window_extent.width;
-        swapchain_extent.height = state->window_extent.height;
+        swapchain_extent.width = swapchain->image_extent.width;
+        swapchain_extent.height = swapchain->image_extent.height;
     } else {
         swapchain_extent = surface_capabilities.currentExtent;
     }
@@ -72,9 +73,9 @@ b8 initialize_swapchain(renderer_state* state) {
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
     u32 swapchain_image_count = surface_capabilities.minImageCount + 1;
-    if ((surface_capabilities.maxImageCount > 0) &&
-        (swapchain_image_count > surface_capabilities.maxImageCount))
-    {
+    if (surface_capabilities.maxImageCount > 0 &&
+        swapchain_image_count > surface_capabilities.maxImageCount
+    ) {
         // Cannot go over max amount of images for swapchain
         swapchain_image_count = surface_capabilities.minImageCount;
     }
@@ -106,7 +107,7 @@ b8 initialize_swapchain(renderer_state* state) {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .pNext = 0,
         .flags = 0,
-        .surface = state->surface,
+        .surface = swapchain->surface,
         .minImageCount = swapchain_image_count,
         .imageFormat = image_format,
         .imageColorSpace = color_space,
@@ -138,41 +139,41 @@ b8 initialize_swapchain(renderer_state* state) {
         state->device.handle,
         &swapchain_cinfo,
         state->allocator,
-        &state->swapchain));
+        &swapchain->swapchain));
     ETINFO("Vulkan Swapchain intialized.");
 
-    state->window_extent.width = swapchain_extent.width;
-    state->window_extent.height = swapchain_extent.height;
-    state->window_extent.depth = 1;
-    state->swapchain_image_format = image_format;
+    swapchain->image_extent.width = swapchain_extent.width;
+    swapchain->image_extent.height = swapchain_extent.height;
+    swapchain->image_extent.depth = 1;
+    swapchain->image_format = image_format;
 
     // Allocate memory for swapchain image handles and swapchain 
     // image view handles. Fetch swapchain images
     VK_CHECK(vkGetSwapchainImagesKHR(
         state->device.handle,
-        state->swapchain,
-        &state->image_count,
+        swapchain->swapchain,
+        &swapchain->image_count,
         0));
-    state->swapchain_images = (VkImage*)etallocate(
-        sizeof(VkImage) * state->image_count,
-        MEMORY_TAG_RENDERER);
-    state->swapchain_image_views = (VkImageView*)etallocate(
-        sizeof(VkImageView) * state->image_count,
-        MEMORY_TAG_RENDERER);
+    swapchain->images = etallocate(
+        sizeof(VkImage) * swapchain->image_count,
+        MEMORY_TAG_SWAPCHAIN);
+    swapchain->views = etallocate(
+        sizeof(VkImageView) * swapchain->image_count,
+        MEMORY_TAG_SWAPCHAIN);
     VK_CHECK(vkGetSwapchainImagesKHR(
         state->device.handle,
-        state->swapchain,
-        &state->image_count,
-        state->swapchain_images));
+        swapchain->swapchain,
+        &swapchain->image_count,
+        swapchain->images));
     ETINFO("Swapchain images retrieved.");
 
     // Create swapchain image views
-    for (u32 i = 0; i < state->image_count; i++) {
+    for (u32 i = 0; i < swapchain->image_count; i++) {
         VkImageViewCreateInfo view_cinfo = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = state->swapchain_image_format,
-            .image = state->swapchain_images[i],
+            .format = swapchain->image_format,
+            .image = swapchain->images[i],
             .subresourceRange.levelCount = 1,
             .subresourceRange.layerCount = 1,
             .subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -184,44 +185,84 @@ b8 initialize_swapchain(renderer_state* state) {
             state->device.handle,
             &view_cinfo,
             state->allocator,
-            &state->swapchain_image_views[i]
+            &swapchain->views[i]
         ));
-        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->swapchain_images[i], "Swapchain Image");
-        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE_VIEW, state->swapchain_image_views[i], "Swapchain Image View");
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, swapchain->images[i], "Swapchain Image");
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE_VIEW, swapchain->views[i], "Swapchain Image View");
     }
     ETINFO("Swapchain image views created");
+
+    // Create image_acquire semaphores and image_present semaphores
+    // TODO: If image count is different, recreate these in recreate swapchain
+    swapchain->image_acquired = etallocate(
+        sizeof(VkSemaphore) * swapchain->image_count,
+        MEMORY_TAG_SWAPCHAIN);
+    swapchain->image_present = etallocate(
+        sizeof(VkSemaphore) * swapchain->image_count,
+        MEMORY_TAG_SWAPCHAIN);
+    VkSemaphoreCreateInfo semaphore_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = 0,
+        .flags = 0};
+    for (u32 i = 0; i < swapchain->image_count; ++i) {
+        VK_CHECK(vkCreateSemaphore(
+            state->device.handle,
+            &semaphore_info,
+            state->allocator,
+            &swapchain->image_acquired[i]));
+        const char acquire_sem[] = "Swapchain semaphore";
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_SEMAPHORE, swapchain->image_acquired[i], acquire_sem);
+        VK_CHECK(vkCreateSemaphore(
+            state->device.handle, 
+            &semaphore_info, 
+            state->allocator, 
+            &swapchain->image_present[i]));
+        const char present_sem[] = "Render semaphore";
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_SEMAPHORE, swapchain->image_present[i], present_sem);
+    }
     return true;
 }
 
-void shutdown_swapchain(renderer_state* state) {
-    for (u32 i = 0; i < state->image_count; ++i) {
+void shutdown_swapchain(renderer_state* state, swapchain* swapchain) {
+    for (u32 i = 0; i < swapchain->image_count; ++i) {
         vkDestroyImageView(
             state->device.handle,
-            state->swapchain_image_views[i],
-            state->allocator);
+            swapchain->views[i],
+            state->allocator
+        );
+        vkDestroySemaphore(state->device.handle, swapchain->image_acquired[i], state->allocator);
+        vkDestroySemaphore(state->device.handle, swapchain->image_present[i], state->allocator);
     }
-    vkDestroySwapchainKHR(state->device.handle, state->swapchain, state->allocator);
-
-    etfree(state->swapchain_image_views,
-        sizeof(VkImageView) * state->image_count,
-        MEMORY_TAG_RENDERER);
-    etfree(state->swapchain_images,
-        sizeof(VkImage) * state->image_count,
-        MEMORY_TAG_RENDERER);
+    vkDestroySwapchainKHR(state->device.handle, swapchain->swapchain, state->allocator);
+    vkDestroySurfaceKHR(state->instance, swapchain->surface, state->allocator);
+    etfree(swapchain->views,
+        sizeof(VkImageView) * swapchain->image_count,
+        MEMORY_TAG_SWAPCHAIN);
+    etfree(swapchain->images,
+        sizeof(VkImage) * swapchain->image_count,
+        MEMORY_TAG_SWAPCHAIN);
+    etfree(swapchain->image_acquired,
+        sizeof(VkSemaphore) * swapchain->image_count,
+        MEMORY_TAG_SWAPCHAIN);
+    etfree(swapchain->image_present,
+        sizeof(VkSemaphore) * swapchain->image_count,
+        MEMORY_TAG_SWAPCHAIN
+    );
 }
 
 // TODO: Linear allocator for the swapchain images and views equal to the max number of images
-void recreate_swapchain(renderer_state* state) {
+void recreate_swapchain(renderer_state* state, swapchain* swapchain) {
     // Destroy the old swapchains image views
-    for (u32 i = 0; i < state->image_count; ++i) {
+    for (u32 i = 0; i < swapchain->image_count; ++i) {
         vkDestroyImageView(
             state->device.handle,
-            state->swapchain_image_views[i],
-            state->allocator);
+            swapchain->views[i],
+            state->allocator
+        );
     }
     // Record old swapchain information
-    VkSwapchainKHR old_swapchain = state->swapchain;
-    u32 old_image_count = state->image_count;
+    VkSwapchainKHR old_swapchain = swapchain->swapchain;
+    u32 old_image_count = swapchain->image_count;
 
     // Surface format detection & selection
     VkFormat image_format;
@@ -230,14 +271,14 @@ void recreate_swapchain(renderer_state* state) {
     u32 format_count = 0;
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
         state->device.gpu,
-        state->surface,
+        swapchain->surface,
         &format_count,
         0));
     // TODO: Change from dynarray to regular allocation
     VkSurfaceFormatKHR* formats = dynarray_create(format_count, sizeof(VkSurfaceFormatKHR));
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
         state->device.gpu,
-        state->surface,
+        swapchain->surface,
         &format_count,
         formats));
 
@@ -262,13 +303,13 @@ void recreate_swapchain(renderer_state* state) {
     VkSurfaceCapabilitiesKHR surface_capabilities;
     VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
         state->device.gpu,
-        state->surface,
+        swapchain->surface,
         &surface_capabilities));
 
     VkExtent2D swapchain_extent;
     if (surface_capabilities.currentExtent.width == 0xFFFFFFFF) {
-        swapchain_extent.width = state->window_extent.width;
-        swapchain_extent.height = state->window_extent.height;
+        swapchain_extent.width = swapchain->image_extent.width;
+        swapchain_extent.height = swapchain->image_extent.height;
     } else {
         swapchain_extent = surface_capabilities.currentExtent;
     }
@@ -287,9 +328,9 @@ void recreate_swapchain(renderer_state* state) {
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
     u32 swapchain_image_count = surface_capabilities.minImageCount + 1;
-    if ((surface_capabilities.maxImageCount > 0) &&
-        (swapchain_image_count > surface_capabilities.maxImageCount))
-    {
+    if (surface_capabilities.maxImageCount > 0 &&
+        swapchain_image_count > surface_capabilities.maxImageCount
+    ) {
         // Cannot go over max amount of images for swapchain
         swapchain_image_count = surface_capabilities.maxImageCount;
     }
@@ -321,7 +362,7 @@ void recreate_swapchain(renderer_state* state) {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .pNext = 0,
         .flags = 0,
-        .surface = state->surface,
+        .surface = swapchain->surface,
         .minImageCount = swapchain_image_count,
         .imageFormat = image_format,
         .imageColorSpace = color_space,
@@ -353,12 +394,12 @@ void recreate_swapchain(renderer_state* state) {
         state->device.handle,
         &swapchain_cinfo,
         state->allocator,
-        &state->swapchain));
+        &swapchain->swapchain));
 
-    state->window_extent.width = swapchain_extent.width;
-    state->window_extent.height = swapchain_extent.height;
-    state->window_extent.depth = 1;
-    state->swapchain_image_format = image_format;
+    swapchain->image_extent.width = swapchain_extent.width;
+    swapchain->image_extent.height = swapchain_extent.height;
+    swapchain->image_extent.depth = 1;
+    swapchain->image_format = image_format;
 
     // Destroy the old swapchain
     vkDestroySwapchainKHR(state->device.handle, old_swapchain, state->allocator);
@@ -367,43 +408,44 @@ void recreate_swapchain(renderer_state* state) {
     // image view handles. Fetch swapchain images
     VK_CHECK(vkGetSwapchainImagesKHR(
         state->device.handle,
-        state->swapchain,
-        &state->image_count,
+        swapchain->swapchain,
+        &swapchain->image_count,
         0));
     // Reallocate memory if the image count is different
-    if (old_image_count != state->image_count) {
+    if (old_image_count != swapchain->image_count) {
         // Reallocate memory for swapchain images
-        etfree(state->swapchain_images,
+        etfree(swapchain->images,
             sizeof(VkImage) * old_image_count,
-            MEMORY_TAG_RENDERER
+            MEMORY_TAG_SWAPCHAIN
         );
-        state->swapchain_images = (VkImage*)etallocate(
-            sizeof(VkImage) * state->image_count,
-            MEMORY_TAG_RENDERER
+        swapchain->images = etallocate(
+            sizeof(VkImage) * swapchain->image_count,
+            MEMORY_TAG_SWAPCHAIN
         );
         // Reallocate memory for swapchain image views
-        etfree(state->swapchain_image_views,
+        etfree(swapchain->views,
             sizeof(VkImageView) * old_image_count,
-            MEMORY_TAG_RENDERER
+            MEMORY_TAG_SWAPCHAIN
         );
-        state->swapchain_image_views = (VkImageView*)etallocate(
-            sizeof(VkImageView) * state->image_count,
-            MEMORY_TAG_RENDERER
+        swapchain->views = etallocate(
+            sizeof(VkImageView) * swapchain->image_count,
+            MEMORY_TAG_SWAPCHAIN
         );
     }
     VK_CHECK(vkGetSwapchainImagesKHR(
         state->device.handle,
-        state->swapchain,
-        &state->image_count,
-        state->swapchain_images));
+        swapchain->swapchain,
+        &swapchain->image_count,
+        swapchain->images
+    ));
 
     // Create swapchain image views
-    for (u32 i = 0; i < state->image_count; i++) {
+    for (u32 i = 0; i < swapchain->image_count; i++) {
         VkImageViewCreateInfo view_cinfo = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = state->swapchain_image_format,
-            .image = state->swapchain_images[i],
+            .format = swapchain->image_format,
+            .image = swapchain->images[i],
             .subresourceRange.levelCount = 1,
             .subresourceRange.layerCount = 1,
             .subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -415,6 +457,7 @@ void recreate_swapchain(renderer_state* state) {
             state->device.handle,
             &view_cinfo,
             state->allocator,
-            &state->swapchain_image_views[i]));
+            &swapchain->views[i]
+        ));
     }
 }

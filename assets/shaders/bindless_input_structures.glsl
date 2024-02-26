@@ -47,7 +47,7 @@ struct draw_command {
 	uint first_instance;
 
 	uint material_id;
-	uint transform_id;
+	uint transform_offset;
 	uint padd;
 };
 layout(std430, set = 0, binding = 1) readonly buffer draw_commands {

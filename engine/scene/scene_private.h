@@ -9,18 +9,23 @@
 #include "resources/resource_private.h"
 
 /** Checklist:
- * Buffer barrier in buffer_create_data maybe??.
+ * Parent child relationship between objects/transforms to make scene graph.
+ * (Double Ended Queue / Ring queue) for traversing the scene graph 
  * 
- * Refactor:
- * renderer_static, scene_renderer, window, engine_core, scene
+ * Use vertex offset to differentiate meshes in the vertex buffer so that index buffer can be stored normally
+ * 
+ * Refactor: 
+ * renderer_static: contains static state for renderer instance.
+ * scene --> 
  * 
  * Image, Material, Surface, Mesh, Object, resource managers
  * 
+ * 
  * Features:
  * Create material blueprint from Shader reflection data taking into account bindless design.
- * Sort calls by different blueprints and by transparency: Mesh contains index into surfaces for opaque surface and transparent surfaces
+ * Sort calls by different blueprints and by transparency: Mesh contains index into surfaces for opaque surface and transparent surfaces.
  * Genuine Instancing - Hardcoded MAX instance amount for each mesh, controlls offsets into transform buffer.
- * Indirect generated on GPU - Compute buffer to cull & sort by material blueprint & instance & generate draw calls
+ * Indirect generated on GPU - Compute buffer to cull & sort by material blueprint & instance & generate draw calls.
  * 
  */
 
@@ -29,20 +34,19 @@ typedef struct scene {
 
     // TEMP: Until bindless has taken over
     u64 vertex_count;
-    vertex* vertices;
     u64 index_count;
+    vertex* vertices;
     u32* indices;
 
     buffer index_buffer;
     buffer vertex_buffer;
     VkDeviceAddress vb_addr;    // Vertex buffer address
-    buffer transform_buffer;
-    VkDeviceAddress tb_addr;    // Transform buffer address
 
-    // HACK: Create on fly just to see if shaders work??
-    buffer* draws_buffer;       // Perframe
+    buffer transform_buffer;
+    VkDeviceAddress tb_addr;
+
+    buffer* draw_buffers;       // Perframe
     buffer* scene_uniforms;     // Perframe
-    // HACK: END
 
     buffer bindless_material_buffer;
 
@@ -56,13 +60,12 @@ typedef struct scene {
     u64 transform_count;
     u64 object_count;
 
-    // Bindless & indirect descriptor set layout is different so this is here until bindless takeover
+    // NOTE: PSOs must implement SET 0 to match this layout & retrieve the information
     VkDescriptorSetLayout scene_layout;
-    VkDescriptorSet* scene_sets;    // Per frame
-
+    VkDescriptorSet* scene_sets;
     VkPushConstantRange push_constant;
 
-    // Material blueprint(one uber shader) information for bindless instances:
+    // TODO: Material manager bindless & support for multiple PSOs.
     VkPipeline opaque_pipeline;
     VkPipeline transparent_pipeline;
     VkPipelineLayout pipeline_layout;
@@ -72,10 +75,9 @@ typedef struct scene {
 
     material_2 materials[MAX_MATERIAL_COUNT];
     u32 material_count;
+    // TODO: END
     
-    // TEMP: Hardcoded for now, rework when materials get abstraction back
     VkDescriptorPool bindless_pool;
-    // TEMP: END
 
     // Draw commands for indirect bindless.
     u64 op_draws_count;
@@ -85,21 +87,24 @@ typedef struct scene {
     draw_command* transparent_draws;
     // TEMP: END
 
-    image_manager* image_bank;
-    material_manager* material_bank;
-    mesh_manager* mesh_bank;
-
-    node** top_nodes;
-    u32 top_node_count;
-
     camera cam;
     scene_data data;
 
-    // TEMP: Leftovers from loaded_gltf not refactored out yet
-    mesh_node* mesh_nodes;
-    u32 mesh_node_count;
+    // TODO: Update to current GPU Driven architecture
+    image_manager* image_bank;
+    material_manager* material_bank;
+    mesh_manager* mesh_bank;
+    // TODO: END
+
+    // TODO: Delete node structure and replace with transform hierarchy
+    node** top_nodes;
+    u32 top_node_count;
+
     node* nodes;
     u32 node_count;
+    mesh_node* mesh_nodes;
+    u32 mesh_node_count;
+    // TODO: END
 
     // TODO: Put all sampler combos into renderer_state as
     // defaults to avoid having them here. 
@@ -111,13 +116,12 @@ typedef struct scene {
     buffer material_buffer;
     // TODO: END
 
-    // TEMP: END
     renderer_state* state;
 } scene;
 
-// TEMP: Bindless testing. Jank
-b8 scene_material_set_instance_bindless(scene* scene, material_pass pass_type, struct bindless_material_resources* resources);
-material_2 scene_material_get_instance_bindless(scene* scene, material_id id);
+// TEMP: Bindless testing
+b8 scene_material_set_instance(scene* scene, material_pass pass_type, struct bindless_material_resources* resources);
+material_2 scene_material_get_instance(scene* scene, material_id id);
 
-void scene_image_set_bindless(scene* scene, u32 img_id, u32 sampler_id);
+void scene_image_set(scene* scene, u32 img_id, u32 sampler_id);
 // TEMP: END

@@ -1,19 +1,9 @@
-#include "etwindow.h"
+#include "etwindow_private.h"
 
 #include "memory/etmemory.h"
 #include "core/logger.h"
 #include "core/events.h"
 #include "core/input.h"
-
-#include "renderer/src/renderer.h"
-
-#define GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h>
-
-struct etwindow_t {
-    GLFWwindow* impl_window;
-    b8 cursor_captured;
-};
 
 static b8 etwindow_on_key_event(u16 code, void* window, event_data data);
 

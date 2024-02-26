@@ -3,9 +3,9 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "CMake Build",
+            "label": "CMake Build: Debug",
             "windows": {
-                "command": "cmake -DCMAKE_BUILD_TYPE=Debug .."
+                "command": "cmake .. -DCMAKE_BUILD_TYPE=Debug"
             },
             "options": {
                 "cwd": "${workspaceFolder}/build"
@@ -19,11 +19,33 @@
         },
         {
             "type": "shell",
-            "label": "MSBuild",
+            "label": "MSBuild Debug",
             "windows": {
                 "command": "msbuild",
                 "args": [
                     "TestEtna.sln",
+                    "/property:Configuration=Debug"
+                ]
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/build"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "type": "shell",
+            "label": "MSBuild Release",
+            "windows": {
+                "command": "msbuild",
+                "args": [
+                    "TestEtna.sln",
+                    "/property:Configuration=Release",
                 ]
             },
             "options": {

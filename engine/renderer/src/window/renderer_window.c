@@ -1,19 +1,20 @@
 #include "renderer_window.h"
+#include "memory/etmemory.h"
+#include "platform/etwindow_private.h"
+#include "renderer/src/swapchain.h"
+#include "renderer/src/renderer.h"
 
-#define GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h>
+b8 renderer_window_init(renderer_state* renderer_state, etwindow_t* window) {
+    window->swapchain = etallocate(sizeof(swapchain), MEMORY_TAG_WINDOW);
+    return false;
+}
 
-struct etwindow_t {
-    GLFWwindow* impl_window;
-    b8 cursor_captured;
-};
-
-b8 window_create_vulkan_surface(renderer_state* renderer_state, struct etwindow_t* window) {
+b8 window_create_vulkan_surface(renderer_state* renderer_state, etwindow_t* window) {
     VkResult result = glfwCreateWindowSurface(
         renderer_state->instance,
         window->impl_window,
         renderer_state->allocator,
-        &renderer_state->surface);
+        &renderer_state->swapchain.surface);
     return result == VK_SUCCESS;
 }
 

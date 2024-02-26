@@ -185,7 +185,8 @@
         "gltfimporter.h": "c",
         "functional": "c",
         "typeinfo": "c",
-        "resource_private.h": "c"
+        "resource_private.h": "c",
+        "etwindow_private.h": "c"
     },
     "C_Cpp.dimInactiveRegions": true,
     "dotnet.defaultSolution": "disable",

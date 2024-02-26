@@ -366,7 +366,7 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
         // }
         // //TEMP: END
 
-        if (!device_meets_requirements(physical_devices[i], state->surface, requirements)) {
+        if (!device_meets_requirements(physical_devices[i], state->swapchain.surface, requirements)) {
             ETFATAL("Device Requirements not met.");
             continue;
         }

@@ -9,6 +9,7 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 
 #Compile shaders and add them to the build directory
 set(SHADER_COMPILER $ENV{VULKAN_SDK}/Bin/glslangValidator.exe)
+set(SHADER_OPTIMIZER_DIR $ENV{VULKAN_SDK}/Bin/)
 
 file(GLOB_RECURSE SHADER_FILES "assets/shaders/*.vert" "assets/shaders/*.frag" "assets/shaders/*.comp")
 file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/assets/shaders/)
@@ -17,6 +18,7 @@ foreach(SHADER_FILE ${SHADER_FILES})
     get_filename_component(SHADER_FILE_NAME ${SHADER_FILE} NAME)
     set(SPV_FILE ${PROJECT_BINARY_DIR}/assets/shaders/${SHADER_FILE_NAME}.spv)
     execute_process(COMMAND ${SHADER_COMPILER} -g ${SHADER_FILE} -o ${SPV_FILE} --target-env vulkan1.3)
+    execute_process(COMMAND spirv-opt -O ${SPV_FILE} -o ${SPV_FILE}.opt WORKING_DIRECTORY ${SHADER_OPTIMIZER_DIR})
 endforeach(SHADER_FILE)
 
 # Create obj folder in build folder
@@ -50,7 +52,7 @@ file(GLOB_RECURSE ENGINE_HEADER_FILES "engine/*.h")
 add_library(engine ${ENGINE_FILES} ${ENGINE_HEADER_FILES})
 
 # Compiler defines for engine
-target_compile_definitions(engine PRIVATE _DEBUG)
+# target_compile_definitions(engine PRIVATE _DEBUG)
 # target_compile_options(engine PRIVATE /fsanitize=address)
 # target_link_options(engine PRIVATE /INFERASANLIBS)
 
@@ -84,7 +86,7 @@ file(GLOB_RECURSE SANDBOX_HEADER_FILES "sandbox/*.h")
 add_executable(sandbox ${SANDBOX_FILES} ${SANDBOX_HEADER_FILES})
 
 # Compiler defines for sandbox
-target_compile_definitions(sandbox PRIVATE _DEBUG)
+# target_compile_definitions(sandbox PRIVATE _DEBUG)
 # target_compile_options(sandbox PRIVATE /fsanitize=address)
 # target_link_options(sandbox PRIVATE /INFERASANLIBS)
 

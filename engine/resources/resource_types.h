@@ -55,11 +55,15 @@ typedef struct surface_2 {
 } surface_2;
 
 typedef struct mesh_2 {
+    u32 vertex_offset;
+    u32 transform_offset;
+    u32 instance_count;
+
     u32 start_surface;
     u32 surface_count;
 } mesh_2;
 
 typedef struct object {
     u32 mesh_index;
-    u32 transform_index;
+    u32 instance_id;        // Instance number to get the transform
 } object;

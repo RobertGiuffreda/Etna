@@ -21,6 +21,15 @@ struct image_manager {
     u32 image_count;
 };
 
+struct image_manager_bindless {
+    renderer_state* state;
+
+    u32* free;  // Free stack
+
+    image images[MAX_IMAGE_COUNT];
+    u32 image_count;
+};
+
 struct material_manager {
     renderer_state* state;
     ds_allocator ds_allocator;

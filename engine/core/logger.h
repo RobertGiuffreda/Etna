@@ -5,7 +5,6 @@
 // TODO: Defined by build config
 #define LOG_WARN_ENABLED
 #define LOG_INFO_ENABLED
-#define LOG_DEBUG_ENABLED
 #define LOG_TRACE_ENABLED
 
 typedef enum log_level {
@@ -41,7 +40,7 @@ void log_output(log_level level, const char* message, ...);
 #define ETINFO(message, ...)
 #endif
 
-#ifdef LOG_DEBUG_ENABLED
+#ifdef _DEBUG
 #define ETDEBUG(message, ...) log_output(LOG_DEBUG, message, ##__VA_ARGS__)
 #else
 #define ETDEBUG(message, ...)

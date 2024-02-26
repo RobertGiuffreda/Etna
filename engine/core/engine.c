@@ -20,7 +20,7 @@
 typedef struct engine_t {
     b8 is_running;
     b8 is_minimized;
-    clock frame_clk;
+    clock frame;
 
     // HACK:TEMP: Proper scene management
     scene* main_scene;
@@ -51,9 +51,12 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
-    engine = (engine_t*)etallocate(sizeof(engine_t), MEMORY_TAG_ENGINE);
+    engine = etallocate(sizeof(engine_t), MEMORY_TAG_ENGINE);
     engine->is_running = false;
-    
+    engine->is_minimized = false;
+    engine->frame.start = 0;
+    engine->frame.elapsed = 0;
+
     if (!logger_initialize()) {
         ETFATAL("Unable to initialize logger.");
         return false;
@@ -86,9 +89,12 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
-    engine->is_minimized = false;
-
-    if (!renderer_initialize(&engine->renderer_state, engine->window, "App")) {
+    renderer_config renderer_config = {
+        .app_name = "Test Application",
+        .engine_name = "Etna",
+        .window = engine->window,
+    };
+    if (!renderer_initialize(&engine->renderer_state, renderer_config)) {
         ETFATAL("Renderer failed to initialize.");
         return false;
     }
@@ -132,29 +138,19 @@ b8 engine_run(void) {
         if (!engine->is_minimized) {
             scene_update(engine->main_scene);
             engine->app_update(engine->app);
-            scene_draw_bindless(engine->main_scene);
-            if (scene_frame_begin_bindless(engine->main_scene, engine->renderer_state)) {
-                // TEMP: Very rough frame timing mechanism
-                clock_time(&engine->frame_clk);
-                clock_start(&engine->frame_clk);
-                // TEMP: END
 
-                scene_render_bindless(engine->main_scene);
+            scene_draw(engine->main_scene);
+            
+            if (scene_frame_begin(engine->main_scene, engine->renderer_state)) {
+                // NOTE: Primitive frame timing
+                clock_time(&engine->frame);
+                printf("ms: %.6llf\r", engine->frame.elapsed * 1000);
+                clock_start(&engine->frame);
 
                 scene_render(engine->main_scene);
                 engine->app_render(engine->app);
-                scene_frame_end_bindless(engine->main_scene, engine->renderer_state);
+                scene_frame_end(engine->main_scene, engine->renderer_state);
             }
-            // if (renderer_prepare_frame(engine->renderer_state)) {
-            //     // TEMP: Very rough frame timing mechanism
-            //     clock_time(&engine->frame_clk);
-            //     clock_start(&engine->frame_clk);
-            //     // TEMP: END
-
-            //     scene_render(engine->main_scene);
-            //     engine->app_render(engine->app);
-            //     renderer_draw_frame(engine->renderer_state);
-            // }
         }
 
         input_update(engine->input_state);
@@ -193,11 +189,6 @@ void engine_shutdown(void) {
 
 b8 engine_on_resize(u16 event_code, void* engine_state, event_data data) {
     engine->is_minimized = EVENT_DATA_WIDTH(data) == 0 || EVENT_DATA_HEIGHT(data) == 0;
-
-    // TODO: Register renderer for resizes using events
-    renderer_on_resize(engine->renderer_state, EVENT_DATA_WIDTH(data), EVENT_DATA_HEIGHT(data));
-    // TODO: END
-
     // Other events should handle this event code as well, so false
     return false;
 }
@@ -209,10 +200,6 @@ b8 engine_on_key_event(u16 event_code, void* engine_state, event_data data) {
         {
         case KEY_ESCAPE:
             engine->is_running = false;
-            break;
-        case KEY_F:
-            // HACK: I'm sorry, this is awful. But I don't want to implement a GUI before I am ready
-            ETINFO("Last frame time: %llf ms.", engine->frame_clk.elapsed * 1000);
             break;
         default:
             break;

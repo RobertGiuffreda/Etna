@@ -244,7 +244,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 material_resources[1].sampler = scene->samplers[smpl_index];
 
                 // TEMP: Bindless
-                scene_image_set_bindless(scene, img_index, smpl_index);
+                scene_image_set(scene, img_index, smpl_index);
                 bindless_consts.color_id = img_index;
                 // TEMP: END
             }
@@ -257,7 +257,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 material_resources[2].sampler = scene->samplers[smpl_index];
                 
                 // TEMP: Bindless
-                scene_image_set_bindless(scene, img_index, smpl_index);
+                scene_image_set(scene, img_index, smpl_index);
                 bindless_consts.mr_id = img_index;
                 // TEMP: END
             }
@@ -279,7 +279,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             .data_buff = scene->bindless_material_buffer.handle,
             .data_buff_offset = sizeof(struct bindless_constants) * i,
         };
-        scene_material_set_instance_bindless(scene, pass_type, &bindless_resources);
+        scene_material_set_instance(scene, pass_type, &bindless_resources);
         // TEMP: END
     }
     vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
@@ -290,7 +290,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     u32* scene_indices = dynarray_create(1, sizeof(u32));
 
     surface_2* scene_surfaces = dynarray_create(1, sizeof(surface_2));
-    mesh_2* scene_meshes = dynarray_create(data->meshes_count, sizeof(mesh_2));
+    mesh_2* scene_meshes = dynarray_create(1, sizeof(mesh_2));
 
     u64 opaque_surface_count;
     u64 transparent_surface_count;
@@ -301,8 +301,13 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         u32 surface_count = dynarray_length(scene_surfaces);
         dynarray_resize((void**)&scene_surfaces, surface_count + gltf_mesh->primitives_count);
 
-        scene_meshes[i].start_surface = surface_count;
-        scene_meshes[i].surface_count = gltf_mesh->primitives_count;
+        mesh_2 new_mesh = {
+            .vertex_offset = 0,
+            .instance_count = 0,
+            .start_surface = surface_count,
+            .surface_count = gltf_mesh->primitives_count,
+        };
+        dynarray_push((void**)&scene_meshes, &new_mesh);
 
         for (u32 j = 0; j < gltf_mesh->primitives_count; ++j) {
             cgltf_primitive* gltf_primitive = &gltf_mesh->primitives[j];
@@ -314,7 +319,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             u64 initial_vertex = dynarray_length(scene_vertices);
             cgltf_accessor* index_accessor = gltf_primitive->indices;
             dynarray_reserve((void**)&scene_indices, dynarray_length(scene_indices) + index_accessor->count);
-
             for (u32 k = 0; k < index_accessor->count; ++k) {
                 u32 index = initial_vertex + cgltf_accessor_read_index(index_accessor, k);
                 dynarray_push((void**)&scene_indices, &index);
@@ -327,7 +331,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 ETERROR("Attempted to load mesh without vertex positions.");
                 return false;
             }
-
             dynarray_resize((void**)&scene_vertices, dynarray_length(scene_vertices) + position->count);
             cgltf_size pos_element_size = cgltf_calc_size(position->type, position->component_type);
             for (u32 k = 0; k < position->count; k++) {
@@ -345,6 +348,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 }
                 scene_vertices[initial_vertex + k] = new_v;
             }
+
             // Load normal information
             cgltf_accessor* normal = get_accessor_from_attributes(
                 gltf_primitive->attributes, gltf_primitive->attributes_count, "NORMAL");
@@ -352,7 +356,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 ETERROR("Attempt to load mesh without vertex normals.");
                 return false;
             }
-
             cgltf_size norm_element_size = cgltf_calc_size(normal->type, normal->component_type);
             for (u32 k = 0; k < normal->count; ++k) {
                 vertex* v = &scene_vertices[initial_vertex + k];
@@ -403,12 +406,52 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             // TEMP: Blueprint ID is hardcoded at the moment
             if (gltf_primitive->material) {
                 u64 mat_index = CGLTF_ARRAY_INDEX(cgltf_material, data->materials, gltf_primitive->material);
-                new_surface->material = scene_material_get_instance_bindless(scene, (material_id){.blueprint_id = 0, .instance_id = mat_index});
+                new_surface->material = scene_material_get_instance(scene, (material_id){.blueprint_id = 0, .instance_id = mat_index});
             } else {
-                new_surface->material = scene_material_get_instance_bindless(scene, (material_id){.blueprint_id = 0, .instance_id = 0});
+                new_surface->material = scene_material_get_instance(scene, (material_id){.blueprint_id = 0, .instance_id = 0});
             }
         }
     }
+
+
+    // TEMP: cgltf calculates the world transform for us so I can temporary use
+    // that function to get a quick and dirty mesh transform buffer to stop using 
+    // updating the push constants for each object draw call
+    object* scene_objects = dynarray_create(1, sizeof(object));
+
+    m4s** transforms_from_mesh_index = etallocate(sizeof(m4s*) * dynarray_length(scene_meshes), MEMORY_TAG_SCENE);
+    for (u32 i = 0; i < dynarray_length(scene_meshes); ++i) {
+        transforms_from_mesh_index[i] = dynarray_create(1, sizeof(m4s));
+    }
+
+    for (u32 i = 0; i < data->nodes_count; ++i) {
+        if (data->nodes[i].mesh) {
+            u32 mesh_index = CGLTF_ARRAY_INDEX(cgltf_mesh, data->meshes, data->nodes[i].mesh);
+            object new_object = {
+                .mesh_index = mesh_index,
+                .instance_id = scene_meshes[mesh_index].instance_count,
+            };
+            dynarray_push((void**)&scene_objects, &new_object);
+
+            m4s new_transform = {0};
+            cgltf_node_transform_world(&data->nodes[i], (cgltf_float*)new_transform.raw);
+
+            dynarray_push((void**)(transforms_from_mesh_index + mesh_index), &new_transform);
+            scene_meshes[mesh_index].instance_count++;
+        }
+    }
+
+    m4s* scene_transforms = dynarray_create(1, sizeof(m4s));
+    u32 transform_offset = 0;
+    for (u32 i = 0; i < dynarray_length(scene_meshes); ++i) {
+        for (u32 j = 0; j < scene_meshes[i].instance_count; ++j) {
+            dynarray_push((void**)&scene_transforms, transforms_from_mesh_index[i] + j);
+        }
+        dynarray_destroy(transforms_from_mesh_index[i]);
+        scene_meshes[i].transform_offset = transform_offset;
+        transform_offset += scene_meshes[i].instance_count;
+    }
+    etfree(transforms_from_mesh_index, sizeof(m4s*) * dynarray_length(scene_meshes), MEMORY_TAG_SCENE);
 
     // Init Shared buffers
     scene->vertex_count = dynarray_length(scene_vertices);
@@ -420,45 +463,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         scene->vertex_count,
         scene_vertices
     );
-    scene->vertices = scene_vertices;
-    scene->indices = scene_indices;
-    
-    // Move data to scene class:
-    scene->index_buffer = scene_shared_buffers.index_buffer;
-    scene->vertex_buffer = scene_shared_buffers.vertex_buffer;
-    scene->vb_addr = scene_shared_buffers.vertex_buffer_address;
-    scene->surfaces = scene_surfaces;
-    scene->meshes = scene_meshes;
-
-    scene->surface_count = dynarray_length(scene_surfaces);
-    scene->mesh_count = dynarray_length(scene_meshes);
-
-    // TEMP: cgltf calculates the world transform for us so I can temporary use
-    // that function to get a quick and dirty mesh transform buffer to stop using 
-    // updating the push constants for each object draw call
-    object* scene_objects = dynarray_create(1, sizeof(object));
-    m4s* scene_transforms = dynarray_create(1, sizeof(m4s));
-
-    for (u32 i = 0; i < data->nodes_count; ++i) {
-        if (data->nodes[i].mesh) {
-            u32 mesh_index = CGLTF_ARRAY_INDEX(cgltf_mesh, data->meshes, data->nodes[i].mesh);
-            object new_object = {
-                .mesh_index = mesh_index,
-                .transform_index = dynarray_length(scene_transforms),
-            };
-            dynarray_push((void**)&scene_objects, &new_object);
-
-            m4s new_transform = {0};
-            cgltf_node_transform_world(&data->nodes[i], (cgltf_float*)new_transform.raw);
-            dynarray_push((void**)&scene_transforms, &new_transform);
-        }
-    }
-
-    // Move data to scene class:
-    scene->transforms = scene_transforms;
-    scene->transform_count = dynarray_length(scene_transforms);
-    scene->objects = scene_objects;
-    scene->object_count = dynarray_length(scene_objects);
 
     // Create transform buffer & get address
     buffer_create_data(
@@ -470,6 +474,26 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         &scene->transform_buffer
     );
     scene->tb_addr = buffer_get_address(state, &scene->transform_buffer);
+
+    // Move data to scene class:
+    scene->vertices = scene_vertices;
+    scene->indices = scene_indices;
+    
+    scene->index_buffer = scene_shared_buffers.index_buffer;
+    scene->vertex_buffer = scene_shared_buffers.vertex_buffer;
+    scene->vb_addr = scene_shared_buffers.vertex_buffer_address;
+    scene->surfaces = scene_surfaces;
+    scene->meshes = scene_meshes;
+
+    scene->surface_count = dynarray_length(scene_surfaces);
+    scene->mesh_count = dynarray_length(scene_meshes);
+
+    scene->transforms = scene_transforms;
+    scene->transform_count = dynarray_length(scene_transforms);
+
+    scene->objects = scene_objects;
+    scene->object_count = dynarray_length(scene_objects);
+
     // TEMP: END
 
     // Meshes

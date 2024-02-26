@@ -63,7 +63,7 @@ typedef struct buffer {
 } buffer;
 // TEMP: END
 
-// TEMP: Refactor this for bindless
+// TEMP: Refactor this
 typedef struct mesh_buffers {
     buffer index_buffer;
     buffer vertex_buffer;
@@ -92,7 +92,7 @@ typedef struct scene_data {
 typedef struct draw_command {
     VkDrawIndexedIndirectCommand draw;
     u32 material_instance_id;
-    u32 transform_id;
+    u32 transform_offset;
     u32 padding;
 } draw_command;
 
