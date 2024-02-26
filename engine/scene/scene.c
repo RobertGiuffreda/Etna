@@ -136,10 +136,10 @@ static f32 light_offset = 2.0f;
 static b8 light_dynamic = true;
 // TEMP: END
 
-void scene_update(scene* scene) {
+void scene_update(scene* scene, f64 dt) {
     renderer_state* state = scene->state;
 
-    camera_update(&scene->cam);
+    camera_update(&scene->cam, dt);
 
     // TODO: Camera should store near and far values & calculate perspective matrix
     // TODO: Scene should register for event system and update camera stuff itself 
@@ -186,7 +186,6 @@ void scene_init_bindless(scene* scene) {
         VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT;
  
     // Set 0: Scene set layout (engine specific). The set itself will be allocated on the fly
-    // TEMP: Test layout
     VkDescriptorBindingFlags ssbf = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT;
     VkDescriptorBindingFlags scene_set_binding_flags[] = {
         [0] = ssbf,
@@ -235,7 +234,6 @@ void scene_init_bindless(scene* scene) {
         scene->state->allocator,
         &scene->scene_layout
     ));
-    // TEMP: Test layout
 
     // Setup global descriptor
     scene->push_constant.offset = 0;
@@ -419,7 +417,7 @@ void scene_init_bindless(scene* scene) {
     }
 
     // Load bindless shaders
-    const char* vertex_path = "build/assets/shaders/bindless_mesh_mat.vert.opt";
+    const char* vertex_path = "build/assets/shaders/bindless_mesh_mat.vert.spv.opt";
     const char* fragment_path = "build/assets/shaders/bindless_mesh_mat.frag.spv.opt";
 
     shader bindless_vertex;

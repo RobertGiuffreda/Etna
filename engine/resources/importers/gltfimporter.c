@@ -865,8 +865,8 @@ static void* load_image_data(
     const char* gltf_path,
     int* width,
     int* height,
-    int* channels)
-{
+    int* channels
+) {
     if (in_image->uri == NULL && in_image->buffer_view == NULL) {
         return NULL;
     }

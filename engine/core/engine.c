@@ -30,7 +30,7 @@ typedef struct engine_t {
     application_t* app;
     b8 (*app_initialize)(application_t* app);
     void (*app_shutdown)(application_t* app);
-    b8 (*app_update)(application_t* app);
+    b8 (*app_update)(application_t* app, f64 dt);
     b8 (*app_render)(application_t* app);
 
     etwindow_t* window;
@@ -99,9 +99,8 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
-    // HACK:TEMP: Loading scene should happen in editor/application
+    // TODO: Scene & Scene Renderer Type class
     scene_initalize(&engine->main_scene, engine->renderer_state);
-    // HACK:TEMP: END
 
     event_observer_register(EVENT_CODE_KEY_RELEASE, (void*)engine, engine_on_key_event);
     event_observer_register(EVENT_CODE_RESIZE, (void*)engine, engine_on_resize);
@@ -122,7 +121,7 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     engine->app_update = app_details.update;
     engine->app_render = app_details.render;
     engine->app_size = app_details.app_size;
-    engine->app = (application_t*)etallocate(app_details.app_size, MEMORY_TAG_APPLICATION);
+    engine->app = etallocate(app_details.app_size, MEMORY_TAG_APPLICATION);
 
     if (!engine->app_initialize(engine->app)) {
         ETFATAL("Unable to initialize application. application_initialize returned false.");
@@ -133,20 +132,20 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
 
 b8 engine_run(void) {
     engine->is_running = true;
+    clock_start(&engine->frame);
 
     while (engine->is_running && !etwindow_should_close(engine->window)) {
         if (!engine->is_minimized) {
-            scene_update(engine->main_scene);
-            engine->app_update(engine->app);
+            clock_time(&engine->frame);
+            f64 dt = engine->frame.elapsed;
+            clock_start(&engine->frame);
+
+            scene_update(engine->main_scene, dt);
+            engine->app_update(engine->app, dt);
 
             scene_draw(engine->main_scene);
             
             if (scene_frame_begin(engine->main_scene, engine->renderer_state)) {
-                // NOTE: Primitive frame timing
-                clock_time(&engine->frame);
-                printf("ms: %.6llf\r", engine->frame.elapsed * 1000);
-                clock_start(&engine->frame);
-
                 scene_render(engine->main_scene);
                 engine->app_render(engine->app);
                 scene_frame_end(engine->main_scene, engine->renderer_state);

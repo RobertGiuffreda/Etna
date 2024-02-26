@@ -7,7 +7,7 @@ typedef struct scene scene;
 
 b8 scene_initalize(scene** scn, renderer_state* state);
 
-void scene_update(scene* scene);
+void scene_update(scene* scene, f64 dt);
 
 void scene_draw(scene* scene);
 

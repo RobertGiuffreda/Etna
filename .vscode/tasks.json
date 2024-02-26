@@ -58,6 +58,27 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "type": "shell",
+            "label": "MSBuild Release With Debug Info",
+            "windows": {
+                "command": "msbuild",
+                "args": [
+                    "TestEtna.sln",
+                    "/property:Configuration=RelWithDebInfo",
+                ]
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/build"
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }

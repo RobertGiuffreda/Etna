@@ -2,10 +2,32 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(Windows) Launch",
+            "name": "(Windows) Debug Launch",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/sandbox.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "(Windows) Launch Release",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/release/sandbox.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "(Windows) Launch RelWithDebugInfo",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/RelWithDebInfo/sandbox.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

@@ -46,10 +46,13 @@ m4s camera_get_rotation_matrix(camera* camera) {
     return glms_mat4_mul(glms_quat_mat4(yaw_quaternion), glms_quat_mat4(pitch_quaternion));
 }
 
-void camera_update(camera* camera) {
+void camera_update(camera* camera, f64 dt) {
     m4s cam_rotation = camera_get_rotation_matrix(camera);
-    camera->position = glms_vec3_add(camera->position, glms_mat4_mulv3(cam_rotation, glms_vec3_scale(camera->velocity, 0.1f), 0.f));
+    camera->position = glms_vec3_add(camera->position, glms_mat4_mulv3(cam_rotation, glms_vec3_scale(camera->velocity, dt), 0.f));
 }
+
+// TODO: Move camera event changes to camera owner structs, like scene
+#define CAM_SPEED 15.0f
 
 b8 camera_on_key_event(u16 code, void* cam, event_data data) {
     keys key = EVENT_DATA_KEY(data);
@@ -61,16 +64,16 @@ b8 camera_on_key_event(u16 code, void* cam, event_data data) {
         switch (key)
         {
         case KEY_W:
-            c->velocity.z = -1.f;
+            c->velocity.z = -CAM_SPEED;
             break;
         case KEY_S:
-            c->velocity.z = 1.f;
+            c->velocity.z = CAM_SPEED;
             break;
         case KEY_A:
-            c->velocity.x = -1.f;
+            c->velocity.x = -CAM_SPEED;
             break;
         case KEY_D:
-            c->velocity.x = 1.f;
+            c->velocity.x = CAM_SPEED;
             break;
         }
         break;

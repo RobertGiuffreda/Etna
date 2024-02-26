@@ -8,7 +8,7 @@ b8 application_initialize(application_t* app);
 
 void application_shutdown(application_t* app);
 
-b8 application_update(application_t* app);
+b8 application_update(application_t* app, f64 dt);
 
 b8 application_render(application_t* app);
 

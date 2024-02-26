@@ -32,7 +32,7 @@
 #include <math.h>
 // TEMP: END
 
-// Initialize frame structure functions
+// TODO: Move non default values to scene/scene_renderer
 static void create_frame_command_structures(renderer_state* state);
 static void destroy_frame_command_structures(renderer_state* state);
 
@@ -47,10 +47,8 @@ static b8 initialize_compute_effects(renderer_state* state);
 static void shutdown_compute_effects(renderer_state* state);
 // TEMP: END
 
-// TEMP: Until material framework is stood up
 static b8 initialize_default_material(renderer_state* state);
 static void shutdown_default_material(renderer_state* state);
-// TEMP: END
 
 static b8 initialize_default_data(renderer_state* state);
 static void shutdown_default_data(renderer_state* state);

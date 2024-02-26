@@ -1,5 +1,7 @@
 #include "vkutils.h"
 
+#include "core/logger.h"
+
 #include "renderer/src/utilities/vkinit.h"
 
 #include "renderer/src/renderer.h"
@@ -10,9 +12,11 @@
  * NOTE: Cache/store the indices of known memory usage bit indices and 
  * start traversing from that index for improvement
  */
-i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
-    u32 memory_type_bits_requirement, VkMemoryPropertyFlags required_properties)
-{
+i32 find_memory_index(
+    const VkPhysicalDeviceMemoryProperties* memory_properties,
+    u32 memory_type_bits_requirement,
+    VkMemoryPropertyFlags required_properties
+) {
     for (u32 i = 0; i < memory_properties->memoryTypeCount; ++i) {
         b8 is_required_memory_type = (1 << i) & memory_type_bits_requirement;
         b8 has_required_properties = (memory_properties->memoryTypes[i].propertyFlags & required_properties) == required_properties;
@@ -84,7 +88,6 @@ mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* 
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &new_surface.vertex_buffer
     );
-    
     VkBufferDeviceAddressInfo device_address_info = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
         .pNext = 0,
@@ -110,7 +113,6 @@ mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* 
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &staging
     );
-
     void* mapped_memory;
     vkMapMemory(state->device.handle, staging.memory, 0, vertex_buffer_size + index_buffer_size, 0, &mapped_memory);
 

@@ -9,7 +9,7 @@ typedef struct application_config {
 
     void (*shutdown)(application_t* app);
 
-    b8 (*update)(application_t* app);
+    b8 (*update)(application_t* app, f64 dt);
 
     b8 (*render)(application_t* app);
 

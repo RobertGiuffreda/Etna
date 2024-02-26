@@ -26,7 +26,7 @@ void buffer_create(
     vkGetBufferMemoryRequirements2(state->device.handle, &memory_requirements_info, &memory_requirements2);
     VkMemoryRequirements memory_requirements = memory_requirements2.memoryRequirements;
 
-    u32 memory_index = find_memory_index(
+    i32 memory_index = find_memory_index(
         &state->device.gpu_memory_props,
         memory_requirements.memoryTypeBits,
         memory_property_flags);
@@ -34,10 +34,13 @@ void buffer_create(
         ETERROR("Memory type with required memory type bits for buffer not found in physical memory properties");
     }
 
-    // Use size retrieved from requirements for allocation
+    VkMemoryAllocateFlagsInfo alloc_flags_info;
     VkMemoryAllocateInfo alloc_info = init_memory_allocate_info(memory_requirements.size, memory_index);
     if (usage_flags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
-        VkMemoryAllocateFlagsInfo alloc_flags_info = init_memory_allocate_flags_info(VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT);
+        alloc_flags_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+        alloc_flags_info.pNext = 0;
+        alloc_flags_info.deviceMask = 0;
+        alloc_flags_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
         alloc_info.pNext = &alloc_flags_info;
     }
     VK_CHECK(vkAllocateMemory(

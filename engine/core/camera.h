@@ -18,7 +18,7 @@ typedef struct camera {
 // Registers the camera for events
 void camera_create(camera* camera);
 void camera_destroy(camera* camera);
-void camera_update(camera* camera);
+void camera_update(camera* camera, f64 dt);
 
 m4s camera_get_view_matrix(camera* camera);
 m4s camera_get_rotation_matrix(camera* camera);

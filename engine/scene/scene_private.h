@@ -2,6 +2,7 @@
 #include "defines.h"
 
 #include "core/camera.h"
+#include "core/clock.h"
 #include "math/math_types.h"
 #include "renderer/src/vk_types.h"
 #include "renderer/src/renderables.h"
@@ -10,13 +11,13 @@
 
 /** Checklist:
  * Parent child relationship between objects/transforms to make scene graph.
- * (Double Ended Queue / Ring queue) for traversing the scene graph 
+ * (Double Ended Queue / Ring queue) for traversing the scene graph
+ * 
+ * Information that changes each frame.
+ * 
  * 
  * Use vertex offset to differentiate meshes in the vertex buffer so that index buffer can be stored normally
  * 
- * Refactor: 
- * renderer_static: contains static state for renderer instance.
- * scene --> 
  * 
  * Image, Material, Surface, Mesh, Object, resource managers
  * 

@@ -20,7 +20,7 @@ void application_shutdown(application_t* app) {
     // scene_shutdown(app->main_scene);
 }
 
-b8 application_update(application_t* app) {
+b8 application_update(application_t* app, f64 dt) {
     // scene_update(app->main_scene);
     return true;
 }
