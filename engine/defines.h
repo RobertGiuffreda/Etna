@@ -53,3 +53,15 @@ typedef _Bool b8;
 #else
     #define DEBUG_CODE(...)
 #endif
+
+#define BLOCK(...)  \
+do {                \
+    __VA_ARGS__     \
+} while(0);         \
+
+// NOTE: Pass code in BLOCK macro.
+#if defined(_DEBUG)
+    #define DEBUG_RELEASE(debug_block, release_block) debug_block
+#else
+    #define DEBUG_RELEASE(debug_block, release_block) release_block
+#endif

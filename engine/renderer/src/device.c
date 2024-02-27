@@ -340,6 +340,7 @@ void device_destroy(renderer_state* state, device* device) {
     device->transfer_qfi = -1;
 
     vkDestroyDevice(device->handle, state->allocator);
+    ETINFO("Vulkan device destroyed");
 }
 
 static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, device* out_device) {

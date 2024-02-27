@@ -232,6 +232,7 @@ b8 initialize_swapchain(renderer_state* state, swapchain* swapchain) {
         const char present_sem[] = "Render semaphore";
         SET_DEBUG_NAME(state, VK_OBJECT_TYPE_SEMAPHORE, swapchain->image_present[i], present_sem);
     }
+    ETINFO("Swapchain initialized");
     return true;
 }
 
@@ -260,6 +261,7 @@ void shutdown_swapchain(renderer_state* state, swapchain* swapchain) {
         sizeof(VkSemaphore) * swapchain->image_count,
         MEMORY_TAG_SWAPCHAIN
     );
+    ETINFO("Swapchain shutdown.");
 }
 
 // TODO: Linear allocator for the swapchain images and views equal to the max number of images
@@ -285,21 +287,21 @@ void recreate_swapchain(renderer_state* state, swapchain* swapchain) {
         state->device.gpu,
         swapchain->surface,
         &format_count,
-        0));
+        NULL
+    ));
     // TODO: Change from dynarray to regular allocation
     VkSurfaceFormatKHR* formats = dynarray_create(format_count, sizeof(VkSurfaceFormatKHR));
     VK_CHECK(vkGetPhysicalDeviceSurfaceFormatsKHR(
         state->device.gpu,
         swapchain->surface,
         &format_count,
-        formats));
-
+        formats
+    ));
     b8 found = false;
     for (u32 i = 0; i < format_count; ++i) {
-        // Preferred format
         if (formats[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
-            formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-        {    
+            formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+        ) {
             image_format = formats[i].format;
             color_space = formats[i].colorSpace;
             found = true;

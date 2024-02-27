@@ -8,6 +8,8 @@ void mesh_manager_shutdown(mesh_manager* manager);
 
 mesh* mesh_manager_get(mesh_manager* manager, u32 id);
 
+struct surface;
+struct vertex;
 typedef struct mesh_config {
     char* name;
     struct surface* surfaces;

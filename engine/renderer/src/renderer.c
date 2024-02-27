@@ -1,6 +1,12 @@
 #include "renderer/rendererAPI.h"
 #include "renderer.h"
 
+#include "data_structures/dynarray.h"
+
+#include "core/logger.h"
+#include "core/etstring.h"
+#include "memory/etmemory.h"
+
 #include "renderer/src/utilities/vkinit.h"
 #include "renderer/src/utilities/vkutils.h"
 
@@ -18,21 +24,11 @@
 
 #include "window/renderer_window.h"
 
-#include "data_structures/dynarray.h"
-
-#include "memory/etmemory.h"
-#include "core/logger.h"
-#include "core/etstring.h"
-
-#include "resources/importers/gltfimporter.h"
-
-#include "scene/scene.h"
-
 // TEMP: Until a math library is situated
 #include <math.h>
 // TEMP: END
 
-// TODO: Move non default values to scene/scene_renderer
+// TODO: Move to scene renderer, more programmable
 static void create_frame_command_structures(renderer_state* state);
 static void destroy_frame_command_structures(renderer_state* state);
 
@@ -42,16 +38,17 @@ static void destroy_frame_synchronization_structures(renderer_state* state);
 static void initialize_descriptors(renderer_state* state);
 static void shutdown_descriptors(renderer_state* state);
 
-// TEMP: Until Compute effects framework. Meaning post processing effect
 static b8 initialize_compute_effects(renderer_state* state);
 static void shutdown_compute_effects(renderer_state* state);
-// TEMP: END
+// TODO: END
 
+// TODO: Default material to scene renderer
 static b8 initialize_default_material(renderer_state* state);
 static void shutdown_default_material(renderer_state* state);
 
 static b8 initialize_default_data(renderer_state* state);
 static void shutdown_default_data(renderer_state* state);
+// TODO: END
 
 VkBool32 vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -240,12 +237,9 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
 
     // Per frame initializations
     create_frame_command_structures(state);
-    ETINFO("Frame command structures created.");
     create_frame_synchronization_structures(state);
-    ETINFO("Frame synchronization structures created.");
 
     initialize_descriptors(state);
-    ETINFO("Descriptors Initialized.");
 
     if (!initialize_compute_effects(state)) {
         ETERROR("Could not initialize compute effects.");
@@ -276,26 +270,20 @@ void renderer_shutdown(renderer_state* state) {
     shutdown_default_material(state);
 
     shutdown_compute_effects(state);
-    ETINFO("Compute effects shutdown.");
 
     shutdown_descriptors(state);
-    ETINFO("Descriptors shutdown.");
 
     destroy_frame_synchronization_structures(state);
-    ETINFO("Frame synchronization structures destroyed.");
 
     destroy_frame_command_structures(state);
-    ETINFO("Frame command structures destroyed.");
 
     image_destroy(state, &state->depth_image);
     image_destroy(state, &state->render_image);
     ETINFO("Rendering attachments (color, depth) destroyed.");
 
     shutdown_swapchain(state, &state->swapchain);
-    ETINFO("Swapchain shutdown.");
 
     device_destroy(state, &state->device);
-    ETINFO("Vulkan device destroyed");
     
 #ifdef _DEBUG
     PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerEXT =
@@ -345,14 +333,18 @@ static void create_frame_command_structures(renderer_state* state) {
         state->device.handle,
         &imm_pool_info,
         state->allocator,
-        &state->imm_pool));
+        &state->imm_pool
+    ));
 
     VkCommandBufferAllocateInfo imm_buffer_alloc_info = init_command_buffer_allocate_info(
         state->imm_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
     VK_CHECK(vkAllocateCommandBuffers(
         state->device.handle,
         &imm_buffer_alloc_info,
-        &state->imm_buffer));
+        &state->imm_buffer
+    ));
+
+    ETINFO("Frame command structures created.");
 }
 
 static void destroy_frame_command_structures(renderer_state* state) {
@@ -374,6 +366,7 @@ static void destroy_frame_command_structures(renderer_state* state) {
     );
 
     vkDestroyCommandPool(state->device.handle, state->imm_pool, state->allocator);
+    ETINFO("Frame command structures destroyed.");
 }
 
 static void create_frame_synchronization_structures(renderer_state* state) {
@@ -395,6 +388,7 @@ static void create_frame_synchronization_structures(renderer_state* state) {
 
     // Create fence for synchronizing immediate command buffer submissions
     VK_CHECK(vkCreateFence(state->device.handle, &fence_info, state->allocator, &state->imm_fence));
+    ETINFO("Frame synchronization structures created.");
 }
 
 static void destroy_frame_synchronization_structures(renderer_state* state) {
@@ -412,6 +406,7 @@ static void destroy_frame_synchronization_structures(renderer_state* state) {
 
     // Destroy fence for synchronizing the immediate command buffer
     vkDestroyFence(state->device.handle, state->imm_fence, state->allocator); 
+    ETINFO("Frame synchronization structures destroyed.");
 }
 
 static void initialize_descriptors(renderer_state* state) {
@@ -487,6 +482,7 @@ static void shutdown_compute_effects(renderer_state* state) {
     vkDestroyPipelineLayout(state->device.handle, state->gradient_effect.layout, state->allocator);
 
     unload_shader(state, &state->gradient_shader);
+    ETINFO("Compute effects shutdown.");
 }
 
 static b8 initialize_default_material(renderer_state* state) {
