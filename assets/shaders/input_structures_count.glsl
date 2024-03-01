@@ -36,7 +36,20 @@ layout(set = 0, binding = 0) uniform scene_data_block {
 	vec4 ambient_color;
 	vec4 light_color;
     vec4 light_position;
+	uint max_draw_count;
 } scene_data;
+
+struct gpu_obj {
+    uint start_index;
+    uint index_count;
+    uint mat_inst_id;
+    uint transform_id;
+};
+layout(set = 0, binding = 1) readonly buffer obj_buffer {
+	gpu_obj objs[];
+};
+
+layout(set = 0, binding = 2) buffer draw_count { uint count; };
 
 // NOTE: struct VkDrawIndexedIndirectCommand parameters
 struct draw_command {
@@ -50,10 +63,11 @@ struct draw_command {
 	uint transform_id;
 	uint padd;
 };
-layout(std430, set = 0, binding = 1) readonly buffer draw_commands {
+layout(std430, set = 0, binding = 3) buffer draw_commands {
 	draw_command draws[];
 };
-layout(set = 0, binding = 2) uniform sampler2D textures[];
+
+layout(set = 0, binding = 4) uniform sampler2D textures[];
 
 // SET 1: Material descriptors
 layout(set = 1, binding = 0) uniform material_data_block {

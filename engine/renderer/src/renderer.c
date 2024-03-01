@@ -24,10 +24,6 @@
 
 #include "window/renderer_window.h"
 
-// TEMP: Until a math library is situated
-#include <math.h>
-// TEMP: END
-
 // TODO: Move to scene renderer, more programmable
 static void create_frame_command_structures(renderer_state* state);
 static void destroy_frame_command_structures(renderer_state* state);

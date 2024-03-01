@@ -133,14 +133,12 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
     }
 
-    // TEMP: Bindless material buffer
-    buffer_create(
-        state,
+    // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
+    buffer_create(state,
         sizeof(struct bindless_constants) * data->materials_count,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &scene->bindless_material_buffer
-    );
+        &scene->bindless_material_buffer);
     void* bindless_mapped_memory;
     VK_CHECK(vkMapMemory(
         state->device.handle,
@@ -148,10 +146,9 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         /* offset: */ 0,
         sizeof(struct bindless_constants) * data->materials_count,
         /* flags: */ 0,
-        &bindless_mapped_memory
-    ));
+        &bindless_mapped_memory));
     struct bindless_constants* bindless_material_constants = (struct bindless_constants*)bindless_mapped_memory;
-    // TEMP: END
+    // TODO: END
 
     // Materials, TODO: Since this is importing a GLTF, we should use the default GLTF_MR material & shaders for it
     // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
@@ -159,8 +156,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         sizeof(struct GLTF_MR_constants) * data->materials_count,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &scene->material_buffer
-    );
+        &scene->material_buffer);
     void* mapped_memory;
     VK_CHECK(vkMapMemory(
         state->device.handle,
@@ -168,8 +164,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         /* offset: */ 0,
         sizeof(struct GLTF_MR_constants) * data->materials_count,
         /* flags: */ 0,
-        &mapped_memory
-    ));
+        &mapped_memory));
     struct GLTF_MR_constants* material_constants = (struct GLTF_MR_constants*)mapped_memory;
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material* i_material = (data->materials + i);
@@ -189,8 +184,10 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 .y = gltf_pbr_mr.roughness_factor,
             }
         };
+
         // TODO: Handle minUniformBufferOffsetAlignment here
         material_constants[i] = constants;
+        // TODO: END
 
         material_pass pass_type = MATERIAL_PASS_MAIN_COLOR;
         if (i_material->alpha_mode == cgltf_alpha_mode_blend) {
@@ -198,7 +195,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
 
         // TODO: Handle minUniformBufferOffsetAlignment here
-        // Default values
         material_resource material_resources[] = {
             [0] = {
                 .binding = 0,
@@ -216,8 +212,9 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 .view = state->white_image.view,
             },
         };
+        // TODO: END
 
-        // TEMP: Bindless
+        // Bindless
         struct bindless_constants bindless_consts = {
             .color = {
                 .r = gltf_pbr_mr.base_color_factor[0],
@@ -232,7 +229,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             .color_id = 0,
             .mr_id = 0,
         };
-        // TEMP: END
 
         if (i_material->has_pbr_metallic_roughness) {
             if (i_material->pbr_metallic_roughness.base_color_texture.texture) {
@@ -274,13 +270,12 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         };
         material_manager_submit(scene->material_bank, &config);
         
-        // TEMP: Bindless
+        // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
         struct bindless_material_resources bindless_resources = {
             .data_buff = scene->bindless_material_buffer.handle,
-            .data_buff_offset = sizeof(struct bindless_constants) * i,
-        };
+            .data_buff_offset = sizeof(struct bindless_constants) * i};
+        // TODO: END
         scene_material_set_instance(scene, pass_type, &bindless_resources);
-        // TEMP: END
     }
     vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
     vkUnmapMemory(state->device.handle, scene->bindless_material_buffer.memory);
@@ -289,8 +284,8 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     vertex* scene_vertices = dynarray_create(1, sizeof(vertex));
     u32* scene_indices = dynarray_create(1, sizeof(u32));
 
-    surface_2* scene_surfaces = dynarray_create(1, sizeof(surface_2));
-    mesh_2* scene_meshes = dynarray_create(1, sizeof(mesh_2));
+    surface* scene_surfaces = dynarray_create(1, sizeof(surface));
+    mesh* scene_meshes = dynarray_create(1, sizeof(mesh));
 
     u64 opaque_surface_count;
     u64 transparent_surface_count;
@@ -301,7 +296,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         u32 surface_count = dynarray_length(scene_surfaces);
         dynarray_resize((void**)&scene_surfaces, surface_count + gltf_mesh->primitives_count);
 
-        mesh_2 new_mesh = {
+        mesh new_mesh = {
             .vertex_offset = 0,
             .instance_count = 0,
             .start_surface = surface_count,
@@ -312,7 +307,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         for (u32 j = 0; j < gltf_mesh->primitives_count; ++j) {
             cgltf_primitive* gltf_primitive = &gltf_mesh->primitives[j];
             
-            surface_2* new_surface = &scene_surfaces[surface_count + j];
+            surface* new_surface = &scene_surfaces[surface_count + j];
             new_surface->start_index = dynarray_length(scene_indices);
             new_surface->index_count = gltf_primitive->indices->count;
 
@@ -382,10 +377,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                     v->uv_y = uvs.y;
                 }
             }
-            // else {
-            //     ETWARN("Loading mesh %s primitive %lu without vertex coordinates.", gltf_mesh->name, j);
-            // }
-
+            
             // Load vertex color information
             cgltf_accessor* color = get_accessor_from_attributes(
                 gltf_primitive->attributes, gltf_primitive->attributes_count, "COLOR_0");
@@ -399,9 +391,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                     }
                 }
             }
-            // else {
-            //     ETWARN("Loading mesh %s primitive %lu without vertex colors.", gltf_mesh->name, j);
-            // }
 
             // TEMP: Blueprint ID is hardcoded at the moment
             if (gltf_primitive->material) {
@@ -410,6 +399,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             } else {
                 new_surface->material = scene_material_get_instance(scene, (material_id){.blueprint_id = 0, .instance_id = 0});
             }
+            // TEMP: END
         }
     }
 
@@ -417,7 +407,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     // TEMP: cgltf calculates the world transform for us so I can temporary use
     // that function to get a quick and dirty mesh transform buffer to stop using 
     // updating the push constants for each object draw call
-    object* scene_objects = dynarray_create(1, sizeof(object));
 
     m4s** transforms_from_mesh_index = etallocate(sizeof(m4s*) * dynarray_length(scene_meshes), MEMORY_TAG_SCENE);
     for (u32 i = 0; i < dynarray_length(scene_meshes); ++i) {
@@ -427,11 +416,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     for (u32 i = 0; i < data->nodes_count; ++i) {
         if (data->nodes[i].mesh) {
             u32 mesh_index = CGLTF_ARRAY_INDEX(cgltf_mesh, data->meshes, data->nodes[i].mesh);
-            object new_object = {
-                .mesh_index = mesh_index,
-                .instance_id = scene_meshes[mesh_index].instance_count,
-            };
-            dynarray_push((void**)&scene_objects, &new_object);
 
             m4s new_transform = {0};
             cgltf_node_transform_world(&data->nodes[i], (cgltf_float*)new_transform.raw);
@@ -441,16 +425,42 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
     }
 
+    gpu_obj* scene_op_objects = dynarray_create(1, sizeof(gpu_obj));
+    gpu_obj* scene_tp_objects = dynarray_create(1, sizeof(gpu_obj));
     m4s* scene_transforms = dynarray_create(1, sizeof(m4s));
     u32 transform_offset = 0;
     for (u32 i = 0; i < dynarray_length(scene_meshes); ++i) {
         for (u32 j = 0; j < scene_meshes[i].instance_count; ++j) {
-            dynarray_push((void**)&scene_transforms, transforms_from_mesh_index[i] + j);
+            // Object representation for test
+            for (u32 k = 0; k < scene_meshes[i].surface_count; ++k) {
+                surface surface = scene_surfaces[scene_meshes[i].start_surface + k];
+                gpu_obj new_obj = {
+                    .start_index = surface.start_index,
+                    .index_count = surface.index_count,
+                    .mat_inst_id = surface.material.id.instance_id,
+                    .transform_id = transform_offset + j,
+                };
+                // TEMP: Material should be per object. 
+                switch (surface.material.pass)
+                {
+                case MATERIAL_PASS_MAIN_COLOR:
+                    dynarray_push((void**)&scene_op_objects, &new_obj);
+                    break;
+                case MATERIAL_PASS_TRANSPARENT:
+                    dynarray_push((void**)&scene_tp_objects, &new_obj);
+                    break;
+                default:
+                    ETERROR("Unsupported material pass type.");
+                    break;
+                }
+            }
+            dynarray_push((void**)&scene_transforms, &transforms_from_mesh_index[i][j]);
         }
         dynarray_destroy(transforms_from_mesh_index[i]);
         scene_meshes[i].transform_offset = transform_offset;
         transform_offset += scene_meshes[i].instance_count;
     }
+
     etfree(transforms_from_mesh_index, sizeof(m4s*) * dynarray_length(scene_meshes), MEMORY_TAG_SCENE);
 
     // Init Shared buffers
@@ -471,9 +481,36 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         sizeof(m4s) * dynarray_length(scene_transforms),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &scene->transform_buffer
-    );
+        &scene->transform_buffer);
     scene->tb_addr = buffer_get_address(state, &scene->transform_buffer);
+    
+    // Move Objects to object buffer
+    u64 staging_size = sizeof(gpu_obj) * dynarray_length(scene_op_objects);
+    buffer staging = {0};
+    buffer_create(
+        state,
+        staging_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+        &staging);
+    void* mapped_staging;
+    VK_CHECK(vkMapMemory(
+        state->device.handle,
+        staging.memory,
+        /* offset: */ 0,
+        VK_WHOLE_SIZE,
+        /* flags: */ 0,
+        &mapped_staging));
+    etcopy_memory(mapped_staging, scene_op_objects, staging_size);
+    vkUnmapMemory(state->device.handle, staging.memory);
+    VkBufferCopy buff_copy = {
+        .dstOffset = 0,
+        .srcOffset = 0,
+        .size = staging_size};
+    IMMEDIATE_SUBMIT(state, cmd, {
+        vkCmdCopyBuffer(cmd, staging.handle, scene->object_buffer.handle, 1, &buff_copy);
+    });
+    buffer_destroy(state, &staging);
 
     // Move data to scene class:
     scene->vertices = scene_vertices;
@@ -491,9 +528,10 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     scene->transforms = scene_transforms;
     scene->transform_count = dynarray_length(scene_transforms);
 
-    scene->objects = scene_objects;
-    scene->object_count = dynarray_length(scene_objects);
-
+    scene->op_objects = scene_op_objects;
+    scene->op_object_count = dynarray_length(scene_op_objects);
+    scene->tp_objects = scene_tp_objects;
+    scene->tp_object_count = dynarray_length(scene_tp_objects);
     // TEMP: END
 
     // Meshes
@@ -502,7 +540,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     for (u32 i = 0; i < data->meshes_count; ++i) {
         cgltf_mesh* gltf_mesh = &data->meshes[i];
 
-        surface* surfaces = etallocate(sizeof(surface) * gltf_mesh->primitives_count, MEMORY_TAG_SCENE);
+        surface_1* surfaces = etallocate(sizeof(surface_1) * gltf_mesh->primitives_count, MEMORY_TAG_SCENE);
 
         dynarray_clear(indices);
         dynarray_clear(vertices);
@@ -510,7 +548,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         for (u32 j = 0; j < gltf_mesh->primitives_count; ++j) {
             cgltf_primitive* gltf_primitive = &gltf_mesh->primitives[j];
 
-            surface* new_surface = &surfaces[j];
+            surface_1* new_surface = &surfaces[j];
             new_surface->start_index = dynarray_length(indices);
             new_surface->index_count = gltf_primitive->indices->count;
 
@@ -585,9 +623,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                     v->uv_y = uvs.y;
                 }
             }
-            // else {
-            //     ETWARN("Loading mesh %s primitive %lu without vertex coordinates.", gltf_mesh->name, j);
-            // }
 
             // Load vertex color information
             cgltf_accessor* color = get_accessor_from_attributes(
@@ -602,9 +637,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                     }
                 }
             }
-            // else {
-            //     ETWARN("Loading mesh %s primitive %lu without vertex colors.", gltf_mesh->name, j);
-            // }
 
             // Set material
             if (gltf_primitive->material) {
@@ -625,7 +657,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         };
         // mesh_manager_submit_immediate(scene->mesh_bank, &config);
         mesh_manager_submit(scene->mesh_bank, &config);
-        etfree(surfaces, sizeof(surface) * gltf_mesh->primitives_count, MEMORY_TAG_SCENE);
+        etfree(surfaces, sizeof(surface_1) * gltf_mesh->primitives_count, MEMORY_TAG_SCENE);
     }
     dynarray_destroy(vertices);
     dynarray_destroy(indices);
@@ -633,7 +665,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     mesh_manager_uploads_wait(scene->mesh_bank);
 
     // Nodes
-    // Count up needed mesh_nodes & needed nodes. Then allocate backing memory for them
     u32 node_count = 0;
     u32 mesh_node_count = 0;
     for (u32 i = 0; i < data->nodes_count; ++i) {
@@ -644,7 +675,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
     }
 
-    // Calling malloc, which etallocate currently does, can have undefined behavoir
     if (mesh_node_count) {
         scene->mesh_nodes = etallocate(sizeof(mesh_node) * mesh_node_count, MEMORY_TAG_SCENE);
         for (u32 i = 0; i < mesh_node_count; ++i) {

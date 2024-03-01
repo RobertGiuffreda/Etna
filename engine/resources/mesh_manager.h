@@ -6,13 +6,13 @@ b8 mesh_manager_initialize(mesh_manager** manager, renderer_state* state);
 
 void mesh_manager_shutdown(mesh_manager* manager);
 
-mesh* mesh_manager_get(mesh_manager* manager, u32 id);
+mesh_1* mesh_manager_get(mesh_manager* manager, u32 id);
 
-struct surface;
+struct surface_1;
 struct vertex;
 typedef struct mesh_config {
     char* name;
-    struct surface* surfaces;
+    struct surface_1* surfaces;
     u32 surface_count;
 
     struct vertex* vertices;

@@ -1,7 +1,7 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
-#include "bindless_input_structures.glsl"
+#include "input_structures_count.glsl"
 
 // TODO: Move to view space calculations
 // TODO: v/x --> v * 1/x

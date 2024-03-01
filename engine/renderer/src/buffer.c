@@ -14,7 +14,7 @@ void buffer_create(
     VkMemoryPropertyFlags memory_property_flags,
     buffer* out_buffer
 ) {
-    // Does buffer create need an initializer or does this 
+    // Does VkBufferCreateInfo need an initializer or does this 
     // needlessly obfuscate buffer creation
     VkBufferCreateInfo buffer_info = init_buffer_create_info(usage_flags, size);
     VK_CHECK(vkCreateBuffer(state->device.handle, &buffer_info, state->allocator, &out_buffer->handle));
@@ -31,7 +31,7 @@ void buffer_create(
         memory_requirements.memoryTypeBits,
         memory_property_flags);
     if (memory_index == -1) {
-        ETERROR("Memory type with required memory type bits for buffer not found in physical memory properties");
+        ETERROR("Supported memory types for buffer not found in physical memory properties.");
     }
 
     VkMemoryAllocateFlagsInfo alloc_flags_info;
@@ -119,11 +119,36 @@ void buffer_destroy(renderer_state* state, buffer* buffer) {
 void buffer_barrier(
     VkCommandBuffer cmd,
     VkBuffer buffer,
+    u64 offset,
+    u64 size,
     VkAccessFlags2 src_access,
     VkAccessFlags2 dst_access,
-    VkPipelineStageFlags2 src_flags,
-    VkPipelineStageFlags2 dst_flags
+    VkPipelineStageFlags2 src_stages,
+    VkPipelineStageFlags2 dst_stages
 ) {
-    
-    return;
+    VkBufferMemoryBarrier2 barrier = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .pNext = 0,
+        .buffer = buffer,
+        .offset = offset,
+        .size = size,
+        .srcAccessMask = src_access,
+        .dstAccessMask = dst_access,
+        .srcStageMask = src_stages,
+        .dstStageMask = dst_stages,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    };
+    VkDependencyInfo depends = {
+        .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .pNext = 0,
+        .dependencyFlags = 0,
+        .memoryBarrierCount = 0,
+        .pMemoryBarriers = NULL,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers = &barrier,
+        .imageMemoryBarrierCount = 0,
+        .pImageMemoryBarriers = NULL,
+    };
+    vkCmdPipelineBarrier2(cmd, &depends);
 }

@@ -1,7 +1,7 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
-#include "bindless_input_structures.glsl"
+#include "input_structures_count.glsl"
 
 layout (location = 0) out vec3 out_position;
 layout (location = 1) out vec3 out_normal;
@@ -13,7 +13,7 @@ layout (location = 5) flat out uint out_color_id;
 void main() {
     draw_command draw = draws[gl_DrawID];
     vertex v = push_constants.v_buffer[gl_VertexIndex].v;
-    mat4 model = push_constants.t_buffer[gl_InstanceIndex].t;
+    mat4 model = push_constants.t_buffer[draw.transform_id].t;
 
     gl_Position = scene_data.viewproj * model * vec4(v.position, 1.0f);
 

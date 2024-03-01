@@ -35,7 +35,7 @@ struct material_manager {
     ds_allocator ds_allocator;
     material_blueprint blueprint;
     
-    material materials[MAX_MATERIAL_COUNT];
+    material_1 materials[MAX_MATERIAL_COUNT];
     u32 material_count;
 };
 
@@ -46,6 +46,6 @@ struct mesh_manager {
     buffer* staging_buffers;
     u32 upload_count;
 
-    mesh meshes[MAX_MESH_COUNT];
+    mesh_1 meshes[MAX_MESH_COUNT];
     u32 mesh_count;
 };

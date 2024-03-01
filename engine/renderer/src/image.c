@@ -235,11 +235,11 @@ void image_barrier(
         .pNext = 0,
         .dependencyFlags = 0,
         .memoryBarrierCount = 0,
-        .pBufferMemoryBarriers = 0,
+        .pMemoryBarriers = 0,
         .bufferMemoryBarrierCount = 0,
         .pBufferMemoryBarriers = 0,
         .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &barrier};
-
+        .pImageMemoryBarriers = &barrier
+    };
     vkCmdPipelineBarrier2(cmd, &dependency);
 }

@@ -9,6 +9,8 @@ extern/SPIRV-Reflect/bin
 assets/gltf/zda_test.glb
 assets/gltf/house2.glb
 
+assets/shaders/input_structures_refactor.glsl
+
 glb_json.json
 etna_log.txt
 etna_err.txt

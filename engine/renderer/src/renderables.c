@@ -145,8 +145,8 @@ static inline void _mesh_node_draw(mesh_node* node, const m4s top_matrix, draw_c
 
     u32 surface_count = dynarray_length(node->mesh->surfaces);
     for (u32 i = 0; i < surface_count; ++i) {
-        surface* s = &node->mesh->surfaces[i];
-        render_object def = {
+        surface_1* s = &node->mesh->surfaces[i];
+        render_object_1 def = {
             .index_count = s->index_count,
             .first_index = s->start_index,
             .index_buffer = node->mesh->buffers.index_buffer.handle,
@@ -175,10 +175,10 @@ node* node_from_mesh_node(mesh_node* node) {
     return &node->base;
 }
 
-void mesh_asset_print(mesh* m_asset) {
+void mesh_asset_print(mesh_1* m_asset) {
     ETINFO("Mesh asset %s data:", m_asset->name);
     for (u32 i = 0; i < dynarray_length(m_asset->surfaces); ++i) {
-        surface* surface = &m_asset->surfaces[i];
+        surface_1* surface = &m_asset->surfaces[i];
         ETINFO(
             "Surface %lu: Start index: %lu | index_count: %lu", 
             i, surface->start_index, surface->index_count
@@ -201,7 +201,7 @@ void mesh_node_print(mesh_node* node) {
 void draw_context_print(draw_context* ctx) {
     ETINFO("Opaque surfaces: ");
     for (u32 i = 0; i < dynarray_length(ctx->opaque_surfaces); ++i) {
-        render_object* rob = &ctx->opaque_surfaces[i];
+        render_object_1* rob = &ctx->opaque_surfaces[i];
         ETINFO(
             "Render Object %lu: Start index: %lu | Index count: %lu",
             i, rob->first_index, rob->index_count
@@ -209,7 +209,7 @@ void draw_context_print(draw_context* ctx) {
     }
     ETINFO("Transparent surfaces: ");
     for (u32 i = 0; i < dynarray_length(ctx->transparent_surfaces); ++i) {
-        render_object* rob = &ctx->transparent_surfaces[i];
+        render_object_1* rob = &ctx->transparent_surfaces[i];
         ETINFO(
             "Render Object %lu: Start index: %lu | Index count: %lu",
             i, rob->first_index, rob->index_count

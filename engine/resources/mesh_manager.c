@@ -58,7 +58,7 @@ void mesh_manager_shutdown(mesh_manager* manager) {
     etfree(manager, sizeof(mesh_manager), MEMORY_TAG_RESOURCE);
 }
 
-mesh* mesh_manager_get(mesh_manager* manager, u32 id) {
+mesh_1* mesh_manager_get(mesh_manager* manager, u32 id) {
     return &manager->meshes[id];
 }
 
@@ -66,13 +66,13 @@ b8 mesh_manager_submit_immediate(mesh_manager* manager, mesh_config* config) {
     if (manager->mesh_count >= MAX_MESH_COUNT)
         return false;
 
-    mesh* new_mesh = &manager->meshes[manager->mesh_count];
+    mesh_1* new_mesh = &manager->meshes[manager->mesh_count];
     new_mesh->id = manager->mesh_count;
     new_mesh->name = str_duplicate_allocate(config->name);
 
     new_mesh->surfaces = dynarray_create_data(
         config->surface_count,
-        sizeof(surface),
+        sizeof(surface_1),
         config->surface_count,
         config->surfaces);
     new_mesh->buffers = upload_mesh_immediate(
@@ -90,13 +90,13 @@ b8 mesh_manager_submit(mesh_manager* manager, mesh_config* config) {
     if (manager->mesh_count >= MAX_MESH_COUNT)
         return false;
 
-    mesh* new_mesh = &manager->meshes[manager->mesh_count];
+    mesh_1* new_mesh = &manager->meshes[manager->mesh_count];
     new_mesh->id = manager->mesh_count;
     new_mesh->name = str_duplicate_allocate(config->name);
 
     new_mesh->surfaces = dynarray_create_data(
         config->surface_count,
-        sizeof(surface),
+        sizeof(surface_1),
         config->surface_count,
         config->surfaces);
 

@@ -8,6 +8,7 @@ typedef struct renderer_config {
     const char* engine_name;
     const char* app_name;
     etwindow_t* window;
+    u8 frame_overlap;
 } renderer_config;
 
 b8 renderer_initialize(renderer_state** out_state, renderer_config config);

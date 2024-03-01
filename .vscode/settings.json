@@ -187,7 +187,13 @@
         "typeinfo": "c",
         "resource_private.h": "c",
         "etwindow_private.h": "c",
-        "math.h": "c"
+        "math.h": "c",
+        "charconv": "c",
+        "mutex": "c",
+        "span": "c",
+        "streambuf": "c",
+        "thread": "c",
+        "xlocmes": "c"
     },
     "C_Cpp.dimInactiveRegions": true,
     "dotnet.defaultSolution": "disable",

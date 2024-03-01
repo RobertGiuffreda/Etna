@@ -9,17 +9,22 @@
 
 #include "resources/resource_private.h"
 
-/** Checklist:
+/** NOTE:
+ * Refactors:
  * Parent child relationship between objects/transforms to make scene graph.
  * (Double Ended Queue / Ring queue) for traversing the scene graph
  * 
- * Information that changes each frame.
- * 
+ * Information that changes each frame:
+ * Transforms, Scene Objects, 
  * 
  * Use vertex offset to differentiate meshes in the vertex buffer so that index buffer can be stored normally
  * 
+ * struct object {
+ *     u32 geo_id;
+ *     u32 transform_id;
+ *     u32 material_id;
+ * };
  * 
- * Image, Material, Surface, Mesh, Object, resource managers
  * 
  * 
  * Features:
@@ -46,24 +51,35 @@ typedef struct scene {
     buffer transform_buffer;
     VkDeviceAddress tb_addr;
 
-    buffer* draw_buffers;       // Perframe
-    buffer* scene_uniforms;     // Perframe
+    buffer scene_uniforms;
+    buffer object_buffer;
+    buffer count_buffer;
+    buffer draw_buffer;
 
     buffer bindless_material_buffer;
 
-    surface_2* surfaces;    // dynarray
-    mesh_2* meshes;         // dynarray
+    surface* surfaces;      // dynarray
+    mesh* meshes;           // dynarray
     m4s* transforms;        // dynarray
-    object* objects;        // dynarray
+    gpu_obj* op_objects;     // dynarray
+    gpu_obj* tp_objects;     // dynarray
 
     u64 surface_count;
     u64 mesh_count;
     u64 transform_count;
-    u64 object_count;
+    u64 op_object_count;
+    u64 tp_object_count;
+    
+    VkDescriptorPool descriptor_pool;
 
+    // TODO: Compute shader pipeline encapsulation
+    VkPipeline draw_gen_pipeline;
+    VkPipelineLayout draw_gen_layout;
+    // TODO: END
+    
     // NOTE: PSOs must implement SET 0 to match this layout & retrieve the information
-    VkDescriptorSetLayout scene_layout;
-    VkDescriptorSet* scene_sets;
+    VkDescriptorSetLayout scene_set_layout;
+    VkDescriptorSet scene_set;
     VkPushConstantRange push_constant;
 
     // TODO: Material manager bindless & support for multiple PSOs.
@@ -74,19 +90,10 @@ typedef struct scene {
     VkDescriptorSetLayout material_layout;
     VkDescriptorSet material_set;
 
-    material_2 materials[MAX_MATERIAL_COUNT];
+    material materials[MAX_MATERIAL_COUNT];
     u32 material_count;
     // TODO: END
     
-    VkDescriptorPool bindless_pool;
-
-    // Draw commands for indirect bindless.
-    u64 op_draws_count;
-    u64 tp_draws_count;
-
-    draw_command* opaque_draws;
-    draw_command* transparent_draws;
-    // TEMP: END
 
     camera cam;
     scene_data data;
@@ -122,7 +129,7 @@ typedef struct scene {
 
 // TEMP: Bindless testing
 b8 scene_material_set_instance(scene* scene, material_pass pass_type, struct bindless_material_resources* resources);
-material_2 scene_material_get_instance(scene* scene, material_id id);
+material scene_material_get_instance(scene* scene, material_id id);
 
 void scene_image_set(scene* scene, u32 img_id, u32 sampler_id);
 // TEMP: END

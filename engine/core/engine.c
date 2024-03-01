@@ -93,7 +93,7 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         .app_name = "Test Application",
         .engine_name = "Etna",
         .window = engine->window,
-    };
+        .frame_overlap = 3};
     if (!renderer_initialize(&engine->renderer_state, renderer_config)) {
         ETFATAL("Renderer failed to initialize.");
         return false;
@@ -138,13 +138,11 @@ b8 engine_run(void) {
         if (!engine->is_minimized) {
             clock_time(&engine->frame);
             f64 dt = engine->frame.elapsed;
-            printf("DeltaTime: %.10llf\r", dt * 1000);
+            printf("dt: %.10llf\r", dt * 1000);
             clock_start(&engine->frame);
 
             scene_update(engine->main_scene, dt);
             engine->app_update(engine->app, dt);
-
-            scene_draw(engine->main_scene);
             
             if (scene_frame_begin(engine->main_scene, engine->renderer_state)) {
                 scene_render(engine->main_scene);

@@ -22,9 +22,9 @@
 
 // TODO: xxxxx_manager_load vs xxxxx_manager_submit
 
-typedef struct mesh mesh;
+typedef struct mesh_1 mesh_1;
 typedef struct image image;
-typedef struct material material;
+typedef struct material_1 material_1;
 typedef struct material_resource material_resource;
 
 typedef struct mesh_manager mesh_manager;
@@ -42,28 +42,40 @@ typedef struct material_id {
     u32 instance_id;
 } material_id;
 
-typedef struct material_2 {
+typedef struct material {
     material_pass pass;
     material_id id;
-} material_2;
+} material;
 
-typedef struct surface_2 {
+typedef struct surface {
     u32 start_index;
     u32 index_count;
 
-    material_2 material;
-} surface_2;
+    material material;
+} surface;
 
-typedef struct mesh_2 {
+typedef struct mesh {
     u32 vertex_offset;
     u32 transform_offset;
     u32 instance_count;
 
     u32 start_surface;
     u32 surface_count;
-} mesh_2;
+} mesh;
 
 typedef struct object {
-    u32 mesh_index;
-    u32 instance_id;        // Instance number to get the transform
+    u32 surface_id;
+    u32 transform_id;
 } object;
+
+// TEMP: Until refactor to move material from surface and add culling bounds
+typedef struct gpu_obj {
+    // TEMP: Above
+    u32 start_index;
+    u32 index_count;
+    // TEMP: END
+
+    u32 mat_inst_id;
+    u32 transform_id;
+} gpu_obj;
+// TEMP: END

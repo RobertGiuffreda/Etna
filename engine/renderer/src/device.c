@@ -23,17 +23,18 @@ typedef struct physical_device_requirements {
     const char** device_extensions;
     // Required features
     // Features
-    b8 sampler_anisotropy;
-    b8 shaderint64;
-    b8 shaderint16;
+    b8 samplerAnisotropy;
+    b8 shaderInt64;
+    b8 shaderInt16;
     b8 multiDrawIndirect;
 
     // Vulkan11Features
     b8 shaderDrawParameters;
 
     // Vulkan12Features
-    b8 buffer_device_address;
-    b8 descriptor_indexing;
+    b8 drawIndirectCount;
+    b8 bufferDeviceAddress;
+    b8 descriptorIndexing;
     b8 shaderUniformBufferArrayNonUniformIndexing;
     b8 shaderSampledImageArrayNonUniformIndexing;
     b8 shaderStorageBufferArrayNonUniformIndexing;
@@ -48,7 +49,7 @@ typedef struct physical_device_requirements {
     b8 runtimeDescriptorArray;
 
     // Vulkan13Features
-    b8 dynamic_rendering;
+    b8 dynamicRendering;
     b8 synchronization2;
     b8 maintenance4;
 
@@ -58,7 +59,7 @@ typedef struct physical_device_requirements {
     b8 transfer_capable;
 
     // To be read after device_meets_requirements function
-    // Graphics|presentation|compute|transfer
+    // Graphics|Presentation|Compute|Transfer
     i32 g_index;
     i32 p_index;
     i32 c_index;
@@ -82,15 +83,16 @@ b8 device_create(renderer_state* state, device* out_device) {
         .device_extension_count = 1,
         .device_extensions = &required_extensions,
 
-        .sampler_anisotropy = true,
-        .shaderint64 = true,
-        .shaderint16 = true,
+        .samplerAnisotropy = true,
+        .shaderInt64 = true,
+        .shaderInt16 = true,
         .multiDrawIndirect = true,
 
         .shaderDrawParameters = true,
 
-        .buffer_device_address = true,
-        .descriptor_indexing = true,
+        .drawIndirectCount = true,
+        .bufferDeviceAddress = true,
+        .descriptorIndexing = true,
         .shaderUniformBufferArrayNonUniformIndexing = true,
         .shaderSampledImageArrayNonUniformIndexing = true,
         .shaderStorageBufferArrayNonUniformIndexing = true,
@@ -104,7 +106,7 @@ b8 device_create(renderer_state* state, device* out_device) {
         .descriptorBindingVariableDescriptorCount = true,
         .runtimeDescriptorArray = true,
 
-        .dynamic_rendering = true,
+        .dynamicRendering = true,
         .synchronization2 = true,
         .maintenance4 = true,
         
@@ -184,14 +186,15 @@ b8 device_create(renderer_state* state, device* out_device) {
     VkPhysicalDeviceVulkan13Features enabled_features13 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
         .pNext = 0,
-        .dynamicRendering = requirements.dynamic_rendering,
+        .dynamicRendering = requirements.dynamicRendering,
         .synchronization2 = requirements.synchronization2,
         .maintenance4 = requirements.maintenance4};
     VkPhysicalDeviceVulkan12Features enabled_features12 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
         .pNext = &enabled_features13,
-        .bufferDeviceAddress = requirements.buffer_device_address,
-        .descriptorIndexing = requirements.descriptor_indexing,
+        .drawIndirectCount = requirements.drawIndirectCount,
+        .bufferDeviceAddress = requirements.bufferDeviceAddress,
+        .descriptorIndexing = requirements.descriptorIndexing,
         .shaderUniformBufferArrayNonUniformIndexing = requirements.shaderUniformBufferArrayNonUniformIndexing,
         .shaderSampledImageArrayNonUniformIndexing = requirements.shaderSampledImageArrayNonUniformIndexing,
         .shaderStorageBufferArrayNonUniformIndexing = requirements.shaderStorageBufferArrayNonUniformIndexing,
@@ -214,9 +217,9 @@ b8 device_create(renderer_state* state, device* out_device) {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .pNext = &enabled_features11,
         .features = {
-            .samplerAnisotropy = requirements.sampler_anisotropy,
-            .shaderInt16 = requirements.shaderint16,
-            .shaderInt64 = requirements.shaderint64,
+            .samplerAnisotropy = requirements.samplerAnisotropy,
+            .shaderInt16 = requirements.shaderInt16,
+            .shaderInt64 = requirements.shaderInt64,
             .multiDrawIndirect = requirements.multiDrawIndirect,
         },
     };
@@ -360,15 +363,15 @@ static b8 pick_physical_device(renderer_state* state, gpu_reqs* requirements, de
         vkGetPhysicalDeviceProperties2(physical_devices[i], &properties2);
         VkPhysicalDeviceProperties* properties = &properties2.properties;
 
-        // //TEMP: To get my laptop to not pick my integrated GPU
-        // if (properties->deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-        //     ETINFO("Device: %u is not a discrete GPU. Skipping", i);
-        //     continue;
-        // }
-        // //TEMP: END
+        // TODO: Move this logic into the device_meets_requirements function
+        if (properties->deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+            ETINFO("Device %s is not a discrete GPU. Skipping", properties->deviceName);
+            continue;
+        }
+        // TODO: END
 
         if (!device_meets_requirements(physical_devices[i], state->swapchain.surface, requirements)) {
-            ETFATAL("Device Requirements not met.");
+            ETINFO("Device %s does not meet requirements.", properties->deviceName);
             continue;
         }
 
@@ -428,15 +431,15 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
     b8 supported = true;
 
     // Features
-    if (requirements->sampler_anisotropy && !features.samplerAnisotropy) {
+    if (requirements->samplerAnisotropy && !features.samplerAnisotropy) {
         ETFATAL("Feature Sampler anisotropy is required & not supported on this device.");
         supported = false;
     }
-    if (requirements->shaderint16 && !features.shaderInt16) {
+    if (requirements->shaderInt16 && !features.shaderInt16) {
         ETFATAL("Feature shaderInt16 is required & not supported on this device.");
         supported = false;
     }
-    if (requirements->shaderint64 && !features.shaderInt64) {
+    if (requirements->shaderInt64 && !features.shaderInt64) {
         ETFATAL("Feature shaderInt64 is required & not supported on this device.");
         supported = false;
     }
@@ -452,12 +455,16 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
     }
 
     // Features 12
-    if (requirements->buffer_device_address && !features12.bufferDeviceAddress) {
-        ETFATAL("Feature Buffer Device Address is required & not supported on this device.");
+    if (requirements->drawIndirectCount && !features12.drawIndirectCount) {
+        ETFATAL("Feature drawIndirectCount is required & not supported on this device.");
         supported = false;
     }
-    if (requirements->descriptor_indexing && !features12.descriptorIndexing) {
-        ETFATAL("Feature descriptor indexing is required & not supported on this device.");
+    if (requirements->bufferDeviceAddress && !features12.bufferDeviceAddress) {
+        ETFATAL("Feature bufferDeviceAddress is required & not supported on this device.");
+        supported = false;
+    }
+    if (requirements->descriptorIndexing && !features12.descriptorIndexing) {
+        ETFATAL("Feature descriptorIndexing is required & not supported on this device.");
         supported = false;
     }
     if (requirements->shaderUniformBufferArrayNonUniformIndexing && !features12.shaderUniformBufferArrayNonUniformIndexing) { 
@@ -510,12 +517,12 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
     }
 
     // Features 13
-    if (requirements->dynamic_rendering && !features13.dynamicRendering) {
-        ETFATAL("Feature Dynamic Rendering is required & not supported on this device.");
+    if (requirements->dynamicRendering && !features13.dynamicRendering) {
+        ETFATAL("Feature dynamicRendering is required & not supported on this device.");
         supported = false;
     }
     if (requirements->synchronization2 && !features13.synchronization2) {
-        ETFATAL("Feature Dynamic Rendering is required & not supported on this device.");
+        ETFATAL("Feature synchronization2 is required & not supported on this device.");
         supported = false;
     }
     if (requirements->maintenance4 && !features13.maintenance4) {
@@ -525,7 +532,7 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
 
     if (!supported) return false;
 
-    // Enumerate supported extnesions
+    // Supported extnesions
     u32 supported_extension_count = 0;
     vkEnumerateDeviceExtensionProperties(device, 0, &supported_extension_count, 0);
     VkExtensionProperties* supported_extensions = 
@@ -549,7 +556,6 @@ static b8 device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surfac
             return false;
         }
     }
-    // Clean up supported extensions dynarray
     dynarray_destroy(supported_extensions);
 
     // Get Queue family information

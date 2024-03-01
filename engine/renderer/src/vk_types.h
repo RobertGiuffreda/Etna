@@ -83,16 +83,17 @@ typedef struct scene_data {
     m4s view;
     m4s proj;
     m4s viewproj;
+    v4s view_pos;
     v4s ambient_color;
     v4s light_color;
     v4s light_position;
-    v4s view_pos;
+    u32 max_draw_count;
 } scene_data;
 
 typedef struct draw_command {
     VkDrawIndexedIndirectCommand draw;
     u32 material_instance_id;
-    u32 transform_offset;
+    u32 transform_id;
     u32 padding;
 } draw_command;
 
@@ -156,29 +157,29 @@ typedef struct GLTF_MR {
 } GLTF_MR;
 
 // Move material pass into this
-typedef struct material {
+typedef struct material_1 {
     char* name;
     u32 id;
     material_instance instance;
-} material;
+} material_1;
 
-typedef struct surface {
+typedef struct surface_1 {
     u32 start_index;
     u32 index_count;
 
-    material* material;
-} surface;
+    material_1* material;
+} surface_1;
 
-typedef struct mesh {
+typedef struct mesh_1 {
     u32 id;
     char* name;
 
     // TODO: Stop using dynarray here
-    surface* surfaces;  // Dynarray
+    surface_1* surfaces;  // Dynarray
     mesh_buffers buffers;
-} mesh;
+} mesh_1;
 
-typedef struct render_object {
+typedef struct render_object_1 {
     char* mesh_name;
     char* material_name;
 
@@ -191,11 +192,11 @@ typedef struct render_object {
 
     m4s transform;
     VkDeviceAddress vertex_buffer_address;
-} render_object;
+} render_object_1;
 
 typedef struct draw_context {
-    render_object* opaque_surfaces;         // Dynarray
-    render_object* transparent_surfaces;    // Dynarray
+    render_object_1* opaque_surfaces;         // Dynarray
+    render_object_1* transparent_surfaces;    // Dynarray
 } draw_context;
 
 /** TEMP:TODO:

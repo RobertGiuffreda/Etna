@@ -63,7 +63,7 @@ void material_manager_shutdown(material_manager* manager) {
     etfree(manager, sizeof(material_manager), MEMORY_TAG_RESOURCE);
 }
 
-material* material_manager_get(material_manager* manager, u32 id) {
+material_1* material_manager_get(material_manager* manager, u32 id) {
     // TODO: Assert id is not invalid
     return &manager->materials[id];
 }
@@ -72,7 +72,7 @@ b8 material_manager_submit(material_manager* manager, material_config* config) {
     if (manager->material_count >= MAX_MATERIAL_COUNT)
         return false;
 
-    material* new_material = &manager->materials[manager->material_count];
+    material_1* new_material = &manager->materials[manager->material_count];
     new_material->id = manager->material_count;
     new_material->name = str_duplicate_allocate(config->name);
 

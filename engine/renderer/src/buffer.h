@@ -20,3 +20,13 @@ void buffer_create_data(
 VkDeviceAddress buffer_get_address(renderer_state* state, buffer* buffer);
 
 void buffer_destroy(renderer_state* state, buffer* buffer);
+
+void buffer_barrier(
+    VkCommandBuffer cmd,
+    VkBuffer buffer,
+    u64 offset,
+    u64 size,
+    VkAccessFlags2 src_access,
+    VkAccessFlags2 dst_access,
+    VkPipelineStageFlags2 src_stages,
+    VkPipelineStageFlags2 dst_stages);

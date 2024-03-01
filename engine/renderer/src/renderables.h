@@ -53,7 +53,7 @@ typedef struct mesh_node {
     struct node base;
 
     // Pointer as mesh can be shared between multiple nodes
-    mesh* mesh;
+    mesh_1* mesh;
 } mesh_node;
 
 void renderable_destroy(renderable* renderable);
