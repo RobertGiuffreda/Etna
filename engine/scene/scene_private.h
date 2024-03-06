@@ -5,27 +5,13 @@
 #include "core/clock.h"
 #include "math/math_types.h"
 #include "renderer/src/vk_types.h"
-#include "renderer/src/renderables.h"
 
 #include "resources/resource_private.h"
 
 /** NOTE:
  * Refactors:
- * Parent child relationship between objects/transforms to make scene graph.
- * (Double Ended Queue / Ring queue) for traversing the scene graph
- * 
- * Information that changes each frame:
- * Transforms, Scene Objects, 
- * 
- * Use vertex offset to differentiate meshes in the vertex buffer so that index buffer can be stored normally
- * 
- * struct object {
- *     u32 geo_id;
- *     u32 transform_id;
- *     u32 material_id;
- * };
- * 
- * 
+ * Use vertex offset to differentiate meshes in the vertex buffer so that index buffers can be stored normally
+ * Walk scene graph updating information
  * 
  * Features:
  * Create material blueprint from Shader reflection data taking into account bindless design.
@@ -33,49 +19,62 @@
  * Genuine Instancing - Hardcoded MAX instance amount for each mesh, controlls offsets into transform buffer.
  * Indirect generated on GPU - Compute buffer to cull & sort by material blueprint & instance & generate draw calls.
  * 
+ * Eventual:
+ * Parent child relationship between objects/transforms to make scene graph.
+ * (Double Ended Queue / Ring queue) for traversing the scene graph
+ * 
  */
 
 typedef struct scene {
     char* name;
 
-    // TEMP: Until bindless has taken over
+    // NOTE: Data representation on cpu
+    camera cam;
+    scene_data data;
+
     u64 vertex_count;
-    u64 index_count;
     vertex* vertices;
+
+    u64 index_count;
     u32* indices;
 
-    buffer index_buffer;
-    buffer vertex_buffer;
-    VkDeviceAddress vb_addr;    // Vertex buffer address
-
-    buffer transform_buffer;
-    VkDeviceAddress tb_addr;
-
-    buffer scene_uniforms;
-    buffer object_buffer;
-    buffer count_buffer;
-    buffer draw_buffer;
-
-    buffer bindless_material_buffer;
-
-    surface* surfaces;      // dynarray
-    mesh* meshes;           // dynarray
-    m4s* transforms;        // dynarray
-    gpu_obj* op_objects;     // dynarray
-    gpu_obj* tp_objects;     // dynarray
-
     u64 surface_count;
+    surface* surfaces;       // dynarray
+
     u64 mesh_count;
-    u64 transform_count;
-    u64 op_object_count;
-    u64 tp_object_count;
+    mesh* meshes;            // dynarray
     
+    u64 transform_count;
+    m4s* transforms;         // dynarray
+    // NOTE: END
+
+    // NOTE: GPU structures to generate draw calls.
+    geometry* geometries;       // All geometries for testing atm
+    object* objects;            // All objects for testing atm
+    // NOTE: END
+
+    // NOTE: GPU Memory Buffers
+    buffer vertex_buffer;
+    buffer index_buffer;
+    buffer transform_buffer;
+
+    buffer scene_uniforms;      // Per Frame Uniform data
+    buffer object_buffer;       // Contains Object information used to generate draws
+    buffer geometry_buffer;
+
+    // TODO: Rename to suit multiple material pipelines
+    buffer count_buffer;        // Holds the counts for each pipeline draw indirect
+    buffer draw_buffer;         // Holds pointers to each material pipelines draw buffers
+    // NOTE: END
+    
+    VkFence* render_fences;
+    VkCommandPool* graphics_pools;
+    VkCommandBuffer* graphics_command_buffers;
+
     VkDescriptorPool descriptor_pool;
 
-    // TODO: Compute shader pipeline encapsulation
     VkPipeline draw_gen_pipeline;
     VkPipelineLayout draw_gen_layout;
-    // TODO: END
     
     // NOTE: PSOs must implement SET 0 to match this layout & retrieve the information
     VkDescriptorSetLayout scene_set_layout;
@@ -90,46 +89,26 @@ typedef struct scene {
     VkDescriptorSetLayout material_layout;
     VkDescriptorSet material_set;
 
+    buffer material_draws_buffer;
+    VkDeviceAddress mat_draws_addr;
+
+    buffer material_buffer;
     material materials[MAX_MATERIAL_COUNT];
     u32 material_count;
     // TODO: END
     
-
-    camera cam;
-    scene_data data;
-
     // TODO: Update to current GPU Driven architecture
     image_manager* image_bank;
-    material_manager* material_bank;
-    mesh_manager* mesh_bank;
-    // TODO: END
-
-    // TODO: Delete node structure and replace with transform hierarchy
-    node** top_nodes;
-    u32 top_node_count;
-
-    node* nodes;
-    u32 node_count;
-    mesh_node* mesh_nodes;
-    u32 mesh_node_count;
-    // TODO: END
-
-    // TODO: Put all sampler combos into renderer_state as
-    // defaults to avoid having them here. 
     u32 sampler_count;
     VkSampler* samplers;
-    // TODO: END
-
-    // TODO: Put into material manager and suballocate??
-    buffer material_buffer;
     // TODO: END
 
     renderer_state* state;
 } scene;
 
-// TEMP: Bindless testing
-b8 scene_material_set_instance(scene* scene, material_pass pass_type, struct bindless_material_resources* resources);
+// TEMP: Managing resources is a mess
+b8 scene_material_set_instance(scene* scene, material_pass pass_type, struct material_resources* resources);
 material scene_material_get_instance(scene* scene, material_id id);
 
-void scene_image_set(scene* scene, u32 img_id, u32 sampler_id);
+void scene_texture_set(scene* scene, u32 img_id, u32 sampler_id);
 // TEMP: END

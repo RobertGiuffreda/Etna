@@ -18,19 +18,13 @@
 #include "renderer/src/pipeline.h"
 #include "renderer/src/shader.h"
 #include "renderer/src/descriptor.h"
-#include "renderer/src/GLTF_MR.h"
-#include "renderer/src/material.h"
-#include "renderer/src/renderables.h"
 
 #include "window/renderer_window.h"
 
+static void initialize_immediate_submit(renderer_state* state);
+static void shutdown_immediate_submit(renderer_state* state);
+
 // TODO: Move to scene renderer, more programmable
-static void create_frame_command_structures(renderer_state* state);
-static void destroy_frame_command_structures(renderer_state* state);
-
-static void create_frame_synchronization_structures(renderer_state* state);
-static void destroy_frame_synchronization_structures(renderer_state* state);
-
 static void initialize_descriptors(renderer_state* state);
 static void shutdown_descriptors(renderer_state* state);
 
@@ -38,13 +32,8 @@ static b8 initialize_compute_effects(renderer_state* state);
 static void shutdown_compute_effects(renderer_state* state);
 // TODO: END
 
-// TODO: Default material to scene renderer
-static b8 initialize_default_material(renderer_state* state);
-static void shutdown_default_material(renderer_state* state);
-
 static b8 initialize_default_data(renderer_state* state);
 static void shutdown_default_data(renderer_state* state);
-// TODO: END
 
 VkBool32 vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -231,19 +220,12 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
     ETINFO("Depth image created");
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->depth_image.handle, "Main depth image");
 
-    // Per frame initializations
-    create_frame_command_structures(state);
-    create_frame_synchronization_structures(state);
+    initialize_immediate_submit(state);
 
     initialize_descriptors(state);
 
     if (!initialize_compute_effects(state)) {
         ETERROR("Could not initialize compute effects.");
-        return false;
-    }
-
-    if (!initialize_default_material(state)) {
-        ETERROR("Could not initialize default material.");
         return false;
     }
 
@@ -263,15 +245,11 @@ void renderer_shutdown(renderer_state* state) {
 
     shutdown_default_data(state);
 
-    shutdown_default_material(state);
-
     shutdown_compute_effects(state);
 
     shutdown_descriptors(state);
 
-    destroy_frame_synchronization_structures(state);
-
-    destroy_frame_command_structures(state);
+    shutdown_immediate_submit(state);
 
     image_destroy(state, &state->depth_image);
     image_destroy(state, &state->render_image);
@@ -295,32 +273,7 @@ void renderer_shutdown(renderer_state* state) {
     etfree(state, sizeof(renderer_state), MEMORY_TAG_RENDERER);
 }
 
-static void create_frame_command_structures(renderer_state* state) {
-    state->graphics_pools = (VkCommandPool*)etallocate(
-        sizeof(VkCommandPool) * state->swapchain.image_count,
-        MEMORY_TAG_RENDERER);
-    state->main_graphics_command_buffers = (VkCommandBuffer*)etallocate(
-        sizeof(VkCommandBuffer) * state->swapchain.image_count,
-        MEMORY_TAG_RENDERER);
-    for (u32 i= 0; i < state->swapchain.image_count; ++i) {
-        VkCommandPoolCreateInfo gpool_info = init_command_pool_create_info(
-            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            state->device.graphics_qfi);
-        VK_CHECK(vkCreateCommandPool(state->device.handle,
-            &gpool_info,
-            state->allocator,
-            &state->graphics_pools[i]
-        ));
-        
-        // Allocate one primary
-        VkCommandBufferAllocateInfo command_buffer_alloc_info = init_command_buffer_allocate_info(
-            state->graphics_pools[i], VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
-        VK_CHECK(vkAllocateCommandBuffers(
-            state->device.handle,
-            &command_buffer_alloc_info,
-            &state->main_graphics_command_buffers[i]
-        ));
-    }
+static void initialize_immediate_submit(renderer_state* state) {
     // Immediate command pool & buffer
     VkCommandPoolCreateInfo imm_pool_info = init_command_pool_create_info(
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
@@ -329,80 +282,29 @@ static void create_frame_command_structures(renderer_state* state) {
         state->device.handle,
         &imm_pool_info,
         state->allocator,
-        &state->imm_pool
-    ));
+        &state->imm_pool));
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_COMMAND_POOL, state->imm_pool, "ImmediateSubmissionCommandPool");
 
     VkCommandBufferAllocateInfo imm_buffer_alloc_info = init_command_buffer_allocate_info(
         state->imm_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
     VK_CHECK(vkAllocateCommandBuffers(
         state->device.handle,
         &imm_buffer_alloc_info,
-        &state->imm_buffer
-    ));
+        &state->imm_buffer));
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_COMMAND_BUFFER, state->imm_buffer, "ImmediateSubmissionCommandBuffer");
 
-    ETINFO("Frame command structures created.");
-}
-
-static void destroy_frame_command_structures(renderer_state* state) {
-    // NOTE: Command buffers do not have to be freed to destroy the
-    // associated command pool
-    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
-        vkDestroyCommandPool(
-            state->device.handle,
-            state->graphics_pools[i],
-            state->allocator
-        );
-    }
-    etfree(state->main_graphics_command_buffers,
-        sizeof(VkCommandBuffer) * state->swapchain.image_count,
-        MEMORY_TAG_RENDERER);
-    etfree(state->graphics_pools,
-        sizeof(VkCommandPool) * state->swapchain.image_count,
-        MEMORY_TAG_RENDERER
-    );
-
-    vkDestroyCommandPool(state->device.handle, state->imm_pool, state->allocator);
-    ETINFO("Frame command structures destroyed.");
-}
-
-static void create_frame_synchronization_structures(renderer_state* state) {
-    state->render_fences = etallocate(
-        sizeof(VkFence) * state->swapchain.image_count,
-        MEMORY_TAG_RENDERER
-    );
-    VkFenceCreateInfo fence_info = init_fence_create_info(
-        VK_FENCE_CREATE_SIGNALED_BIT
-    );
-    
-    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
-        VK_CHECK(vkCreateFence(state->device.handle,
-            &fence_info,
-            state->allocator,
-            &state->render_fences[i]
-        ));
-    }
-
-    // Create fence for synchronizing immediate command buffer submissions
+    // Immediate Fence
+    VkFenceCreateInfo fence_info = init_fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
     VK_CHECK(vkCreateFence(state->device.handle, &fence_info, state->allocator, &state->imm_fence));
-    ETINFO("Frame synchronization structures created.");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_FENCE, state->imm_fence, "ImmediateSubmissionFence");
+
+    ETINFO("Immediate submission functionality initialized.");
 }
 
-static void destroy_frame_synchronization_structures(renderer_state* state) {
-    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
-        vkDestroyFence(
-            state->device.handle,
-            state->render_fences[i],
-            state->allocator
-        );
-    }
-    etfree(state->render_fences,
-        sizeof(VkFence) * state->swapchain.image_count,
-        MEMORY_TAG_RENDERER
-    );
-
-    // Destroy fence for synchronizing the immediate command buffer
+static void shutdown_immediate_submit(renderer_state* state) {
+    vkDestroyCommandPool(state->device.handle, state->imm_pool, state->allocator);
     vkDestroyFence(state->device.handle, state->imm_fence, state->allocator); 
-    ETINFO("Frame synchronization structures destroyed.");
+    ETINFO("Immediate submission functionality shutdown.");
 }
 
 static void initialize_descriptors(renderer_state* state) {
@@ -440,7 +342,7 @@ static void shutdown_descriptors(renderer_state* state) {
 }
 
 static b8 initialize_compute_effects(renderer_state* state) {
-    if (!load_shader(state, "build/assets/shaders/gradient.comp.spv", &state->gradient_shader)) {
+    if (!load_shader(state, "assets/shaders/gradient.comp.spv", &state->gradient_shader)) {
         ETERROR("Error loading compute effect shader.");
         return false;
     }
@@ -479,14 +381,6 @@ static void shutdown_compute_effects(renderer_state* state) {
 
     unload_shader(state, &state->gradient_shader);
     ETINFO("Compute effects shutdown.");
-}
-
-static b8 initialize_default_material(renderer_state* state) {
-    return GLTF_MR_build_blueprint(&state->metal_rough_material, state);
-}
-
-static void shutdown_default_material(renderer_state* state) {
-    GLTF_MR_destroy_blueprint(&state->metal_rough_material, state);
 }
 
 static b8 initialize_default_data(renderer_state* state) {
@@ -550,48 +444,17 @@ static b8 initialize_default_data(renderer_state* state) {
 
     sampler_info.magFilter = VK_FILTER_NEAREST;
     sampler_info.minFilter = VK_FILTER_NEAREST;
-    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->default_sampler_nearest);
+    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->sampler_nearest);
 
     sampler_info.magFilter = VK_FILTER_LINEAR;
     sampler_info.minFilter = VK_FILTER_LINEAR;
-    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->default_sampler_linear);
-
-    struct GLTF_MR_material_resources mat_resources;
-    mat_resources.color_image = state->white_image;
-    mat_resources.color_sampler = state->default_sampler_linear;
-    mat_resources.metal_rough_image = state->white_image;
-    mat_resources.metal_rough_sampler = state->default_sampler_linear;
-
-    // Create material_constants uniform buffer
-    buffer_create(
-        state,
-        sizeof(struct GLTF_MR_constants),
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &state->default_material_constants
-    );
-
-    struct GLTF_MR_constants scene_uniform_data = {
-        .color_factors = (v4s){.raw = {1.f, 1.f, 1.f, 1.f}},
-        .metal_rough_factors = (v4s){.raw = {1.f, .5f, 0.f, 0.f}},
-    };
-    struct GLTF_MR_constants* mapped_data;
-    vkMapMemory(state->device.handle, state->default_material_constants.memory, 0, sizeof(struct GLTF_MR_constants), 0, (void**)&mapped_data);
-    *mapped_data = scene_uniform_data;
-    vkUnmapMemory(state->device.handle, state->default_material_constants.memory);
-
-    mat_resources.data_buffer = state->default_material_constants.handle;
-    mat_resources.data_buffer_offset = 0;
-
-    state->default_material_instance = GLTF_MR_create_instance(&state->metal_rough_material, state, MATERIAL_PASS_MAIN_COLOR, &mat_resources, &state->global_ds_allocator);
+    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->sampler_linear);
     return true;
 }
 
 static void shutdown_default_data(renderer_state* state) {
-    buffer_destroy(state, &state->default_material_constants);
-
-    vkDestroySampler(state->device.handle, state->default_sampler_linear, state->allocator);
-    vkDestroySampler(state->device.handle, state->default_sampler_nearest, state->allocator);
+    vkDestroySampler(state->device.handle, state->sampler_linear, state->allocator);
+    vkDestroySampler(state->device.handle, state->sampler_nearest, state->allocator);
 
     image_destroy(state, &state->error_image);
     image_destroy(state, &state->black_image);

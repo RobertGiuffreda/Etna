@@ -38,7 +38,7 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
 
     u64 code_size = 0;
     if (!file_size(shader_file, &code_size)) {
-        ETERROR("Unable to measure size of compute shader file: '%s'.", path);
+        ETERROR("Unable to measure size of shader file: '%s'.", path);
         file_close(shader_file);
         return false;
     }
@@ -57,13 +57,24 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
 
     VK_CHECK(vkCreateShaderModule(state->device.handle, &shader_info, state->allocator, &shader->module));
 
+    shader->entry_point = "main";
+    if (str_str_search(path, "vert")) {
+        shader->stage = VK_SHADER_STAGE_VERTEX_BIT;
+    } else if (str_str_search(path, "frag")) {
+        shader->stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    } else if (str_str_search(path, "comp")) {
+        shader->stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    }
+
+    // NOTE: Spirv-reflect is currently trying to dereference a null pointer while parsing the current shader code
+    // The VkDescriptorSetLayout's are hardcoded at the moment and the code runs so I think its a problem on the librarys end.
+    // I am trying the debug the Issue 
+
+    /*
     // Shader byte code loaded from file
     SpvReflectShaderModule spv_reflect_module = {0};
     SPIRV_REFLECT_CHECK(spvReflectCreateShaderModule2(SPV_REFLECT_MODULE_FLAG_NONE, code_size, shader_code, &spv_reflect_module));
 
-    // Clean up memoory allocated for shader code and files
-    etfree(shader_code, code_size, MEMORY_TAG_RENDERER);
-    file_close(shader_file);
 
     shader->entry_point = str_duplicate_allocate(spv_reflect_module.entry_point_name);
     shader->stage = spv_reflect_shader_stage_to_vulkan_shader_stage(spv_reflect_module.shader_stage);
@@ -120,10 +131,20 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
     etfree(push_blocks, sizeof(SpvReflectBlockVariable*) * push_block_count, MEMORY_TAG_SHADER);
     etfree(sets, sizeof(SpvReflectDescriptorSet*) * set_count, MEMORY_TAG_SHADER);
     spvReflectDestroyShaderModule(&spv_reflect_module);
+    */
+
+    // Clean up memoory allocated for shader code and files
+    etfree(shader_code, code_size, MEMORY_TAG_RENDERER);
+    file_close(shader_file);
     return true;
 }
 
 void unload_shader(renderer_state* state, shader* shader) {
+    // NOTE: Spirv-reflect is currently trying to dereference a null pointer while parsing the current shader code
+    // The VkDescriptorSetLayout's are hardcoded at the moment and the code runs so I think its a problem on the librarys end.
+    // I am trying the debug the Issue 
+    
+    /*
     for (u32 i = 0; i < shader->push_block_count; ++i)
         free_block_variables(shader->push_blocks + i);
     etfree(shader->push_blocks, sizeof(block_variable) * shader->push_block_count, MEMORY_TAG_SHADER);
@@ -141,6 +162,8 @@ void unload_shader(renderer_state* state, shader* shader) {
     }
     etfree(shader->sets, sizeof(set_layout) * shader->set_count, MEMORY_TAG_SHADER);
     str_duplicate_free(shader->entry_point);
+    */
+
     vkDestroyShaderModule(state->device.handle, shader->module, state->allocator);
 }
 

@@ -155,8 +155,11 @@ void log_output(log_level level, const char* format, ...) {
     va_end(list);
     etcopy_memory((u8*)output + log_prefix_len + format_len, log_postfix[level], log_postfix_len + 1);
 
-    // Standard output
-    printf("%s\n", output);
+    if (level > LOG_ERROR) {
+        fprintf(stdout, "%s\n", output);
+    } else {
+        fprintf(stderr, "%s\n", output);
+    }
 
     // Add newline character before ansi postfix  
     output[log_prefix_len + format_len] = '\n';

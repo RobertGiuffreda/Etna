@@ -127,7 +127,7 @@ typedef struct shader {
     block_variable* push_blocks;
 } shader;
 
-// NOTE: Reflection only tested with Vulkan GLSL
+// NOTE: Reflection only tested with SpirV compiled from Vulkan GLSL
 b8 load_shader(renderer_state* state, const char* path, shader* shader);
 void unload_shader(renderer_state* state, shader* shader);
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "renderer/src/vk_types.h"
-#include "renderer/src/renderer.h"
+#include "renderer/src/shader.h"
 
 #define DEFAULT_GRAPHICS_PIPELINE_STAGE_COUNT 2
 #define DEFAULT_VERTEX_STAGE_INDEX 0

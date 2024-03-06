@@ -12,9 +12,7 @@
 #include "core/input.h"
 // TEMP: END
 
-#include "resources/mesh_manager.h"
 #include "resources/image_manager.h"
-#include "resources/material_manager.h"
 #include "resources/resource_private.h"
 
 // TEMP: Make this renderer implementation agnostic
@@ -25,7 +23,6 @@
 #include "renderer/src/descriptor.h"
 #include "renderer/src/shader.h"
 #include "renderer/src/pipeline.h"
-#include "renderer/src/renderables.h"
 #include "resources/importers/gltfimporter.h"
 // TEMP: END
 
@@ -37,41 +34,40 @@
 static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 // TEMP: END
 
-// TEMP: Bindless testing
-static void scene_init_bindless(scene* scene);
-static void scene_shutdown_bindless(scene* scene);
-// TEMP: END
+// TODO: Make separate scene renderer struct
+static void scene_renderer_init(scene* scene, renderer_state* state);
+static void scene_renderer_shutdown(scene* scene);
+// TODO: END
 
 // TEMP: Better Way of doing this, config maybe
 #define MAX_DRAW_COMMANDS 8192
 #define MAX_OBJECTS 8192
 // TEMP: END
 
-// TODO: Read from shader reflection data. 
+// TODO: Read from shader reflection data.
 typedef enum set_0_bindings {
-    SET_0_BINDING_FRAME_UNIFORM_BUFFER = 0,
-    SET_0_BINDING_OBJECT_BUFFER,
-    SET_0_BINDING_DRAW_COUNT_BUFFER,
-    SET_0_BINDING_DRAW_COMMANDS_BUFFER,
-    SET_0_BINDING_TEXTURES,
-    SET_0_BINDING_COUNT,
-} scene_set_bindings;
+    SET_0_FRAME_UNIFORM_BUFFER_BINDING = 0,
+    SET_0_DRAW_COUNTS_BUFFER_BINDING,
+    SET_0_DRAW_BUFFERS_BINDING,
+    SET_0_OBJECT_BUFFER_BINDING,
+    SET_0_GEOMETRY_BUFFER_BINDING,
+    SET_0_VERTEX_BUFFER_BINDING,
+    SET_0_TRANSFORM_BUFFER_BINDING,
+    SET_0_TEXTURES_BINDING,
+    SET_0_BINDING_MAX,
+} set_0_bindings;
+
+typedef enum set_1_bindings {
+    SET_1_DRAW_BUFFER_BINDING = 0,
+    SET_1_INSTANCE_DATA_BUFFER_BINDING,
+    SET_1_BINDING_MAX,
+} set_1_bindings;
 // TODO: END
 
-// TODO: Compute shader to generate draws
-
 b8 scene_initalize(scene** scn, renderer_state* state) {
-    // HACK:TODO: Make configurable & from application
-    const char* path = "build/assets/gltf/structure.glb";
-    // HACK:TODO: END
-
     scene* new_scene = etallocate(sizeof(struct scene), MEMORY_TAG_SCENE);
     new_scene->state = state;
-    new_scene->name = str_duplicate_allocate(path);
-
-    mesh_manager_initialize(&new_scene->mesh_bank, state);
-    image_manager_initialize(&new_scene->image_bank, state);
-    material_manager_initialize(&new_scene->material_bank, state);
+    new_scene->name = "Etna Scene Testing";
 
     camera_create(&new_scene->cam);
     new_scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
@@ -83,53 +79,22 @@ b8 scene_initalize(scene** scn, renderer_state* state) {
     new_scene->data.ambient_color = a_color;
     new_scene->data.light_color = l_color;
 
-    // TEMP: Bindless
-    scene_init_bindless(new_scene);
-    // TEMP: END
+    scene_renderer_init(new_scene, state);
     
-    // HACK:TEMP: Serialize and deserialization of a scene file
-    if (!import_gltf(new_scene, path, state)) {
-        ETERROR("Error loading gltf file initializing scene.");
-        return false;
-    }
-    // HACK:TEMP: END
-
     event_observer_register(EVENT_CODE_KEY_RELEASE, new_scene, scene_on_key_event);
     *scn = new_scene;
     return true;
 }
 
-// TEMP: Scene parameters here are currently hard-coded for an imported gltf file.
-// Eventually the material buffers will be handled by the material manager
-// The samplers will have some kind of system as well to manage them
 void scene_shutdown(scene* scene) {
     renderer_state* state = scene->state;
 
     event_observer_deregister(EVENT_CODE_KEY_RELEASE, scene, scene_on_key_event);
 
-    dynarray_destroy(scene->top_nodes);
-
-    for (u32 i = 0; i < scene->mesh_node_count; ++i) {
-        str_duplicate_free(scene->mesh_nodes[i].base.name);
-        mesh_node_destroy(&scene->mesh_nodes[i]);
-    }
-    etfree(scene->mesh_nodes, sizeof(mesh_node) * scene->mesh_node_count, MEMORY_TAG_SCENE);
-
-    for (u32 i = 0; i < scene->node_count; ++i) {
-        str_duplicate_free(scene->nodes[i].name);
-        node_destroy(&scene->nodes[i]);
-    }
-    etfree(scene->nodes, sizeof(node) * scene->node_count, MEMORY_TAG_SCENE);
-
-    // TODO: Put renderer objects to destroy in a deletion queue
-    // to insure they are destroyed when unused.
+    // NOTE: This is needed to make sure objects are not destroyed while in use
     vkDeviceWaitIdle(state->device.handle);
-    // TODO: END
 
-    // TODO: Modify to use GPU Driven architecture
-    mesh_manager_shutdown(scene->mesh_bank);
-    material_manager_shutdown(scene->material_bank);
-    buffer_destroy(state, &scene->material_buffer);
+    // TODO: Update to GPU driven
     image_manager_shutdown(scene->image_bank);
     // TODO: END
 
@@ -137,11 +102,9 @@ void scene_shutdown(scene* scene) {
         vkDestroySampler(state->device.handle, scene->samplers[i], state->allocator);
     etfree(scene->samplers, sizeof(VkSampler) * scene->sampler_count, MEMORY_TAG_SCENE);
 
-    scene_shutdown_bindless(scene);
+    scene_renderer_shutdown(scene);
 
     camera_destroy(&scene->cam);
-
-    str_duplicate_free(scene->name);
     
     etfree(scene, sizeof(struct scene), MEMORY_TAG_SCENE);
 }
@@ -185,61 +148,127 @@ void scene_update(scene* scene, f64 dt) {
     scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
 }
 
-// TEMP: Bindless testing
-void scene_init_bindless(scene* scene) {
-    // For use in VkDescriptorSetLayoutBindingFlagsCreateInfo for each set
-    const VkDescriptorBindingFlags flags = 
+void scene_renderer_init(scene* scene, renderer_state* state) {
+    image_manager_initialize(&scene->image_bank, state);
+
+    scene->render_fences = etallocate(
+        sizeof(VkFence) * state->swapchain.image_count,
+        MEMORY_TAG_SCENE);
+    VkFenceCreateInfo fence_info = init_fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
+    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
+        VK_CHECK(vkCreateFence(
+            state->device.handle,
+            &fence_info,
+            state->allocator,
+            &scene->render_fences[i]
+        ));
+    }
+    scene->graphics_pools = etallocate(
+        sizeof(VkCommandPool) * state->swapchain.image_count,
+        MEMORY_TAG_SCENE);
+    scene->graphics_command_buffers = etallocate(
+        sizeof(VkCommandBuffer) * state->swapchain.image_count,
+        MEMORY_TAG_SCENE);
+    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
+        DEBUG_CODE(
+            char cmd_pool_name[] = "GraphicsCommandPool X";
+            cmd_pool_name[str_length(cmd_pool_name) - 1] = i - '0';
+            char cmd_buff_name[] = "GraphicsCommandBuffer X";
+            cmd_buff_name[str_length(cmd_buff_name) - 1] = i - '0';
+        );
+        VkCommandPoolCreateInfo gpool_info = init_command_pool_create_info(
+            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            state->device.graphics_qfi);
+        VK_CHECK(vkCreateCommandPool(state->device.handle,
+            &gpool_info,
+            state->allocator,
+            &scene->graphics_pools[i]));
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_COMMAND_POOL, scene->graphics_pools[i], cmd_pool_name);
+        
+        // Allocate one primary
+        VkCommandBufferAllocateInfo command_buffer_alloc_info = init_command_buffer_allocate_info(
+            scene->graphics_pools[i], VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
+        VK_CHECK(vkAllocateCommandBuffers(
+            state->device.handle,
+            &command_buffer_alloc_info,
+            &scene->graphics_command_buffers[i]));
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_COMMAND_BUFFER, scene->graphics_command_buffers[i], cmd_buff_name);
+    }
+
+    // Set 0: Scene set layout (engine specific). The set itself will be allocated on the fly
+    VkDescriptorBindingFlags ssbf = 
         VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
         VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
         VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT;
- 
-    // Set 0: Scene set layout (engine specific). The set itself will be allocated on the fly
-    VkDescriptorBindingFlags ssbf = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT;
     VkDescriptorBindingFlags scene_set_binding_flags[] = {
-        [SET_0_BINDING_FRAME_UNIFORM_BUFFER] = ssbf,
-        [SET_0_BINDING_OBJECT_BUFFER] = ssbf,
-        [SET_0_BINDING_DRAW_COUNT_BUFFER] = ssbf,
-        [SET_0_BINDING_DRAW_COMMANDS_BUFFER] = ssbf,
-        [SET_0_BINDING_TEXTURES] = ssbf | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT,
+        [SET_0_FRAME_UNIFORM_BUFFER_BINDING] = ssbf,
+        [SET_0_DRAW_COUNTS_BUFFER_BINDING] = ssbf,
+        [SET_0_DRAW_BUFFERS_BINDING] = ssbf,
+        [SET_0_OBJECT_BUFFER_BINDING] = ssbf,
+        [SET_0_GEOMETRY_BUFFER_BINDING] = ssbf,
+        [SET_0_VERTEX_BUFFER_BINDING] = ssbf,
+        [SET_0_TRANSFORM_BUFFER_BINDING] = ssbf,
+        [SET_0_TEXTURES_BINDING] = ssbf | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT,
     };
     VkDescriptorSetLayoutBindingFlagsCreateInfo scene_binding_flags_create_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
         .pNext = 0,
-        .bindingCount = SET_0_BINDING_COUNT,
+        .bindingCount = SET_0_BINDING_MAX,
         .pBindingFlags = scene_set_binding_flags,
     };
     VkDescriptorSetLayoutBinding scene_set_bindings[] = {
-        [SET_0_BINDING_FRAME_UNIFORM_BUFFER] = {
-            .binding = SET_0_BINDING_FRAME_UNIFORM_BUFFER,
+        [SET_0_FRAME_UNIFORM_BUFFER_BINDING] = {
+            .binding = SET_0_FRAME_UNIFORM_BUFFER_BINDING,
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
             .pImmutableSamplers = NULL,
         },
-        [SET_0_BINDING_OBJECT_BUFFER] = {
-            .binding = SET_0_BINDING_OBJECT_BUFFER,
+        [SET_0_DRAW_COUNTS_BUFFER_BINDING] = {
+            .binding = SET_0_DRAW_COUNTS_BUFFER_BINDING,
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
             .pImmutableSamplers = NULL,
         },
-        [SET_0_BINDING_DRAW_COUNT_BUFFER] = {
-            .binding = SET_0_BINDING_DRAW_COUNT_BUFFER,
+        [SET_0_DRAW_BUFFERS_BINDING] = {
+            .binding = SET_0_DRAW_BUFFERS_BINDING,
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
             .pImmutableSamplers = NULL,
         },
-        [SET_0_BINDING_DRAW_COMMANDS_BUFFER] = {
-            .binding = SET_0_BINDING_DRAW_COMMANDS_BUFFER,
+        [SET_0_OBJECT_BUFFER_BINDING] = {
+            .binding = SET_0_OBJECT_BUFFER_BINDING,
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
             .pImmutableSamplers = NULL,
         },
-        [SET_0_BINDING_TEXTURES] = {
-            .binding = SET_0_BINDING_TEXTURES,
-            .descriptorCount = scene->state->device.properties_12.maxDescriptorSetUpdateAfterBindSampledImages,
+        [SET_0_GEOMETRY_BUFFER_BINDING] = {
+            .binding = SET_0_GEOMETRY_BUFFER_BINDING,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL,
+        },
+        [SET_0_VERTEX_BUFFER_BINDING] = {
+            .binding = SET_0_VERTEX_BUFFER_BINDING,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL,
+        },
+        [SET_0_TRANSFORM_BUFFER_BINDING] = {
+            .binding = SET_0_TRANSFORM_BUFFER_BINDING,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL,
+        },
+        [SET_0_TEXTURES_BINDING] = {
+            .binding = SET_0_TEXTURES_BINDING,
+            .descriptorCount = state->device.properties_12.maxDescriptorSetUpdateAfterBindSampledImages,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             .pImmutableSamplers = NULL,
@@ -249,58 +278,76 @@ void scene_init_bindless(scene* scene) {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .pNext = &scene_binding_flags_create_info,
         .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
-        .bindingCount = SET_0_BINDING_COUNT,
+        .bindingCount = SET_0_BINDING_MAX,
         .pBindings = scene_set_bindings,
     };
     VK_CHECK(vkCreateDescriptorSetLayout(
-        scene->state->device.handle,
+        state->device.handle,
         &scene_layout_info,
-        scene->state->allocator,
+        state->allocator,
         &scene->scene_set_layout));
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, scene->scene_set_layout, "Scene Descriptor Set Layout");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, scene->scene_set_layout, "Scene Descriptor Set Layout");
 
-    // Setup global push constant
+    // TODO: Remove this
     scene->push_constant.offset = 0;
     scene->push_constant.size = sizeof(VkDeviceAddress) + sizeof(VkDeviceAddress);
     scene->push_constant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+    // TODO: END
 
     // Set 1: Material layout (material specific). Arrays of each element
-    dsl_builder mat_builder = descriptor_set_layout_builder_create();
-    mat_builder.layout_info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-    descriptor_set_layout_builder_add_binding(
-        &mat_builder,
-        /* Binding: */ 0,
-        scene->state->device.properties_12.maxDescriptorSetUpdateAfterBindUniformBuffers - 30,  // HACK:TEMP: FIX THIS
-        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    const VkDescriptorBindingFlags mat_binding_flags[] = {
-        [0] = flags | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT,
+    VkDescriptorSetLayoutBinding mat_bindings[] = {
+        [SET_1_DRAW_BUFFER_BINDING] = {
+            .binding = SET_1_DRAW_BUFFER_BINDING,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = NULL,
+        },
+        [SET_1_INSTANCE_DATA_BUFFER_BINDING] = {
+            .binding = SET_1_INSTANCE_DATA_BUFFER_BINDING,
+            .descriptorCount = MAX_MATERIAL_COUNT,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = NULL,
+        },
+    };
+    VkDescriptorBindingFlags mat_binding_flags[] = {
+        [SET_1_DRAW_BUFFER_BINDING] = ssbf,
+        [SET_1_INSTANCE_DATA_BUFFER_BINDING] = ssbf | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT,
     };
     VkDescriptorSetLayoutBindingFlagsCreateInfo mat_binding_flags_cinfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
         .pNext = 0,
-        .bindingCount = 1,
-        .pBindingFlags = mat_binding_flags};
-    mat_builder.layout_info.pNext = &mat_binding_flags_cinfo;
-    scene->material_layout = descriptor_set_layout_builder_build(
-        &mat_builder,
-        scene->state);
-    descriptor_set_layout_builder_destroy(&mat_builder);
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, scene->material_layout, "Material Descriptor Set Layout");
+        .bindingCount = SET_1_BINDING_MAX,
+        .pBindingFlags = mat_binding_flags
+    };
+    VkDescriptorSetLayoutCreateInfo mat_layout_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = &mat_binding_flags_cinfo,
+        .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT,
+        .bindingCount = SET_1_BINDING_MAX,
+        .pBindings = mat_bindings,
+    };
+    VK_CHECK(vkCreateDescriptorSetLayout(
+        state->device.handle,
+        &mat_layout_info,
+        state->allocator,
+        &scene->material_layout));
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, scene->material_layout, "Material Descriptor Set Layout");
 
     // DescriptorPool
     VkDescriptorPoolSize sizes[] = {
         [0] = {
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = MAX_IMAGE_COUNT * 3,
+            .descriptorCount = MAX_IMAGE_COUNT,
         },
         [1] = {
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 5 + MAX_MATERIAL_COUNT,
+            .descriptorCount = MAX_MATERIAL_BLUEPRINT_COUNT * MAX_MATERIAL_COUNT,
         },
         [2] = {
             .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .descriptorCount = 10,
+            .descriptorCount = MAX_MATERIAL_BLUEPRINT_COUNT + 20,
         },
     };
     VkDescriptorPoolCreateInfo pool_info = {
@@ -309,14 +356,14 @@ void scene_init_bindless(scene* scene) {
         .flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT,
         .maxSets = 4,
         .poolSizeCount = 3,
-        .pPoolSizes = sizes
+        .pPoolSizes = sizes,
     };
     VK_CHECK(vkCreateDescriptorPool(
-        scene->state->device.handle,
+        state->device.handle,
         &pool_info,
-        scene->state->allocator,
+        state->allocator,
         &scene->descriptor_pool));
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_DESCRIPTOR_POOL, scene->descriptor_pool, "Scene Descriptor Pool");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_DESCRIPTOR_POOL, scene->descriptor_pool, "Scene Descriptor Pool");
 
     u32 scene_image_count = MAX_IMAGE_COUNT;
     VkDescriptorSetVariableDescriptorCountAllocateInfo scene_descriptor_count_info = {
@@ -332,41 +379,49 @@ void scene_init_bindless(scene* scene) {
         .pSetLayouts = &scene->scene_set_layout,
     };
     VK_CHECK(vkAllocateDescriptorSets(
-        scene->state->device.handle,
+        state->device.handle,
         &scene_set_alloc_info,
         &scene->scene_set));
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_DESCRIPTOR_SET, scene->scene_set, "Scene Descriptor Set");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_DESCRIPTOR_SET, scene->scene_set, "Scene Descriptor Set");
 
     // Create buffers
     buffer_create(
-        scene->state,
+        state,
         sizeof(scene_data),
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->scene_uniforms);
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_BUFFER, scene->scene_uniforms.handle, "Frame Uniforms");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->scene_uniforms.handle, "Frame Uniforms");
     buffer_create(
-        scene->state,
-        sizeof(gpu_obj) * MAX_OBJECTS,
+        state,
+        sizeof(object) * MAX_OBJECTS,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->object_buffer);
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_BUFFER, scene->object_buffer.handle, "Object Buffer");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->object_buffer.handle, "Object Buffer");
     // TEMP: MAX_DRAW_COMMANDS, multiple draw command buffers and draw count buffers are temp until generation on the GPU
     buffer_create(
-        scene->state,
-        sizeof(u32),
+        state,
+        sizeof(u32) * MAX_MATERIAL_BLUEPRINT_COUNT,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->count_buffer);
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_BUFFER, scene->count_buffer.handle, "Count Buffer");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->count_buffer.handle, "Count Buffer");
     buffer_create(
-        scene->state,
-        sizeof(draw_command) * MAX_DRAW_COMMANDS * 2,
+        state,
+        sizeof(VkDeviceAddress) * MAX_MATERIAL_BLUEPRINT_COUNT,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->draw_buffer);
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_BUFFER, scene->draw_buffer.handle, "Draws Buffer");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->draw_buffer.handle, "Draws Buffer");
+    buffer_create(
+        state,
+        sizeof(draw_command) * MAX_DRAW_COMMANDS * 2,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &scene->material_draws_buffer);
+    scene->mat_draws_addr = buffer_get_address(state, &scene->material_draws_buffer);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->material_draws_buffer.handle, "MaterialIndirectDrawCommandBuffer");
     // TEMP: END
 
     // Write buffers to DescriptorSet
@@ -382,7 +437,7 @@ void scene_init_bindless(scene* scene) {
         .dstArrayElement = 0,
         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         .dstSet = scene->scene_set,
-        .dstBinding = SET_0_BINDING_FRAME_UNIFORM_BUFFER,
+        .dstBinding = SET_0_FRAME_UNIFORM_BUFFER_BINDING,
         .pBufferInfo = &uniform_buffer_info,
     };
     VkDescriptorBufferInfo object_buffer_info = {
@@ -397,7 +452,7 @@ void scene_init_bindless(scene* scene) {
         .dstArrayElement = 0,
         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         .dstSet = scene->scene_set,
-        .dstBinding = SET_0_BINDING_OBJECT_BUFFER,
+        .dstBinding = SET_0_OBJECT_BUFFER_BINDING,
         .pBufferInfo = &object_buffer_info,
     };
     VkDescriptorBufferInfo draw_count_buffer_info = {
@@ -412,7 +467,7 @@ void scene_init_bindless(scene* scene) {
         .dstArrayElement = 0,
         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         .dstSet = scene->scene_set,
-        .dstBinding = SET_0_BINDING_DRAW_COUNT_BUFFER,
+        .dstBinding = SET_0_DRAW_COUNTS_BUFFER_BINDING,
         .pBufferInfo = &draw_count_buffer_info,
     };
     VkDescriptorBufferInfo draws_buffer_info = {
@@ -427,7 +482,7 @@ void scene_init_bindless(scene* scene) {
         .dstArrayElement = 0,
         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
         .dstSet = scene->scene_set,
-        .dstBinding = SET_0_BINDING_DRAW_COMMANDS_BUFFER,
+        .dstBinding = SET_0_DRAW_BUFFERS_BINDING,
         .pBufferInfo = &draws_buffer_info,
     };
     VkWriteDescriptorSet writes[] = {
@@ -437,7 +492,7 @@ void scene_init_bindless(scene* scene) {
         draws_buffer_write,
     };
     vkUpdateDescriptorSets(
-        scene->state->device.handle,
+        state->device.handle,
         /* writeCount: */ 4,
         writes,
         /* copyCount: */ 0,
@@ -459,10 +514,46 @@ void scene_init_bindless(scene* scene) {
         .pSetLayouts = &scene->material_layout,
     };
     VK_CHECK(vkAllocateDescriptorSets(
-        scene->state->device.handle,
+        state->device.handle,
         &mat_set_info,
-        &scene->material_set
-    ));
+        &scene->material_set));
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_DESCRIPTOR_SET, scene->material_set, "MaterialDescriptorSet");
+
+    // Write to the descriptor set for the materials draw buffer
+    VkDescriptorBufferInfo material_draws_buffer_info = {
+        .buffer = scene->material_draws_buffer.handle,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
+    VkWriteDescriptorSet material_draws_buffer_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .dstSet = scene->material_set,
+        .dstBinding = SET_1_DRAW_BUFFER_BINDING,
+        .pBufferInfo = &material_draws_buffer_info,
+    };
+    vkUpdateDescriptorSets(
+        state->device.handle,
+        /* writeCount */ 1,
+        &material_draws_buffer_write,
+        /* copyCount */ 0,
+        /* copies */ NULL
+    );
+
+    // Copy the device address of the materials draw buffer
+    void* mapped_draws_buffer;
+    VK_CHECK(vkMapMemory(
+        state->device.handle,
+        scene->draw_buffer.memory,
+        /* offset */ 0,
+        VK_WHOLE_SIZE,
+        /* flags */ 0,
+        &mapped_draws_buffer));
+    etcopy_memory(mapped_draws_buffer, &scene->mat_draws_addr, sizeof(VkDeviceAddress));
+    vkUnmapMemory(state->device.handle, scene->draw_buffer.memory);
 
     scene->material_count = 0;
     for (u32 i = 0; i < MAX_MATERIAL_COUNT; ++i) {
@@ -471,26 +562,24 @@ void scene_init_bindless(scene* scene) {
     
     // Pipelines:
     // Draw generation compute shader
-    const char* draw_gen_path = "build/assets/shaders/draws.comp.spv.opt";
+    const char* draw_gen_path = "assets/shaders/draws_refactor.comp.spv.opt";
 
     shader draw_gen;
-    if (!load_shader(scene->state, draw_gen_path, &draw_gen)) {
+    if (!load_shader(state, draw_gen_path, &draw_gen)) {
         ETFATAL("Unable to load draw generation shader.");
         return;
     }
     VkPipelineLayoutCreateInfo draw_gen_layout_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = 0,
-        .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &scene->push_constant,
         .setLayoutCount = 1,
         .pSetLayouts = &scene->scene_set_layout};
     VK_CHECK(vkCreatePipelineLayout(
-        scene->state->device.handle,
+        state->device.handle,
         &draw_gen_layout_info,
-        scene->state->allocator,
+        state->allocator,
         &scene->draw_gen_layout));
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_PIPELINE_LAYOUT, scene->draw_gen_layout, "Draw Generation Pipeline Layout");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE_LAYOUT, scene->draw_gen_layout, "Draw Generation Pipeline Layout");
     VkPipelineShaderStageCreateInfo draw_stage_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .pNext = 0,
@@ -502,28 +591,29 @@ void scene_init_bindless(scene* scene) {
         .pNext = 0,
         .layout = scene->draw_gen_layout,
         .stage = draw_stage_info};
-    VK_CHECK(vkCreateComputePipelines(
-        scene->state->device.handle,
+    VkResult result = vkCreateComputePipelines(
+        state->device.handle,
         VK_NULL_HANDLE,
         /* CreateInfoCount */ 1,
         &draw_pipeline_info,
-        scene->state->allocator,
-        &scene->draw_gen_pipeline));
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_PIPELINE, scene->draw_gen_pipeline, "Draw Generation Pipeline");
-    unload_shader(scene->state, &draw_gen);
+        state->allocator,
+        &scene->draw_gen_pipeline);
+    VK_CHECK(result);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE, scene->draw_gen_pipeline, "Draw Generation Pipeline");
+    unload_shader(state, &draw_gen);
 
     // Load bindless shaders
-    const char* vertex_path = "build/assets/shaders/bindless_mesh_mat.vert.spv.opt";
-    const char* fragment_path = "build/assets/shaders/bindless_mesh_mat.frag.spv.opt";
+    const char* vertex_path = "assets/shaders/blinn_mr.vert.spv.opt";
+    const char* fragment_path = "assets/shaders/blinn_mr.frag.spv.opt";
 
     shader bindless_vertex;
-    if (!load_shader(scene->state, vertex_path, &bindless_vertex)) {
+    if (!load_shader(state, vertex_path, &bindless_vertex)) {
         ETERROR("Error loading shader %s.", vertex_path);
         return;
     }
 
     shader bindless_fragment;
-    if (!load_shader(scene->state, fragment_path, &bindless_fragment)) {
+    if (!load_shader(state, fragment_path, &bindless_fragment)) {
         ETERROR("Error loading shader %s.", fragment_path);
         return;
     }
@@ -536,17 +626,15 @@ void scene_init_bindless(scene* scene) {
     VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = 0,
-        .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &scene->push_constant,
         .setLayoutCount = 2,
         .pSetLayouts = pipeline_ds_layouts,
     };
     VK_CHECK(vkCreatePipelineLayout(
-        scene->state->device.handle,
+        state->device.handle,
         &pipeline_layout_create_info,
-        scene->state->allocator,
+        state->allocator,
         &scene->pipeline_layout));
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_PIPELINE_LAYOUT, scene->pipeline_layout, "Pipeline Layout");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE_LAYOUT, scene->pipeline_layout, "Pipeline Layout");
 
     // Opaque pipeline
     pipeline_builder builder = pipeline_builder_create();
@@ -558,40 +646,47 @@ void scene_init_bindless(scene* scene) {
     pipeline_builder_disable_blending(&builder);
     pipeline_builder_enable_depthtest(&builder, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
-    pipeline_builder_set_color_attachment_format(&builder, scene->state->render_image.format);
-    pipeline_builder_set_depth_attachment_format(&builder, scene->state->depth_image.format);
+    pipeline_builder_set_color_attachment_format(&builder, state->render_image.format);
+    pipeline_builder_set_depth_attachment_format(&builder, state->depth_image.format);
     builder.layout = scene->pipeline_layout;
-    scene->opaque_pipeline = pipeline_builder_build(&builder, scene->state);
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_PIPELINE, scene->opaque_pipeline, "Opaque Pipeline");
+    scene->opaque_pipeline = pipeline_builder_build(&builder, state);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE, scene->opaque_pipeline, "Opaque Pipeline");
 
     // Transparent pipeline
     pipeline_builder_enable_blending_additive(&builder);
     pipeline_builder_enable_depthtest(&builder, false, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
-    scene->transparent_pipeline = pipeline_builder_build(&builder, scene->state);
-    SET_DEBUG_NAME(scene->state, VK_OBJECT_TYPE_PIPELINE, scene->transparent_pipeline, "Transparent Pipeline");
+    scene->transparent_pipeline = pipeline_builder_build(&builder, state);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE, scene->transparent_pipeline, "Transparent Pipeline");
 
     pipeline_builder_destroy(&builder);
 
     // Unload shaders
-    unload_shader(scene->state, &bindless_vertex);
-    unload_shader(scene->state, &bindless_fragment);
+    unload_shader(state, &bindless_vertex);
+    unload_shader(state, &bindless_fragment);
 }
 
-void scene_shutdown_bindless(scene* scene) {
+void scene_renderer_shutdown(scene* scene) {
     renderer_state* state = scene->state;
-    dynarray_destroy(scene->op_objects);
-    dynarray_destroy(scene->tp_objects);
     dynarray_destroy(scene->transforms);
     dynarray_destroy(scene->meshes);
     dynarray_destroy(scene->surfaces);
     dynarray_destroy(scene->indices);
     dynarray_destroy(scene->vertices);
+    dynarray_destroy(scene->objects);
+    dynarray_destroy(scene->geometries);
 
-    buffer_destroy(state, &scene->bindless_material_buffer);
-    buffer_destroy(state, &scene->index_buffer);
+    buffer_destroy(state, &scene->scene_uniforms);
+    buffer_destroy(state, &scene->count_buffer);
+    buffer_destroy(state, &scene->draw_buffer);
+    buffer_destroy(state, &scene->object_buffer);
+    buffer_destroy(state, &scene->geometry_buffer);
     buffer_destroy(state, &scene->vertex_buffer);
     buffer_destroy(state, &scene->transform_buffer);
+
+    buffer_destroy(state, &scene->material_draws_buffer);
+    buffer_destroy(state, &scene->material_buffer);
+    buffer_destroy(state, &scene->index_buffer);
 
     vkDestroyPipeline(state->device.handle, scene->draw_gen_pipeline, state->allocator);
     vkDestroyPipelineLayout(state->device.handle, scene->draw_gen_layout, state->allocator);
@@ -599,11 +694,6 @@ void scene_shutdown_bindless(scene* scene) {
     vkDestroyPipeline(state->device.handle, scene->opaque_pipeline, state->allocator);
     vkDestroyPipeline(state->device.handle, scene->transparent_pipeline, state->allocator);
     vkDestroyPipelineLayout(state->device.handle, scene->pipeline_layout, state->allocator);
-
-    buffer_destroy(state, &scene->scene_uniforms);
-    buffer_destroy(state, &scene->object_buffer);
-    buffer_destroy(state, &scene->count_buffer);
-    buffer_destroy(state, &scene->draw_buffer);
 
     vkDestroyDescriptorPool(
         state->device.handle,
@@ -618,12 +708,33 @@ void scene_shutdown_bindless(scene* scene) {
         scene->scene_set_layout,
         state->allocator
     );
+
+    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
+        vkDestroyCommandPool(
+            state->device.handle,
+            scene->graphics_pools[i],
+            state->allocator
+        );
+    }
+    etfree(scene->graphics_command_buffers,
+        sizeof(VkCommandBuffer) * state->swapchain.image_count,
+        MEMORY_TAG_SCENE);
+    etfree(scene->graphics_pools,
+        sizeof(VkCommandPool) * state->swapchain.image_count,
+        MEMORY_TAG_SCENE
+    );
+
+
+    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
+        vkDestroyFence(state->device.handle, scene->render_fences[i], state->allocator);
+    }
+    etfree(scene->render_fences, sizeof(VkFence) * state->swapchain.image_count, MEMORY_TAG_SCENE);
 }
 
 b8 scene_render(scene* scene) {
     renderer_state* state = scene->state;
     // TEMP:TODO: Create staging buffer to move this instead of vkCmdUpdateBuffer
-    VkCommandBuffer cmd = state->main_graphics_command_buffers[state->swapchain.frame_index];
+    VkCommandBuffer cmd = scene->graphics_command_buffers[state->swapchain.frame_index];
     vkCmdUpdateBuffer(cmd,
         scene->scene_uniforms.handle,
         /* Offset: */ 0,
@@ -632,12 +743,12 @@ b8 scene_render(scene* scene) {
     vkCmdFillBuffer(cmd,
         scene->count_buffer.handle,
         /* Offset: */ 0,
-        sizeof(u32),
+        sizeof(u32) * MAX_MATERIAL_BLUEPRINT_COUNT,
         (u32)0);
-    buffer_barrier(cmd, scene->scene_uniforms.handle, /* Offset: */ 0, sizeof(scene_data),
+    buffer_barrier(cmd, scene->scene_uniforms.handle, /* Offset: */ 0, VK_WHOLE_SIZE,
         VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
-    buffer_barrier(cmd, scene->count_buffer.handle, /* Offset: */ 0, sizeof(u32),
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+    buffer_barrier(cmd, scene->count_buffer.handle, /* Offset: */ 0, VK_WHOLE_SIZE,
         VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
     // TEMP:TODO: END
@@ -651,7 +762,7 @@ b8 scene_frame_begin(scene* scene, renderer_state* state) {
     result = vkWaitForFences(
         state->device.handle,
         /* Fence count: */ 1,
-        &state->render_fences[state->swapchain.frame_index],
+        &scene->render_fences[state->swapchain.frame_index],
         VK_TRUE,
         1000000000);
     VK_CHECK(result);
@@ -690,39 +801,31 @@ b8 scene_frame_begin(scene* scene, renderer_state* state) {
     VK_CHECK(vkResetFences(
         state->device.handle,
         /* Fence count: */ 1,
-        &state->render_fences[state->swapchain.frame_index]
+        &scene->render_fences[state->swapchain.frame_index]
     ));
 
-    VK_CHECK(vkResetCommandBuffer(state->main_graphics_command_buffers[state->swapchain.frame_index], 0));
+    VK_CHECK(vkResetCommandBuffer(scene->graphics_command_buffers[state->swapchain.frame_index], 0));
     VkCommandBufferBeginInfo begin_info = init_command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    VK_CHECK(vkBeginCommandBuffer(state->main_graphics_command_buffers[state->swapchain.frame_index], &begin_info));
+    VK_CHECK(vkBeginCommandBuffer(scene->graphics_command_buffers[state->swapchain.frame_index], &begin_info));
     return true;
 }
 
 void draw_geometry(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
-    struct push {
-        VkDeviceAddress vertex_buff;
-        VkDeviceAddress transform_buff;
-    } push = {
-        .vertex_buff = scene->vb_addr,
-        .transform_buff = scene->tb_addr,
-    };
-    
-    u32 object_count = dynarray_length(scene->op_objects);
-    // TODO: Call draw call generation compute shader
+    u32 object_count = dynarray_length(scene->objects);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_pipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_layout, 0, 1, &scene->scene_set, 0, NULL);
-    vkCmdPushConstants(cmd, scene->draw_gen_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(struct push), &push);
     vkCmdDispatch(cmd, ceil(object_count / 32.0f), 1, 1);
 
-    buffer_barrier(cmd, scene->draw_buffer.handle, /* offset: */ 0, VK_WHOLE_SIZE,
-        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT);
     buffer_barrier(cmd, scene->count_buffer.handle, /* offset: */ 0, VK_WHOLE_SIZE,
         VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT);
+    buffer_barrier(cmd, scene->material_draws_buffer.handle, /* offset */ 0, VK_WHOLE_SIZE,
+        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT);
+    buffer_barrier(cmd, scene->draw_buffer.handle, 0, VK_WHOLE_SIZE,
+        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT
     );
-    // TODO: END
 
     VkRenderingAttachmentInfo color_attachment = init_color_attachment_info(
     state->render_image.view, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -758,15 +861,13 @@ void draw_geometry(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
     };
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->opaque_pipeline);
-    
-    vkCmdPushConstants(cmd, scene->pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(struct push), &push);
 
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->pipeline_layout, 0, 2, sets, 0, NULL);
 
     vkCmdBindIndexBuffer(cmd, scene->index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
     
     vkCmdDrawIndexedIndirectCount(cmd,
-        scene->draw_buffer.handle,
+        scene->material_draws_buffer.handle,
         /* Offset: */ 0,
         scene->count_buffer.handle,
         /* Count Offset: */ 0,
@@ -777,7 +878,7 @@ void draw_geometry(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
 
 b8 scene_frame_end(scene* scene, renderer_state* state) {
     VkResult result;
-    VkCommandBuffer frame_cmd = state->main_graphics_command_buffers[state->swapchain.frame_index];
+    VkCommandBuffer frame_cmd = scene->graphics_command_buffers[state->swapchain.frame_index];
 
     // TEMP: Hardcode Gradient compute
     image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
@@ -859,7 +960,7 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
         state->device.graphics_queue, 
         /* submitCount */ 1,
         &submit_info,
-        state->render_fences[state->swapchain.frame_index]);
+        scene->render_fences[state->swapchain.frame_index]);
     VK_CHECK(result);
 
     VkPresentInfoKHR present_info = {
@@ -880,26 +981,28 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
     return true;
 }
 
-b8 scene_material_set_instance(scene* scene, material_pass pass_type, struct bindless_material_resources* resources) {
+b8 scene_material_set_instance(scene* scene, material_pass pass_type, struct material_resources* resources) {
     // TODO: Update the material set based on the amount of material instances
     if (scene->material_count >= MAX_MATERIAL_COUNT) {
         ETERROR("Max material count reached.");
         return false;
     }
 
+    u32 material_index = scene->material_count++;
+
     VkDescriptorBufferInfo buff_info = {
         .buffer = resources->data_buff,
         .offset = resources->data_buff_offset,
-        .range = sizeof(struct bindless_constants),
+        .range = sizeof(struct blinn_mr_constants),
     };
     VkWriteDescriptorSet buffer_write = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .pNext = 0,
         .descriptorCount = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .dstArrayElement = scene->material_count,
+        .dstArrayElement = material_index,
         .dstSet = scene->material_set,
-        .dstBinding = 0,
+        .dstBinding = SET_1_INSTANCE_DATA_BUFFER_BINDING,
         .pBufferInfo = &buff_info,
     };
 
@@ -914,11 +1017,11 @@ b8 scene_material_set_instance(scene* scene, material_pass pass_type, struct bin
     material mat = {
         .id = {
             .blueprint_id = 0,
-            .instance_id = scene->material_count,
+            .instance_id = material_index,
         },
         .pass = pass_type,
     };
-    scene->materials[scene->material_count++] = mat;
+    scene->materials[material_index] = mat;
     return true;
 }
 
@@ -931,7 +1034,7 @@ material scene_material_get_instance(scene* scene, material_id id) {
     return scene->materials[id.instance_id];
 }
 
-void scene_image_set(scene* scene, u32 img_id, u32 sampler_id) {
+void scene_texture_set(scene* scene, u32 img_id, u32 sampler_id) {
     image* img = image_manager_get(scene->image_bank, img_id);
     VkDescriptorImageInfo image_info = {
         .sampler = scene->samplers[sampler_id],
@@ -943,7 +1046,7 @@ void scene_image_set(scene* scene, u32 img_id, u32 sampler_id) {
         .pNext = 0,
         .descriptorCount = 1,
         .dstArrayElement = img_id,
-        .dstBinding = SET_0_BINDING_TEXTURES,
+        .dstBinding = SET_0_TEXTURES_BINDING,
         .dstSet = scene->scene_set,
         .pImageInfo = &image_info,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -956,7 +1059,6 @@ void scene_image_set(scene* scene, u32 img_id, u32 sampler_id) {
         /* Copies: */ NULL
     );
 }
-// TEMP: END
 
 static b8 scene_on_key_event(u16 code, void* scne, event_data data) {
     scene* s = (scene*)scne;

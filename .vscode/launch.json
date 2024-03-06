@@ -6,9 +6,11 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/sandbox.exe",
-            "args": [],
+            "args": [
+                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
+            ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build/",
             "environment": [],
             "console": "integratedTerminal"
         },
@@ -17,9 +19,11 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/release/sandbox.exe",
-            "args": [],
+            "args": [
+                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
+            ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build/",
             "environment": [],
             "console": "integratedTerminal"
         },
@@ -28,9 +32,11 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/RelWithDebInfo/sandbox.exe",
-            "args": [],
+            "args": [
+                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
+            ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build/",
             "environment": [],
             "console": "integratedTerminal"
         },

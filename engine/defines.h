@@ -24,6 +24,9 @@ typedef _Bool b8;
     #define STATIC_ASSERT static_assert
 #endif
 
+STATIC_ASSERT(sizeof(float) == 4, "Unsupported architecture, float should be 32 bits.");
+STATIC_ASSERT(sizeof(double) == 8, "Unsupported architecture, double should be 64 bits.");
+
 #define true 1
 #define false 0
 
@@ -46,10 +49,7 @@ typedef _Bool b8;
 #endif
 
 #if defined(_DEBUG)
-    #define DEBUG_CODE(...) \
-    do {                    \
-        __VA_ARGS__         \
-    } while (0);
+    #define DEBUG_CODE(...) __VA_ARGS__
 #else
     #define DEBUG_CODE(...)
 #endif

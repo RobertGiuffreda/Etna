@@ -1,11 +1,12 @@
 #include "pipeline.h"
 
 #include "renderer/src/utilities/vkinit.h"
+#include "renderer/src/renderer.h"
 
 #include "data_structures/dynarray.h"
 
-#include "memory/etmemory.h"
 #include "core/logger.h"
+#include "memory/etmemory.h"
 
 // TODO: Expand to support multiple color attachments
 
@@ -41,31 +42,30 @@ VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* sta
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
         .pNext = 0,
         .viewportCount = 1,
-        .scissorCount = 1
+        .scissorCount = 1,
     };
 
-    // setup dummy color blending. We arent using transparent objects yet
-    // the blending is just "no blend", but we do write to the color attachment
     VkPipelineColorBlendStateCreateInfo color_blending = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         .pNext = 0,
         .logicOpEnable = VK_FALSE,
         .logicOp = VK_LOGIC_OP_COPY,
         .attachmentCount = 1,
-        .pAttachments = &builder->color_blend_attachment
+        .pAttachments = &builder->color_blend_attachment,
     };
 
     VkPipelineVertexInputStateCreateInfo vertex_input_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
 
-    VkDynamicState dynamic_state[] = {
-        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR
+    VkDynamicState dynamic_states[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
     };
 
     VkPipelineDynamicStateCreateInfo dynamic_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .dynamicStateCount = 2,
-        .pDynamicStates = &dynamic_state[0]
+        .pDynamicStates = dynamic_states,
     };
 
     VkGraphicsPipelineCreateInfo pipeline_info = {
@@ -81,18 +81,19 @@ VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* sta
         .pColorBlendState = &color_blending,
         .pDepthStencilState = &builder->depth_stencil,
         .layout = builder->layout,
-        .pDynamicState = &dynamic_info
+        .pDynamicState = &dynamic_info,
     };
 
     VkPipeline new_pipeline;
     if (vkCreateGraphicsPipelines(
         state->device.handle,
         VK_NULL_HANDLE,
-        1, &pipeline_info,
+        /* infoCount: */ 1,
+        &pipeline_info,
         state->allocator,
-        &new_pipeline) != VK_SUCCESS)
-    {
-        ETERROR("vkCreategraphicsPipelines failed to create pipeline");
+        &new_pipeline
+    ) != VK_SUCCESS) {
+        ETERROR("vkCreategraphicsPipelines failed to create pipeline.");
         return VK_NULL_HANDLE;
     }
     return new_pipeline;

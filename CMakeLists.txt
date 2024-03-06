@@ -18,6 +18,7 @@ foreach(SHADER_FILE ${SHADER_FILES})
     get_filename_component(SHADER_FILE_NAME ${SHADER_FILE} NAME)
     set(SPV_FILE ${PROJECT_BINARY_DIR}/assets/shaders/${SHADER_FILE_NAME}.spv)
     execute_process(COMMAND ${SHADER_COMPILER} -g ${SHADER_FILE} -o ${SPV_FILE} --target-env vulkan1.3)
+    execute_process(COMMAND spirv-val --target-env vulkan1.3 ${SPV_FILE})
     execute_process(COMMAND spirv-opt -O ${SPV_FILE} -o ${SPV_FILE}.opt WORKING_DIRECTORY ${SHADER_OPTIMIZER_DIR})
 endforeach(SHADER_FILE)
 
@@ -27,8 +28,6 @@ file(MAKE_DIRECTORY ${GLTF_DIRECTORY})
 
 # Copy over the gltf files
 configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/structure.glb ${GLTF_DIRECTORY}/structure.glb COPYONLY)
-# configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/house2.glb ${GLTF_DIRECTORY}/house2.glb COPYONLY)
-# configure_file(${CMAKE_SOURCE_DIR}/assets/gltf/zda_test.glb ${GLTF_DIRECTORY}/zda_test.glb COPYONLY)
 
 #NOTE: External dependencies
 #Add glfw as a dependency to be built alongside the engine

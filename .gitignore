@@ -8,8 +8,12 @@ extern/SPIRV-Reflect/bin
 
 assets/gltf/zda_test.glb
 assets/gltf/house2.glb
+assets/gltf/structure.glb
 
 assets/shaders/input_structures_refactor.glsl
+assets/shaders/draws_refactor.comp
+
+deprecated/
 
 glb_json.json
 etna_log.txt

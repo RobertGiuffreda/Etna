@@ -643,12 +643,32 @@ std::string ToStringUserType(SpvReflectUserType user_type) {
       return "Buffer";
     case SPV_REFLECT_USER_TYPE_BYTE_ADDRESS_BUFFER:
       return "ByteAddressBuffer";
+    case SPV_REFLECT_USER_TYPE_CONSTANT_BUFFER:
+      return "ConstantBuffer";
     case SPV_REFLECT_USER_TYPE_CONSUME_STRUCTURED_BUFFER:
       return "ConsumeStructuredBuffer";
     case SPV_REFLECT_USER_TYPE_INPUT_PATCH:
       return "InputPatch";
     case SPV_REFLECT_USER_TYPE_OUTPUT_PATCH:
       return "OutputPatch";
+    case SPV_REFLECT_USER_TYPE_RASTERIZER_ORDERED_BUFFER:
+      return "RasterizerOrderedBuffer";
+    case SPV_REFLECT_USER_TYPE_RASTERIZER_ORDERED_BYTE_ADDRESS_BUFFER:
+      return "RasterizerOrderedByteAddressBuffer";
+    case SPV_REFLECT_USER_TYPE_RASTERIZER_ORDERED_STRUCTURED_BUFFER:
+      return "RasterizerOrderedStructuredBuffer";
+    case SPV_REFLECT_USER_TYPE_RASTERIZER_ORDERED_TEXTURE_1D:
+      return "RasterizerOrderedTexture1D";
+    case SPV_REFLECT_USER_TYPE_RASTERIZER_ORDERED_TEXTURE_1D_ARRAY:
+      return "RasterizerOrderedTexture1DArray";
+    case SPV_REFLECT_USER_TYPE_RASTERIZER_ORDERED_TEXTURE_2D:
+      return "RasterizerOrderedTexture2D";
+    case SPV_REFLECT_USER_TYPE_RASTERIZER_ORDERED_TEXTURE_2D_ARRAY:
+      return "RasterizerOrderedTexture2DArray";
+    case SPV_REFLECT_USER_TYPE_RASTERIZER_ORDERED_TEXTURE_3D:
+      return "RasterizerOrderedTexture3D";
+    case SPV_REFLECT_USER_TYPE_RAYTRACING_ACCELERATION_STRUCTURE:
+      return "RaytracingAccelerationStructure";
     case SPV_REFLECT_USER_TYPE_RW_BUFFER:
       return "RWBuffer";
     case SPV_REFLECT_USER_TYPE_RW_BYTE_ADDRESS_BUFFER:
@@ -667,6 +687,10 @@ std::string ToStringUserType(SpvReflectUserType user_type) {
       return "RWTexture3D";
     case SPV_REFLECT_USER_TYPE_STRUCTURED_BUFFER:
       return "StructuredBuffer";
+    case SPV_REFLECT_USER_TYPE_SUBPASS_INPUT:
+      return "SubpassInput";
+    case SPV_REFLECT_USER_TYPE_SUBPASS_INPUT_MS:
+      return "SubpassInputMS";
     case SPV_REFLECT_USER_TYPE_TEXTURE_1D:
       return "Texture1D";
     case SPV_REFLECT_USER_TYPE_TEXTURE_1D_ARRAY:
@@ -681,6 +705,8 @@ std::string ToStringUserType(SpvReflectUserType user_type) {
       return "Texture2DMSArray";
     case SPV_REFLECT_USER_TYPE_TEXTURE_3D:
       return "Texture3D";
+    case SPV_REFLECT_USER_TYPE_TEXTURE_BUFFER:
+      return "TextureBuffer";
     case SPV_REFLECT_USER_TYPE_TEXTURE_CUBE:
       return "TextureCube";
     case SPV_REFLECT_USER_TYPE_TEXTURE_CUBE_ARRAY:
@@ -735,6 +761,7 @@ std::string ToStringDecorationFlags(SpvReflectDecorationFlags decoration_flags) 
   }
   std::stringstream sstream;
   PRINT_AND_CLEAR_DECORATION_FLAG(sstream, decoration_flags, NON_WRITABLE);
+  PRINT_AND_CLEAR_DECORATION_FLAG(sstream, decoration_flags, NON_READABLE);
   PRINT_AND_CLEAR_DECORATION_FLAG(sstream, decoration_flags, FLAT);
   PRINT_AND_CLEAR_DECORATION_FLAG(sstream, decoration_flags, NOPERSPECTIVE);
   PRINT_AND_CLEAR_DECORATION_FLAG(sstream, decoration_flags, BUILT_IN);
@@ -1865,6 +1892,9 @@ void SpvReflectToYaml::WriteDescriptorBinding(std::ostream& os, const SpvReflect
   os << t1 << "input_attachment_index: " << db.input_attachment_index << std::endl;
   //   uint32_t                            set;
   os << t1 << "set: " << db.set << std::endl;
+  //   SpvReflectDecorationFlags           decoration_flags;
+  os << t1 << "decoration_flags: " << AsHexString(db.decoration_flags) << " # " << ToStringDecorationFlags(db.decoration_flags)
+     << std::endl;
   //   SpvReflectDescriptorType            descriptor_type;
   os << t1 << "descriptor_type: " << db.descriptor_type << " # " << ToStringDescriptorType(db.descriptor_type) << std::endl;
   //   SpvReflectResourceType              resource_type;
@@ -1920,6 +1950,18 @@ void SpvReflectToYaml::WriteDescriptorBinding(std::ostream& os, const SpvReflect
     assert(itor != descriptor_binding_to_index_.end());
     os << t1 << "uav_counter_binding: *db" << itor->second << " # " << SafeString(db.uav_counter_binding->name) << std::endl;
   }
+
+  if (db.byte_address_buffer_offset_count > 0) {
+    os << t1 << "ByteAddressBuffer offsets: [";
+    for (uint32_t i = 0; i < db.byte_address_buffer_offset_count; i++) {
+      os << db.byte_address_buffer_offsets[i];
+      if (i < (db.byte_address_buffer_offset_count - 1)) {
+        os << ", ";
+      }
+    }
+    os << "]\n";
+  }
+
   if (verbosity_ >= 1) {
     //   SpvReflectTypeDescription*        type_description;
     if (db.type_description == nullptr) {
@@ -2242,6 +2284,7 @@ void SpvReflectToYaml::Write(std::ostream& os) {
   for (uint32_t i = 0; i < sm_.spec_constant_count; ++i) {
     os << t3 << "spirv_id: " << sm_.spec_constants[i].spirv_id << std::endl;
     os << t3 << "constant_id: " << sm_.spec_constants[i].constant_id << std::endl;
+    os << t3 << "name: " << SafeString(sm_.spec_constants[i].name) << std::endl;
   }
 
   if (verbosity_ >= 2) {

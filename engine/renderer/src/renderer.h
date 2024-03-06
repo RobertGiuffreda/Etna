@@ -6,8 +6,7 @@
 // TEMP: END
 
 #include "renderer/src/vk_types.h"
-#include "swapchain.h"
-#include "renderer/src/renderables.h"
+#include "renderer/src/swapchain.h"
 #include "renderer/src/shader.h"
 
 typedef struct renderer_state {
@@ -20,36 +19,32 @@ typedef struct renderer_state {
 
     device device;
 
-    // TODO: ??Move to the window class??
+    // TODO: Move to window
     swapchain swapchain;
     // TODO: END
 
-    // TODO: Move to scene_renderer
+    // TODO: Move to scene
     VkExtent3D render_extent;
     image render_image;
     image depth_image;
     // TODO: END
     
-    // TODO: Move to the scene_renderer or swapchain??
-    VkFence* render_fences;
-
-    VkCommandPool* graphics_pools;
-    VkCommandBuffer* main_graphics_command_buffers;
-    // TODO: Per frame END
-
-    VkCommandPool imm_pool;
-    VkCommandBuffer imm_buffer;
-    VkFence imm_fence;
-
+    // TEMP: Compute effect members, will be removed.
     ds_allocator global_ds_allocator;
-
-    // NOTE: Compute effect members
+    
     shader gradient_shader;
     compute_effect gradient_effect;
 
     VkDescriptorSetLayout draw_image_descriptor_set_layout;
     VkDescriptorSet draw_image_descriptor_set;
-    // NOTE: END
+
+    VkDescriptorSetLayout scene_data_descriptor_set_layout;
+    // TEMP: END
+
+    // NOTE: Immediate Submission
+    VkCommandPool imm_pool;
+    VkCommandBuffer imm_buffer;
+    VkFence imm_fence;
 
     // NOTE: Defaults
     image white_image;
@@ -57,16 +52,9 @@ typedef struct renderer_state {
     image grey_image;
     image error_image;
 
-    VkSampler default_sampler_linear;
-    VkSampler default_sampler_nearest;
-    
-    GLTF_MR metal_rough_material;
-
-    material_instance default_material_instance;
-    buffer default_material_constants;
+    VkSampler sampler_linear;
+    VkSampler sampler_nearest;
     // NOTE: END
-
-    VkDescriptorSetLayout scene_data_descriptor_set_layout;
 } renderer_state;
 
 // TODO: Setup debug names for vulkan objects

@@ -70,7 +70,6 @@ void image2D_create_data(
     VkMemoryPropertyFlags memory_flags,
     image* out_image
 ) {
-    // Create staging buffer and upload data to it
     u64 data_size = extent.width * extent.height * extent.depth * 4;
     buffer staging = {0};
     buffer_create(
@@ -199,7 +198,7 @@ void blit_image2D_to_image2D(
 }
 
 // TODO: This function should return VkImageMemoryBarrier2 
-// struct and have the caller submit the barrier
+// struct and have the caller call vkCmdPipelineBarrier2
 void image_barrier(
     VkCommandBuffer cmd,
     VkImage image,
@@ -239,7 +238,6 @@ void image_barrier(
         .bufferMemoryBarrierCount = 0,
         .pBufferMemoryBarriers = 0,
         .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &barrier
-    };
+        .pImageMemoryBarriers = &barrier};
     vkCmdPipelineBarrier2(cmd, &dependency);
 }

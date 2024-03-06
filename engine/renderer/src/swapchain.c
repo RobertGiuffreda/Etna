@@ -152,7 +152,7 @@ b8 initialize_swapchain(renderer_state* state, swapchain* swapchain) {
         &swapchain_cinfo,
         state->allocator,
         &swapchain->swapchain));
-    ETINFO("Vulkan Swapchain intialized.");
+    ETINFO("VkSwapchainKHR created.");
 
     swapchain->image_extent.width = swapchain_extent.width;
     swapchain->image_extent.height = swapchain_extent.height;

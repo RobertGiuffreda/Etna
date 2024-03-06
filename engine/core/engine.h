@@ -9,6 +9,8 @@ typedef struct engine_config {
 
     i32 width;
     i32 height;
+
+    const char* scene_path;
 } engine_config;
 
 b8 engine_initialize(engine_config engine_details, application_config app_details);

@@ -33,7 +33,7 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_t** out_window_state) {
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetWindowSizeCallback(window, resize_callback);
 
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    // glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     
     // Move the window then show it, hiding the movement
     glfwSetWindowPos(window, config->x_start_pos, config->y_start_pos);
@@ -41,7 +41,7 @@ b8 etwindow_initialize(etwindow_config* config, etwindow_t** out_window_state) {
 
     *out_window_state = (etwindow_t*)etallocate(sizeof(struct etwindow_t), MEMORY_TAG_WINDOW);
     (*out_window_state)->impl_window = window;
-    (*out_window_state)->cursor_captured = true;
+    (*out_window_state)->cursor_captured = false;
 
     event_observer_register(EVENT_CODE_KEY_RELEASE, (*out_window_state), etwindow_on_key_event);
     return true;

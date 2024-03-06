@@ -26,18 +26,11 @@
 #include "renderer/src/utilities/vkutils.h"
 #include "renderer/src/renderer.h"
 
-#include "renderer/src/descriptor.h"
 #include "renderer/src/buffer.h"
 #include "renderer/src/image.h"
-#include "renderer/src/material.h"
-#include "renderer/src/GLTF_MR.h"
-
-#include "renderer/src/renderables.h"
 // TEMP: END
 
-#include "resources/mesh_manager.h"
 #include "resources/image_manager.h"
-#include "resources/material_manager.h"
 #include "scene/scene.h"
 #include "scene/scene_private.h"
 
@@ -79,8 +72,8 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         return false;
     }
 
-    // Attempt to load the data from buffers in
-    result = cgltf_load_buffers(&options, data, 0);
+    // Attempt to load the data from buffers
+    result = cgltf_load_buffers(&options, data, path);
     if (result != cgltf_result_success) {
         ETERROR("Failed to load gltf file %s.", path);
         cgltf_free(data);
@@ -108,7 +101,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     }
     scene->sampler_count = data->samplers_count;
 
-    // Images
     for (u32 i = 0; i < data->images_count; ++i) {
         // TODO: Create an image loader 
         int width, height, channels;
@@ -124,7 +116,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 .width = width,
                 .height = height,
                 .data = image_data};
-            // The id of the image is just the place in the backing array
             image2D_submit(scene->image_bank, &config);
             stbi_image_free(image_data);
         } else {
@@ -135,87 +126,35 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
     // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
     buffer_create(state,
-        sizeof(struct bindless_constants) * data->materials_count,
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &scene->bindless_material_buffer);
-    void* bindless_mapped_memory;
-    VK_CHECK(vkMapMemory(
-        state->device.handle,
-        scene->bindless_material_buffer.memory,
-        /* offset: */ 0,
-        sizeof(struct bindless_constants) * data->materials_count,
-        /* flags: */ 0,
-        &bindless_mapped_memory));
-    struct bindless_constants* bindless_material_constants = (struct bindless_constants*)bindless_mapped_memory;
-    // TODO: END
-
-    // Materials, TODO: Since this is importing a GLTF, we should use the default GLTF_MR material & shaders for it
-    // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
-    buffer_create(state,
-        sizeof(struct GLTF_MR_constants) * data->materials_count,
+        sizeof(struct blinn_mr_constants) * data->materials_count,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &scene->material_buffer);
-    void* mapped_memory;
+    void* material_mapped_memory;
     VK_CHECK(vkMapMemory(
         state->device.handle,
         scene->material_buffer.memory,
         /* offset: */ 0,
-        sizeof(struct GLTF_MR_constants) * data->materials_count,
+        sizeof(struct blinn_mr_constants) * data->materials_count,
         /* flags: */ 0,
-        &mapped_memory));
-    struct GLTF_MR_constants* material_constants = (struct GLTF_MR_constants*)mapped_memory;
+        &material_mapped_memory));
+    struct blinn_mr_constants* material_constants = (struct blinn_mr_constants*)material_mapped_memory;
+    // TODO: END
+
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material* i_material = (data->materials + i);
-
-        // TODO: Check for cgltf_pbr_metallic_roughness beforehand
-        // if not present use some default values
-        cgltf_pbr_metallic_roughness gltf_pbr_mr = i_material->pbr_metallic_roughness;
-        struct GLTF_MR_constants constants = {
-            .color_factors = {
-                .r = gltf_pbr_mr.base_color_factor[0],
-                .g = gltf_pbr_mr.base_color_factor[1],
-                .b = gltf_pbr_mr.base_color_factor[2],
-                .a = gltf_pbr_mr.base_color_factor[3],
-            },
-            .metal_rough_factors = {
-                .x = gltf_pbr_mr.metallic_factor,
-                .y = gltf_pbr_mr.roughness_factor,
-            }
-        };
-
-        // TODO: Handle minUniformBufferOffsetAlignment here
-        material_constants[i] = constants;
-        // TODO: END
 
         material_pass pass_type = MATERIAL_PASS_MAIN_COLOR;
         if (i_material->alpha_mode == cgltf_alpha_mode_blend) {
             pass_type = MATERIAL_PASS_TRANSPARENT;
         }
 
-        // TODO: Handle minUniformBufferOffsetAlignment here
-        material_resource material_resources[] = {
-            [0] = {
-                .binding = 0,
-                .buffer = scene->material_buffer.handle,
-                .offset = sizeof(struct GLTF_MR_constants) * i,
-            },
-            [1] = {
-                .binding = 1,
-                .sampler = state->default_sampler_linear,
-                .view = state->white_image.view,
-            },
-            [2] = {
-                .binding = 2,
-                .sampler = state->default_sampler_linear,
-                .view = state->white_image.view,
-            },
-        };
-        // TODO: END
+        // TODO: Check for cgltf_pbr_metallic_roughness beforehand
+        // if not present use some default values
+        cgltf_pbr_metallic_roughness gltf_pbr_mr = i_material->pbr_metallic_roughness;
 
         // Bindless
-        struct bindless_constants bindless_consts = {
+        struct blinn_mr_constants bindless_consts = {
             .color = {
                 .r = gltf_pbr_mr.base_color_factor[0],
                 .g = gltf_pbr_mr.base_color_factor[1],
@@ -236,11 +175,8 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, color_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, color_tex->sampler);
 
-                material_resources[1].view = image_manager_get(scene->image_bank, img_index)->view;
-                material_resources[1].sampler = scene->samplers[smpl_index];
-
                 // TEMP: Bindless
-                scene_image_set(scene, img_index, smpl_index);
+                scene_texture_set(scene, img_index, smpl_index);
                 bindless_consts.color_id = img_index;
                 // TEMP: END
             }
@@ -248,37 +184,24 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 cgltf_texture* mr_tex = i_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, mr_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, mr_tex->sampler);
-
-                material_resources[2].view = image_manager_get(scene->image_bank, img_index)->view;
-                material_resources[2].sampler = scene->samplers[smpl_index];
                 
                 // TEMP: Bindless
-                scene_image_set(scene, img_index, smpl_index);
+                scene_texture_set(scene, img_index, smpl_index);
                 bindless_consts.mr_id = img_index;
                 // TEMP: END
             }
         }
 
-        // TEMP: Bindless
-        bindless_material_constants[i] = bindless_consts;
-        // TEMP: END
-        
-        material_config config = {
-            .name = i_material->name,
-            .pass_type = pass_type,
-            .resources = material_resources,
-        };
-        material_manager_submit(scene->material_bank, &config);
-        
+        material_constants[i] = bindless_consts;
+                
         // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
-        struct bindless_material_resources bindless_resources = {
-            .data_buff = scene->bindless_material_buffer.handle,
-            .data_buff_offset = sizeof(struct bindless_constants) * i};
+        struct material_resources bindless_resources = {
+            .data_buff = scene->material_buffer.handle,
+            .data_buff_offset = sizeof(struct blinn_mr_constants) * i};
         // TODO: END
         scene_material_set_instance(scene, pass_type, &bindless_resources);
     }
     vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
-    vkUnmapMemory(state->device.handle, scene->bindless_material_buffer.memory);
 
     // TEMP: Big scene index and vertex buffer, Bindless
     vertex* scene_vertices = dynarray_create(1, sizeof(vertex));
@@ -286,6 +209,8 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
     surface* scene_surfaces = dynarray_create(1, sizeof(surface));
     mesh* scene_meshes = dynarray_create(1, sizeof(mesh));
+
+    geometry* scene_geometries = dynarray_create(1, sizeof(geometry));
 
     u64 opaque_surface_count;
     u64 transparent_surface_count;
@@ -295,6 +220,8 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
         u32 surface_count = dynarray_length(scene_surfaces);
         dynarray_resize((void**)&scene_surfaces, surface_count + gltf_mesh->primitives_count);
+        // TEMP: until multiple psos are working
+        dynarray_resize((void**)&scene_geometries, surface_count + gltf_mesh->primitives_count);
 
         mesh new_mesh = {
             .vertex_offset = 0,
@@ -310,6 +237,13 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             surface* new_surface = &scene_surfaces[surface_count + j];
             new_surface->start_index = dynarray_length(scene_indices);
             new_surface->index_count = gltf_primitive->indices->count;
+
+            geometry* new_geometry = &scene_geometries[surface_count + j];
+            new_geometry->start_index = dynarray_length(scene_indices);
+            new_geometry->index_count = gltf_primitive->indices->count;
+            // TODO: Take this into account when creating the new geometry
+            new_geometry->vertex_offset = 0;
+
 
             u64 initial_vertex = dynarray_length(scene_vertices);
             cgltf_accessor* index_accessor = gltf_primitive->indices;
@@ -361,7 +295,9 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
             // Load texture coordinates, UVs
             cgltf_accessor* uv = get_accessor_from_attributes(
-                gltf_primitive->attributes, gltf_primitive->attributes_count, "TEXCOORD_0");
+                gltf_primitive->attributes,
+                gltf_primitive->attributes_count,
+                "TEXCOORD_0");
             if (uv) {
                 cgltf_size uv_element_size = cgltf_calc_size(uv->type, uv->component_type);
                 for (u32 k = 0; k < uv->count; ++k) {
@@ -425,8 +361,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
     }
 
-    gpu_obj* scene_op_objects = dynarray_create(1, sizeof(gpu_obj));
-    gpu_obj* scene_tp_objects = dynarray_create(1, sizeof(gpu_obj));
+    object* scene_objects = dynarray_create(1, sizeof(object));
     m4s* scene_transforms = dynarray_create(1, sizeof(m4s));
     u32 transform_offset = 0;
     for (u32 i = 0; i < dynarray_length(scene_meshes); ++i) {
@@ -434,25 +369,13 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             // Object representation for test
             for (u32 k = 0; k < scene_meshes[i].surface_count; ++k) {
                 surface surface = scene_surfaces[scene_meshes[i].start_surface + k];
-                gpu_obj new_obj = {
-                    .start_index = surface.start_index,
-                    .index_count = surface.index_count,
-                    .mat_inst_id = surface.material.id.instance_id,
+                object new_object = {
+                    .geo_id = scene_meshes[i].start_surface + k,
+                    .pso_id = surface.material.id.blueprint_id,
+                    .mat_id = surface.material.id.instance_id,
                     .transform_id = transform_offset + j,
                 };
-                // TEMP: Material should be per object. 
-                switch (surface.material.pass)
-                {
-                case MATERIAL_PASS_MAIN_COLOR:
-                    dynarray_push((void**)&scene_op_objects, &new_obj);
-                    break;
-                case MATERIAL_PASS_TRANSPARENT:
-                    dynarray_push((void**)&scene_tp_objects, &new_obj);
-                    break;
-                default:
-                    ETERROR("Unsupported material pass type.");
-                    break;
-                }
+                dynarray_push((void**)&scene_objects, &new_object);
             }
             dynarray_push((void**)&scene_transforms, &transforms_from_mesh_index[i][j]);
         }
@@ -463,7 +386,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
     etfree(transforms_from_mesh_index, sizeof(m4s*) * dynarray_length(scene_meshes), MEMORY_TAG_SCENE);
 
-    // Init Shared buffers
+    // TODO: New function that does not take vertex buffer address
     scene->vertex_count = dynarray_length(scene_vertices);
     scene->index_count = dynarray_length(scene_indices);
     mesh_buffers scene_shared_buffers = upload_mesh_immediate(
@@ -474,18 +397,26 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         scene_vertices
     );
 
-    // Create transform buffer & get address
+    // Transform buffer & Geometry buffer
     buffer_create_data(
         state,
         scene_transforms,
         sizeof(m4s) * dynarray_length(scene_transforms),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->transform_buffer);
-    scene->tb_addr = buffer_get_address(state, &scene->transform_buffer);
-    
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->transform_buffer.handle, "Transform Buffer");
+    buffer_create_data(
+        state,
+        scene_geometries,
+        sizeof(geometry) * dynarray_length(scene_geometries),
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &scene->geometry_buffer);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->geometry_buffer.handle, "Geometry Buffer");
+
     // Move Objects to object buffer
-    u64 staging_size = sizeof(gpu_obj) * dynarray_length(scene_op_objects);
+    u64 staging_size = sizeof(object) * dynarray_length(scene_objects);
     buffer staging = {0};
     buffer_create(
         state,
@@ -501,7 +432,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         VK_WHOLE_SIZE,
         /* flags: */ 0,
         &mapped_staging));
-    etcopy_memory(mapped_staging, scene_op_objects, staging_size);
+    etcopy_memory(mapped_staging, scene_objects, staging_size);
     vkUnmapMemory(state->device.handle, staging.memory);
     VkBufferCopy buff_copy = {
         .dstOffset = 0,
@@ -518,7 +449,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     
     scene->index_buffer = scene_shared_buffers.index_buffer;
     scene->vertex_buffer = scene_shared_buffers.vertex_buffer;
-    scene->vb_addr = scene_shared_buffers.vertex_buffer_address;
     scene->surfaces = scene_surfaces;
     scene->meshes = scene_meshes;
 
@@ -528,218 +458,68 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     scene->transforms = scene_transforms;
     scene->transform_count = dynarray_length(scene_transforms);
 
-    scene->op_objects = scene_op_objects;
-    scene->op_object_count = dynarray_length(scene_op_objects);
-    scene->tp_objects = scene_tp_objects;
-    scene->tp_object_count = dynarray_length(scene_tp_objects);
+    u64 object_count = dynarray_length(scene_objects);
+    scene->objects = scene_objects;
+    scene->geometries = scene_geometries;
+
+    VkDescriptorBufferInfo geometry_buffer_info = {
+        .buffer = scene->geometry_buffer.handle,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
+    VkWriteDescriptorSet geometry_buffer_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .dstSet = scene->scene_set,
+        .dstBinding = 4,
+        .pBufferInfo = &geometry_buffer_info,
+    };
+    VkDescriptorBufferInfo vertex_buffer_info = {
+        .buffer = scene->vertex_buffer.handle,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
+    VkWriteDescriptorSet vertex_buffer_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .dstSet = scene->scene_set,
+        .dstBinding = 5,
+        .pBufferInfo = &vertex_buffer_info,
+    };
+    VkDescriptorBufferInfo transform_buffer_info = {
+        .buffer = scene->transform_buffer.handle,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
+    VkWriteDescriptorSet transform_buffer_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .dstSet = scene->scene_set,
+        .dstBinding = 6,
+        .pBufferInfo = &transform_buffer_info,
+    };
+    VkWriteDescriptorSet writes[] = {
+        geometry_buffer_write,
+        vertex_buffer_write,
+        transform_buffer_write,
+    };
+    vkUpdateDescriptorSets(
+        state->device.handle,
+        /* writeCount */ 3,
+        writes,
+        /* copyCount */ 0,
+        /* copies */ NULL 
+    );
     // TEMP: END
-
-    // Meshes
-    vertex* vertices = dynarray_create(1, sizeof(vertex));
-    u32* indices = dynarray_create(1, sizeof(u32));
-    for (u32 i = 0; i < data->meshes_count; ++i) {
-        cgltf_mesh* gltf_mesh = &data->meshes[i];
-
-        surface_1* surfaces = etallocate(sizeof(surface_1) * gltf_mesh->primitives_count, MEMORY_TAG_SCENE);
-
-        dynarray_clear(indices);
-        dynarray_clear(vertices);
-
-        for (u32 j = 0; j < gltf_mesh->primitives_count; ++j) {
-            cgltf_primitive* gltf_primitive = &gltf_mesh->primitives[j];
-
-            surface_1* new_surface = &surfaces[j];
-            new_surface->start_index = dynarray_length(indices);
-            new_surface->index_count = gltf_primitive->indices->count;
-
-            u64 initial_vertex = dynarray_length(vertices);
-
-            // load indices
-            cgltf_accessor* index_accessor = gltf_primitive->indices;
-            dynarray_reserve((void**)&indices, dynarray_length(indices) + index_accessor->count);
-
-            for (u32 k = 0; k < index_accessor->count; ++k) {
-                u32 index = initial_vertex + cgltf_accessor_read_index(index_accessor, k);
-                dynarray_push((void**)&indices, &index);
-            }
-
-            // Load position information
-            cgltf_accessor* position = get_accessor_from_attributes(
-                gltf_primitive->attributes, gltf_primitive->attributes_count, "POSITION");
-            if (!position) {
-                ETERROR("Attempted to load mesh without vertex positions.");
-                return false;
-            }
-
-            dynarray_resize((void**)&vertices, dynarray_length(vertices) + position->count);
-            cgltf_size pos_element_size = cgltf_calc_size(position->type, position->component_type);
-            for (u32 k = 0; k < position->count; k++) {
-                vertex new_v = {
-                    .position = (v3s){.raw = {0.f, 0.f, 0.f}},
-                    .normal = (v3s){.raw = {1.f, 0.f, 0.f}},
-                    .color = (v4s){.raw = {1.f, 1.f, 1.f, 1.f}},
-                    .uv_x = 0,
-                    .uv_y = 0,
-                };
-                
-                if (!cgltf_accessor_read_float(position, k, new_v.position.raw, pos_element_size)) {
-                    ETERROR("Error attempting to read position value from %s.", path);
-                    return false;
-                }
-                vertices[initial_vertex + k] = new_v;
-            }
-
-            // Load normal information
-            cgltf_accessor* normal = get_accessor_from_attributes(
-                gltf_primitive->attributes, gltf_primitive->attributes_count, "NORMAL");
-            if (!normal) {
-                ETERROR("Attempt to load mesh without vertex normals.");
-                return false;
-            }
-
-            cgltf_size norm_element_size = cgltf_calc_size(normal->type, normal->component_type);
-            for (u32 k = 0; k < normal->count; ++k) {
-                vertex* v = &vertices[initial_vertex + k];
-                if (!cgltf_accessor_read_float(normal, k, v->normal.raw, norm_element_size)) {
-                    ETERROR("Error attempting to read normal value from %s.", path);
-                }
-            }
-
-            // Load texture coordinates, UVs
-            cgltf_accessor* uv = get_accessor_from_attributes(
-                gltf_primitive->attributes, gltf_primitive->attributes_count, "TEXCOORD_0");
-            if (uv) {
-                cgltf_size uv_element_size = cgltf_calc_size(uv->type, uv->component_type);
-                for (u32 k = 0; k < uv->count; ++k) {
-                    vertex* v = &vertices[initial_vertex + k];
-
-                    v2s uvs = {.raw = {0.f, 0.f}};
-                    if (!cgltf_accessor_read_float(uv, k, uvs.raw, uv_element_size)) {
-                        ETERROR("Error attempting to read uvs from %s.", path);
-                        return false;
-                    }
-
-                    v->uv_x = uvs.x;
-                    v->uv_y = uvs.y;
-                }
-            }
-
-            // Load vertex color information
-            cgltf_accessor* color = get_accessor_from_attributes(
-                gltf_primitive->attributes, gltf_primitive->attributes_count, "COLOR_0");
-            if (color) {
-                cgltf_size element_size = cgltf_calc_size(color->type, color->component_type);
-                for (u32 k = 0; k < color->count; ++k) {
-                    vertex* v = &vertices[initial_vertex + k];
-                    if (!cgltf_accessor_read_float(color, k, v->color.raw, element_size)) {
-                        ETERROR("Error attempting to read color value from %s.", path);
-                        return false;
-                    }
-                }
-            }
-
-            // Set material
-            if (gltf_primitive->material) {
-                u64 mat_index = CGLTF_ARRAY_INDEX(cgltf_material, data->materials, gltf_primitive->material);
-                new_surface->material = material_manager_get(scene->material_bank, mat_index);
-            } else {
-                new_surface->material = material_manager_get(scene->material_bank, 0);
-            }
-        }
-        mesh_config config = {
-            .name = gltf_mesh->name,
-            .surface_count = gltf_mesh->primitives_count,
-            .surfaces = surfaces,
-            .index_count = dynarray_length(indices),
-            .indices = indices,
-            .vertex_count = dynarray_length(vertices),
-            .vertices = vertices
-        };
-        // mesh_manager_submit_immediate(scene->mesh_bank, &config);
-        mesh_manager_submit(scene->mesh_bank, &config);
-        etfree(surfaces, sizeof(surface_1) * gltf_mesh->primitives_count, MEMORY_TAG_SCENE);
-    }
-    dynarray_destroy(vertices);
-    dynarray_destroy(indices);
-
-    mesh_manager_uploads_wait(scene->mesh_bank);
-
-    // Nodes
-    u32 node_count = 0;
-    u32 mesh_node_count = 0;
-    for (u32 i = 0; i < data->nodes_count; ++i) {
-        if (data->nodes[i].mesh) {
-            mesh_node_count++;
-        } else {
-            node_count++;
-        }
-    }
-
-    if (mesh_node_count) {
-        scene->mesh_nodes = etallocate(sizeof(mesh_node) * mesh_node_count, MEMORY_TAG_SCENE);
-        for (u32 i = 0; i < mesh_node_count; ++i) {
-            mesh_node_create(&scene->mesh_nodes[i]);
-        }
-    } else scene->mesh_nodes = 0;
-    if (node_count) {
-        scene->nodes = etallocate(sizeof(node) * node_count, MEMORY_TAG_SCENE);
-        for (u32 i = 0; i < node_count; ++i) {
-            node_create(&scene->nodes[i]);
-        }
-    } else scene->nodes = 0;
-    
-    node** nodes_by_index = etallocate(sizeof(node*) * data->nodes_count, MEMORY_TAG_SCENE);
-    for (u32 m_node_i = 0, node_i = 0; (m_node_i + node_i) < data->nodes_count;) {
-        u32 i = m_node_i + node_i;
-
-        node* node;
-        if (data->nodes[i].mesh) {
-            mesh_node* m_node = &scene->mesh_nodes[m_node_i];
-            u32 mesh_index = CGLTF_ARRAY_INDEX(cgltf_mesh, data->meshes, data->nodes[i].mesh);
-            m_node->mesh = mesh_manager_get(scene->mesh_bank, mesh_index);
-            node = node_from_mesh_node(m_node);
-            m_node_i++;
-        } else {
-            node = &scene->nodes[node_i];
-            node_i++;
-        }
-
-        cgltf_node_transform_local(&data->nodes[i], (cgltf_float*)node->local_transform.raw);
-        cgltf_node_transform_world(&data->nodes[i], (cgltf_float*)node->world_transform.raw);
-
-        node->name = str_duplicate_allocate(data->nodes[i].name);
-
-        // Store the node address in the nodes_by_index to grab a reference by index when
-        // setting up the node hierarchy
-        nodes_by_index[i] = node;
-    }
-
-    // Connect nodes with children and parents
-    scene->top_nodes = dynarray_create(1, sizeof(node*));
-    for (u32 i = 0; i < data->nodes_count; ++i) {
-        node* node = nodes_by_index[i];
-
-        dynarray_resize((void**)&node->children, data->nodes[i].children_count);
-        for (u32 j = 0; j < data->nodes[i].children_count; ++j) {
-            u32 child_node_index = CGLTF_ARRAY_INDEX(cgltf_node, data->nodes, data->nodes[i].children[j]);
-            node->children[j] = nodes_by_index[child_node_index];
-        }
-        if (data->nodes[i].parent) {
-            node->parent = nodes_by_index[CGLTF_ARRAY_INDEX(cgltf_node, data->nodes, data->nodes[i].parent)];
-        }
-        // No parent means top level node
-        else {
-            dynarray_push((void**)&scene->top_nodes, &nodes_by_index[i]);
-        }
-    }
-    etfree(nodes_by_index, sizeof(node*) * data->nodes_count, MEMORY_TAG_SCENE);
-    scene->mesh_node_count = mesh_node_count;
-    scene->node_count = node_count;
-    scene->top_node_count = dynarray_length(scene->top_nodes);
-    for (u32 i = 0; i < scene->top_node_count; ++i) {
-        node_refresh_transform(scene->top_nodes[i], glms_mat4_identity());
-    }
-
     return true;
 }
 
@@ -908,7 +688,13 @@ static void* load_image_data(
         u64 byte_length = in_image->buffer_view->size;
 
         return stbi_load_from_memory(
-            (u8*)buffer_data + byte_offset, byte_length, width, height, channels, 4);
+            (u8*)buffer_data + byte_offset,
+            byte_length,
+            width,
+            height,
+            channels,
+            /* requested channels: */ 4
+        );
     }
 
     const char* uri = in_image->uri;

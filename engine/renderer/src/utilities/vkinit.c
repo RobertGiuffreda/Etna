@@ -7,8 +7,8 @@
 
 VkCommandPoolCreateInfo init_command_pool_create_info(
     VkCommandPoolCreateFlags flags,
-    i32 queue_family_index)
-{
+    i32 queue_family_index
+) {
     VkCommandPoolCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .pNext = 0,
@@ -20,8 +20,8 @@ VkCommandPoolCreateInfo init_command_pool_create_info(
 VkCommandBufferAllocateInfo init_command_buffer_allocate_info(
     VkCommandPool command_pool,
     VkCommandBufferLevel level,
-    u32 buffer_count)
-{
+    u32 buffer_count
+) {
     VkCommandBufferAllocateInfo info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .pNext = 0,
@@ -32,8 +32,8 @@ VkCommandBufferAllocateInfo init_command_buffer_allocate_info(
 }
 
 VkCommandBufferBeginInfo init_command_buffer_begin_info(
-    VkCommandBufferUsageFlags flags)
-{
+    VkCommandBufferUsageFlags flags
+) {
     VkCommandBufferBeginInfo info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .pNext = 0,
@@ -43,8 +43,8 @@ VkCommandBufferBeginInfo init_command_buffer_begin_info(
 }
 
 VkCommandBufferSubmitInfo init_command_buffer_submit_info(
-    VkCommandBuffer command_buffer)
-{
+    VkCommandBuffer command_buffer
+) {
     VkCommandBufferSubmitInfo info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
         .pNext = 0,
@@ -70,8 +70,8 @@ VkSemaphoreCreateInfo init_semaphore_create_info(VkSemaphoreCreateFlags flags) {
 
 VkSemaphoreSubmitInfo init_semaphore_submit_info(
     VkSemaphore semaphore,
-    VkPipelineStageFlags2 stage_mask)
-{
+    VkPipelineStageFlags2 stage_mask
+) {
     VkSemaphoreSubmitInfo info = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
         .pNext = 0,
@@ -83,8 +83,8 @@ VkSemaphoreSubmitInfo init_semaphore_submit_info(
 VkSubmitInfo2 init_submit_info2(
     u32 wait_semaphore_info_count, const VkSemaphoreSubmitInfo* pwait_semaphore_infos,
     u32 command_buffer_info_count, const VkCommandBufferSubmitInfo* pcommand_buffer_infos,
-    u32 signal_semaphore_info_count, const VkSemaphoreSubmitInfo* psignal_semaphore_infos)
-{
+    u32 signal_semaphore_info_count, const VkSemaphoreSubmitInfo* psignal_semaphore_infos
+) {
     VkSubmitInfo2 info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
         .pNext = 0,
@@ -98,8 +98,8 @@ VkSubmitInfo2 init_submit_info2(
 }
 
 VkImageSubresourceRange init_image_subresource_range(
-    VkImageAspectFlags aspect_flags)
-{
+    VkImageAspectFlags aspect_flags
+) {
     VkImageSubresourceRange sub_range = {
         .aspectMask = aspect_flags,
         .baseMipLevel = 0,
@@ -112,8 +112,8 @@ VkImageSubresourceRange init_image_subresource_range(
 VkImageCreateInfo init_image2D_create_info(
     VkFormat format,
     VkImageUsageFlags usage_flags,
-    VkExtent3D extent)
-{
+    VkExtent3D extent
+) {
     VkImageCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = 0,
@@ -132,8 +132,8 @@ VkImageCreateInfo init_image2D_create_info(
 VkImageViewCreateInfo init_image_view2D_create_info(
     VkFormat format,
     VkImage image,
-    VkImageAspectFlags aspect_flags)
-{
+    VkImageAspectFlags aspect_flags
+) {
     VkImageViewCreateInfo info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext = 0,
@@ -351,8 +351,8 @@ VkBufferImageCopy2 init_buffer_image_copy2(void) {
 VkCopyBufferToImageInfo2 init_copy_buffer_to_image_info2(
     VkBuffer buffer,
     VkImage image,
-    VkImageLayout layout)
-{
+    VkImageLayout layout
+) {
     VkCopyBufferToImageInfo2 info = {
         .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2,
         .pNext = 0,

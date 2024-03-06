@@ -88,13 +88,6 @@ mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* 
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &new_surface.vertex_buffer
     );
-    VkBufferDeviceAddressInfo device_address_info = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-        .pNext = 0,
-        .buffer = new_surface.vertex_buffer.handle};
-    // Get Vertex buffer address
-    new_surface.vertex_buffer_address = vkGetBufferDeviceAddress(state->device.handle, &device_address_info);
-
     // Create Index Buffer
     buffer_create(
         state,

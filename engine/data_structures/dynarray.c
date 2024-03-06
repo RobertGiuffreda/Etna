@@ -12,7 +12,7 @@
 #define DYNARRAY_RESIZE_FACTOR 2
 #define RESIZE_CAPACITY(curr_capacity) ((curr_capacity + 1) * DYNARRAY_RESIZE_FACTOR)
 
-// Currently aligned to 64 bytes
+// 32 Bytes so that v4s & m4s alignment is not disrupted by hidden alloc
 typedef struct dynarray {
     u64 capacity;
     u64 length;
@@ -29,15 +29,13 @@ static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity);
 static inline dynarray* _dynarray_resize_index(dynarray* header, u64 length, u64 index);
 static inline void _dynarray_shift_index(dynarray* header, u64 index);
 
-void* dynarray_create(u64 capacity, u64 stride)
-{
+void* dynarray_create(u64 capacity, u64 stride) {
     dynarray* header = _dynarray_create(capacity, stride, MEMORY_TAG_DYNARRAY);
     header->length = 0;
     header->capacity = capacity;
     header->stride = stride;
     header->tag = MEMORY_TAG_DYNARRAY;
 
-    // Move forward by a value of 1 * sizeof(dynarray).
     return (void*)(header + 1);
 }
 
@@ -48,7 +46,6 @@ void* dynarray_create_tagged(u64 capacity, u64 stride, memory_tag tag) {
     header->stride = stride;
     header->tag = tag;
 
-    // Move forward by a value of 1 * sizeof(dynarray).
     return (void*)(header + 1);
 }
 

@@ -53,13 +53,16 @@ b8 image2D_submit(image_manager* manager, image_config* config) {
 
     image* new_image = &manager->images[manager->image_count];
     new_image->id = manager->image_count;
-    new_image->name = str_duplicate_allocate(config->name);
+    if (config->name) {
+        new_image->name = str_duplicate_allocate(config->name);
+    } else {
+        new_image->name = str_duplicate_allocate("Name not found.");
+    }
     
     VkExtent3D image_size = {
         .width = config->width,
         .height = config->height,
-        .depth = 1
-    };
+        .depth = 1};
     image2D_create_data(
         manager->state,
         config->data,
@@ -68,9 +71,7 @@ b8 image2D_submit(image_manager* manager, image_config* config) {
         VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        new_image
-    );
-    
+        new_image);
     SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE, new_image->handle, new_image->name);
     SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE_VIEW, new_image->view, new_image->name);
 

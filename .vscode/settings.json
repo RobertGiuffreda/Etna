@@ -193,7 +193,8 @@
         "span": "c",
         "streambuf": "c",
         "thread": "c",
-        "xlocmes": "c"
+        "xlocmes": "c",
+        "array": "c"
     },
     "C_Cpp.dimInactiveRegions": true,
     "dotnet.defaultSolution": "disable",
