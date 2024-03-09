@@ -1,20 +1,24 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
-#include "input_structures_refactor.glsl"
-// SET 1: Material descriptors
+// NOTE: This shader is just blinn phong without using metal roughness at the moment
 
-// This needs to be present in each created material
+#include "input_structures.glsl"
+
 layout(set = 1, binding = 0) readonly buffer blinn_draws_buffer {
     draw_command blinn_draws[];
 };
 
-layout(set = 1, binding = 1) uniform blinn_mr_block {
+struct blinn_inst {
 	vec4 color_factors;
-    vec4 metal_rough_factors;
 	uint color_index;
+    float metalness;
+    float roughness;
 	uint metal_rough_index;
-} blinn_mr[];
+};
+layout(set = 1, binding = 1) readonly buffer mat_inst_buffer {
+	blinn_inst mat_insts[];
+};
 
 layout (location = 0) out vec3 out_position;
 layout (location = 1) out vec3 out_normal;
@@ -33,11 +37,10 @@ void main() {
 
     // TODO: Compute the normal matrix on the CPU and not GPU
     out_normal = (transpose(inverse(model)) * vec4(v.normal, 0.0f)).xyz;
-    // out_normal = (push_constants.render_matrix * vec4(v.normal, 0.0f)).xyz;
 
-    out_color = v.color.xyz * blinn_mr[nonuniformEXT(draw.material_id)].color_factors.xyz;
+    out_color = v.color.xyz * mat_insts[nonuniformEXT(draw.material_id)].color_factors.xyz;
     out_uv.x = v.uv_x;
     out_uv.y = v.uv_y;
 
-    out_color_id = blinn_mr[nonuniformEXT(draw.material_id)].color_index;
+    out_color_id = mat_insts[nonuniformEXT(draw.material_id)].color_index;
 }

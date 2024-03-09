@@ -52,7 +52,7 @@ void camera_update(camera* camera, f64 dt) {
 }
 
 // TODO: Move camera event changes to camera owner structs, like scene
-#define CAM_SPEED 15.0f
+#define CAM_SPEED 10.0f
 
 b8 camera_on_key_event(u16 code, void* cam, event_data data) {
     keys key = EVENT_DATA_KEY(data);

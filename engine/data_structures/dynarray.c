@@ -105,8 +105,7 @@ void dynarray_reserve(void** array_ptr, u64 capacity) {
 void dynarray_push(void** array_ptr, const void* element)
 {
     dynarray* header = (dynarray*)(*array_ptr) - 1;
-    if (header->length >= header->capacity)
-    {
+    if (header->length >= header->capacity) {
         // Resize the dynarray: Address has changed so:
         header = _dynarray_resize(header, RESIZE_CAPACITY(header->capacity));
         // Update caller's pointer to array.

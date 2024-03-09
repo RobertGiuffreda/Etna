@@ -30,3 +30,27 @@ void buffer_barrier(
     VkAccessFlags2 dst_access,
     VkPipelineStageFlags2 src_stages,
     VkPipelineStageFlags2 dst_stages);
+
+static inline VkBufferMemoryBarrier2 buffer_memory_barrier(
+    VkBuffer buffer,
+    u64 offset,
+    u64 size,
+    VkAccessFlags2 src_access,
+    VkAccessFlags2 dst_access,
+    VkPipelineStageFlags2 src_stages,
+    VkPipelineStageFlags2 dst_stages
+) {
+    return (VkBufferMemoryBarrier2){
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .pNext = 0,
+        .buffer = buffer,
+        .offset = offset,
+        .size = size,
+        .srcAccessMask = src_access,
+        .dstAccessMask = dst_access,
+        .srcStageMask = src_stages,
+        .dstStageMask = dst_stages,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    };
+}

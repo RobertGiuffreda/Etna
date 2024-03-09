@@ -10,7 +10,6 @@
 
 #include "core/logger.h"
 #include "core/etstring.h"
-
 #include "core/etfile.h"
 
 #include "memory/etmemory.h"
@@ -33,6 +32,7 @@
 #include "resources/image_manager.h"
 #include "scene/scene.h"
 #include "scene/scene_private.h"
+#include "scene/scene_resources.h"
 
 // TODO: Replace use of this macro with cgltf functions for getting index
 /** HELPER FOR CGLTF
@@ -124,84 +124,69 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
     }
 
-    // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
-    buffer_create(state,
-        sizeof(struct blinn_mr_constants) * data->materials_count,
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &scene->material_buffer);
-    void* material_mapped_memory;
-    VK_CHECK(vkMapMemory(
-        state->device.handle,
-        scene->material_buffer.memory,
-        /* offset: */ 0,
-        sizeof(struct blinn_mr_constants) * data->materials_count,
-        /* flags: */ 0,
-        &material_mapped_memory));
-    struct blinn_mr_constants* material_constants = (struct blinn_mr_constants*)material_mapped_memory;
-    // TODO: END
+    // NOTE: Structure to convert a gltf file's material indices to my engines mat id system
+    mat_id* mat_index_to_id = dynarray_create(1, sizeof(mat_id));
 
     for (u32 i = 0; i < data->materials_count; ++i) {
-        cgltf_material* i_material = (data->materials + i);
+        cgltf_material* gltf_material = (data->materials + i);
 
-        material_pass pass_type = MATERIAL_PASS_MAIN_COLOR;
-        if (i_material->alpha_mode == cgltf_alpha_mode_blend) {
-            pass_type = MATERIAL_PASS_TRANSPARENT;
-        }
+        cgltf_pbr_metallic_roughness gltf_pbr_mr = gltf_material->pbr_metallic_roughness;
 
-        // TODO: Check for cgltf_pbr_metallic_roughness beforehand
-        // if not present use some default values
-        cgltf_pbr_metallic_roughness gltf_pbr_mr = i_material->pbr_metallic_roughness;
-
-        // Bindless
-        struct blinn_mr_constants bindless_consts = {
+        blinn_mr_ubo ubo_entry = {
             .color = {
                 .r = gltf_pbr_mr.base_color_factor[0],
                 .g = gltf_pbr_mr.base_color_factor[1],
                 .b = gltf_pbr_mr.base_color_factor[2],
                 .a = gltf_pbr_mr.base_color_factor[3],
             },
-            .mr = {
-                .x = gltf_pbr_mr.metallic_factor,
-                .y = gltf_pbr_mr.roughness_factor,
-            },
-            .color_id = 0,
+            .color_id = 0,  // Default
+            .metalness = gltf_pbr_mr.metallic_factor,
+            .roughness = gltf_pbr_mr.roughness_factor,
             .mr_id = 0,
         };
 
-        if (i_material->has_pbr_metallic_roughness) {
-            if (i_material->pbr_metallic_roughness.base_color_texture.texture) {
-                cgltf_texture* color_tex = i_material->pbr_metallic_roughness.base_color_texture.texture;
+        if (gltf_material->has_pbr_metallic_roughness) {
+            if (gltf_material->pbr_metallic_roughness.base_color_texture.texture) {
+                cgltf_texture* color_tex = gltf_material->pbr_metallic_roughness.base_color_texture.texture;
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, color_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, color_tex->sampler);
 
-                // TEMP: Bindless
                 scene_texture_set(scene, img_index, smpl_index);
-                bindless_consts.color_id = img_index;
-                // TEMP: END
+                ubo_entry.color_id = img_index;
             }
-            if (i_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
-                cgltf_texture* mr_tex = i_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
+            if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
+                cgltf_texture* mr_tex = gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
                 u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, mr_tex->image);
                 u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, mr_tex->sampler);
                 
-                // TEMP: Bindless
                 scene_texture_set(scene, img_index, smpl_index);
-                bindless_consts.mr_id = img_index;
-                // TEMP: END
+                ubo_entry.mr_id = img_index;
             }
         }
 
-        material_constants[i] = bindless_consts;
-                
-        // TODO: Use, minUniformBufferOffsetAlignment to determine aligned size of GLTF_MR_constants.  
-        struct material_resources bindless_resources = {
-            .data_buff = scene->material_buffer.handle,
-            .data_buff_offset = sizeof(struct blinn_mr_constants) * i};
+        mat_pipe_type material_type;
+        switch (gltf_material->alpha_mode)
+        {
+        // TODO: Implement alpha masking in engine
+        case cgltf_alpha_mode_mask:
         // TODO: END
-        scene_material_set_instance(scene, pass_type, &bindless_resources);
+        case cgltf_alpha_mode_blend:
+            material_type = MAT_PIPE_METAL_ROUGH_TRANSPARENT;
+            break;
+        default:
+            material_type = MAT_PIPE_METAL_ROUGH;
+            break;
+        }
+        u32 pipe_id = (u32)material_type;
+        u32 inst_id = mat_instance_create(&scene->materials[material_type], state, sizeof(blinn_mr_ubo), &ubo_entry);
+
+        mat_id mat_inst = {
+            .pipe_id = pipe_id,
+            // HACK: If unable to create the material instance just use the first one
+            .inst_id = (inst_id == INVALID_ID) ? 0 : inst_id,
+        };
+        dynarray_push((void**)&mat_index_to_id, &mat_inst);
     }
-    vkUnmapMemory(state->device.handle, scene->material_buffer.memory);
 
     // TEMP: Big scene index and vertex buffer, Bindless
     vertex* scene_vertices = dynarray_create(1, sizeof(vertex));
@@ -328,17 +313,13 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 }
             }
 
-            // TEMP: Blueprint ID is hardcoded at the moment
-            if (gltf_primitive->material) {
-                u64 mat_index = CGLTF_ARRAY_INDEX(cgltf_material, data->materials, gltf_primitive->material);
-                new_surface->material = scene_material_get_instance(scene, (material_id){.blueprint_id = 0, .instance_id = mat_index});
-            } else {
-                new_surface->material = scene_material_get_instance(scene, (material_id){.blueprint_id = 0, .instance_id = 0});
-            }
-            // TEMP: END
+            u64 mat_index = (gltf_primitive->material) ? CGLTF_ARRAY_INDEX(cgltf_material, data->materials, gltf_primitive->material) : 0;
+            new_surface->material = mat_index_to_id[mat_index];
         }
     }
 
+    // Gltf material indices have been converted to mat_id for my renderer
+    dynarray_destroy(mat_index_to_id);
 
     // TEMP: cgltf calculates the world transform for us so I can temporary use
     // that function to get a quick and dirty mesh transform buffer to stop using 
@@ -371,8 +352,8 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 surface surface = scene_surfaces[scene_meshes[i].start_surface + k];
                 object new_object = {
                     .geo_id = scene_meshes[i].start_surface + k,
-                    .pso_id = surface.material.id.blueprint_id,
-                    .mat_id = surface.material.id.instance_id,
+                    .pso_id = surface.material.pipe_id,
+                    .mat_id = surface.material.inst_id,
                     .transform_id = transform_offset + j,
                 };
                 dynarray_push((void**)&scene_objects, &new_object);
@@ -449,11 +430,14 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     
     scene->index_buffer = scene_shared_buffers.index_buffer;
     scene->vertex_buffer = scene_shared_buffers.vertex_buffer;
+
+    // TEMP: Resources refactor
     scene->surfaces = scene_surfaces;
     scene->meshes = scene_meshes;
 
     scene->surface_count = dynarray_length(scene_surfaces);
     scene->mesh_count = dynarray_length(scene_meshes);
+    // TEMP: END
 
     scene->transforms = scene_transforms;
     scene->transform_count = dynarray_length(scene_transforms);

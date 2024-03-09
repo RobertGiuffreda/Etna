@@ -40,7 +40,7 @@ typedef struct descriptor_set_allocator {
 } ds_allocator;
 // TEMP: END
 
-// TEMP: Until my vulkan memory management is implemented
+// TODO: Remove id as it gives wrong impression & implement suballocation
 typedef struct image {
     u32 id;
     char* name;
@@ -61,7 +61,7 @@ typedef struct buffer {
     VkBuffer handle;
     VkDeviceMemory memory;
 } buffer;
-// TEMP: END
+// TODO: END
 
 // TEMP: Refactor this
 typedef struct mesh_buffers {
@@ -85,23 +85,6 @@ typedef struct draw_command {
     u32 material_inst_id;
     u32 transform_id;
 } draw_command;
-
-// TODO: Remove the padding and handle 
-// the alignment for binding myself 
-struct blinn_mr_constants {
-    v4s color;
-    v4s mr;
-    u32 color_id;
-    u32 mr_id;
-    u32 padd1;
-    u32 padd2;
-    v4s padding[13];
-};
-
-struct material_resources {
-    VkBuffer data_buff;
-    u32 data_buff_offset;
-};
 
 // TEMP:TODO: Design abstraction to interface with compute shaders in GPU driven manor
 typedef struct compute_push_constants {

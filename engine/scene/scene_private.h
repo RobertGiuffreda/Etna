@@ -7,23 +7,79 @@
 #include "renderer/src/vk_types.h"
 
 #include "resources/resource_private.h"
+#include "resources/material_refactor.h"
+#include "scene/scene_resources.h"
 
-/** NOTE:
- * Refactors:
+/** TODO:
+ * Multiple material shaders with different pipelines
  * Use vertex offset to differentiate meshes in the vertex buffer so that index buffers can be stored normally
- * Walk scene graph updating information
+ * Use the 
  * 
- * Features:
- * Create material blueprint from Shader reflection data taking into account bindless design.
- * Sort calls by different blueprints and by transparency: Mesh contains index into surfaces for opaque surface and transparent surfaces.
- * Genuine Instancing - Hardcoded MAX instance amount for each mesh, controlls offsets into transform buffer.
- * Indirect generated on GPU - Compute buffer to cull & sort by material blueprint & instance & generate draw calls.
  * 
- * Eventual:
  * Parent child relationship between objects/transforms to make scene graph.
  * (Double Ended Queue / Ring queue) for traversing the scene graph
  * 
+ * Keep in mind:
+ * Genuine Instancing - Hardcoded MAX instance amount for each mesh, controlls offsets into transform buffer.
  */
+
+#define MAX_DRAW_COMMANDS 8192
+#define MAX_OBJECTS 8192
+
+typedef struct blinn_mr_ubo {
+    v4s color;
+    u32 color_id;
+    f32 metalness;
+    f32 roughness;
+    u32 mr_id;
+} blinn_mr_ubo;
+
+typedef struct solid_ubo {
+    v4s color;
+} solid_ubo;
+
+// NOTE: Each one describes a different pipeline object
+typedef enum mat_pipe_type {
+    MAT_PIPE_METAL_ROUGH,
+    MAT_PIPE_SOLID,
+    MAT_PIPE_METAL_ROUGH_TRANSPARENT,
+    MAT_PIPE_MAX,
+} mat_pipe_type;
+
+static const mat_pipe_config scene_mat_configs[MAT_PIPE_MAX] = {
+    [MAT_PIPE_METAL_ROUGH] = {
+        .vert_path = "assets/shaders/blinn_mr.vert.spv.opt",
+        .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
+        .inst_size = sizeof(blinn_mr_ubo),
+        .transparent = false,
+    },
+    [MAT_PIPE_SOLID] = {
+        .vert_path = "assets/shaders/solid.vert.spv.opt",
+        .frag_path = "assets/shaders/solid.frag.spv.opt",
+        .inst_size = sizeof(solid_ubo),
+        .transparent = false,
+    },
+    [MAT_PIPE_METAL_ROUGH_TRANSPARENT] = {
+        .vert_path = "assets/shaders/blinn_mr_tp.vert.spv.opt",
+        .frag_path = "assets/shaders/blinn_mr_tp.frag.spv.opt",
+        .inst_size = sizeof(blinn_mr_ubo),
+        .transparent = true,
+    },
+};
+
+// TODO: Read from shader reflection data.
+// NOTE: Spirv-reflect is dereferencing a null pointer on me at the moment
+typedef enum scene_set_bindings {
+    SCENE_SET_FRAME_UNIFORMS_BINDING = 0,
+    SCENE_SET_DRAW_COUNTS_BINDING,
+    SCENE_SET_DRAW_BUFFERS_BINDING,
+    SCENE_SET_OBJECTS_BINDING,
+    SCENE_SET_GEOMETRIES_BINDING,
+    SCENE_SET_VERTICES_BINDING,
+    SCENE_SET_TRANSFORMS_BINDING,
+    SCENE_SET_TEXTURES_BINDING,
+    SCENE_SET_BINDING_MAX,
+} scene_set_bindings;
 
 typedef struct scene {
     char* name;
@@ -33,19 +89,19 @@ typedef struct scene {
     scene_data data;
 
     u64 vertex_count;
-    vertex* vertices;
+    vertex* vertices;       // dynarray
 
     u64 index_count;
-    u32* indices;
+    u32* indices;           // dynarray
 
     u64 surface_count;
-    surface* surfaces;       // dynarray
+    surface* surfaces;      // dynarray
 
     u64 mesh_count;
-    mesh* meshes;            // dynarray
+    mesh* meshes;           // dynarray
     
     u64 transform_count;
-    m4s* transforms;         // dynarray
+    m4s* transforms;        // dynarray
     // NOTE: END
 
     // NOTE: GPU structures to generate draw calls.
@@ -63,10 +119,12 @@ typedef struct scene {
     buffer geometry_buffer;
 
     // TODO: Rename to suit multiple material pipelines
-    buffer count_buffer;        // Holds the counts for each pipeline draw indirect
-    buffer draw_buffer;         // Holds pointers to each material pipelines draw buffers
+    buffer counts_buffer;        // Holds the counts for each pipeline draw indirect
+    buffer draws_buffer;         // Holds pointers to each material pipelines draw buffers
+    // TODO: END
     // NOTE: END
     
+    // NOTE: Per frame rendering primitives
     VkFence* render_fences;
     VkCommandPool* graphics_pools;
     VkCommandBuffer* graphics_command_buffers;
@@ -79,24 +137,14 @@ typedef struct scene {
     // NOTE: PSOs must implement SET 0 to match this layout & retrieve the information
     VkDescriptorSetLayout scene_set_layout;
     VkDescriptorSet scene_set;
-    VkPushConstantRange push_constant;
 
-    // TODO: Material manager bindless & support for multiple PSOs.
-    VkPipeline opaque_pipeline;
-    VkPipeline transparent_pipeline;
-    VkPipelineLayout pipeline_layout;
+    // NOTE: Currenly material pipelines are all hardcoded to
+    // To have the same descriptor set layout and pipeline layouts
+    VkDescriptorSetLayout mat_set_layout;
+    VkPipelineLayout mat_pipeline_layout;
 
-    VkDescriptorSetLayout material_layout;
-    VkDescriptorSet material_set;
+    mat_pipe materials[MAT_PIPE_MAX];
 
-    buffer material_draws_buffer;
-    VkDeviceAddress mat_draws_addr;
-
-    buffer material_buffer;
-    material materials[MAX_MATERIAL_COUNT];
-    u32 material_count;
-    // TODO: END
-    
     // TODO: Update to current GPU Driven architecture
     image_manager* image_bank;
     u32 sampler_count;
@@ -105,10 +153,3 @@ typedef struct scene {
 
     renderer_state* state;
 } scene;
-
-// TEMP: Managing resources is a mess
-b8 scene_material_set_instance(scene* scene, material_pass pass_type, struct material_resources* resources);
-material scene_material_get_instance(scene* scene, material_id id);
-
-void scene_texture_set(scene* scene, u32 img_id, u32 sampler_id);
-// TEMP: END

@@ -3,16 +3,19 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
-#include "input_structures_refactor.glsl"
+#include "input_structures.glsl"
 
 // SET 1: Material descriptors
 layout(set = 1, binding = 0) readonly buffer color_draws_buffer {
     draw_command color_draws[];
 };
 
-layout(set = 1, binding = 1) uniform color_block {
-	vec4 color;
-} colors[];
+struct solid_inst {
+    vec4 color;
+};
+layout(set = 1, binding = 1) readonly buffer solid_inst_buffer {
+	solid_inst mat_insts[];
+};
 
 layout (location = 0) in vec3 in_position;
 layout (location = 1) in vec3 in_normal;

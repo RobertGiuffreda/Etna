@@ -49,9 +49,9 @@ STATIC_ASSERT(sizeof(double) == 8, "Unsupported architecture, double should be 6
 #endif
 
 #if defined(_DEBUG)
-    #define DEBUG_CODE(...) __VA_ARGS__
+    #define DEBUG_BLOCK(...) __VA_ARGS__
 #else
-    #define DEBUG_CODE(...)
+    #define DEBUG_BLOCK(...)
 #endif
 
 #define BLOCK(...)  \
@@ -61,7 +61,7 @@ do {                \
 
 // NOTE: Pass code in BLOCK macro.
 #if defined(_DEBUG)
-    #define DEBUG_RELEASE(debug_block, release_block) debug_block
+    #define DEBUG_RELEASE(debug, release) debug
 #else
-    #define DEBUG_RELEASE(debug_block, release_block) release_block
+    #define DEBUG_RELEASE(debug, release) release
 #endif

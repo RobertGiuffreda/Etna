@@ -146,7 +146,7 @@ b8 engine_run(void) {
         if (!engine->is_minimized) {
             clock_time(&engine->frame);
             f64 dt = engine->frame.elapsed;
-            printf("dt: %.10llf\r", dt * 1000);
+            printf("Frame time: %.8llfms\r", dt * 1000);
             clock_start(&engine->frame);
 
             scene_update(engine->main_scene, dt);

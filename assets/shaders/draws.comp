@@ -1,0 +1,30 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+#include "input_structures.glsl"
+
+#define SUBGROUP_SIZE 32
+layout(local_size_x = SUBGROUP_SIZE) in;
+layout(local_size_y = 1) in;
+layout(local_size_z = 1) in;
+
+// Compute shader draw call command generation. 
+void main() {
+	uint gID = gl_GlobalInvocationID.x;
+	if (gID >= frame_data.max_draw_count) {
+		return;
+	}
+	object obj = objects[gID];
+    geometry geo = geometries[obj.geo_id];
+	draw_command command;
+	command.index_count = geo.index_count;
+	command.instance_count = 1;
+	command.first_index = geo.start_index;
+	command.vertex_offset = geo.vertex_offset;
+	command.first_instance = 0;
+	command.material_id = obj.mat_id;
+	command.transform_id = obj.transform_id;
+
+	uint draw_id = atomicAdd(counts[obj.pso_id], 1);
+	draw_buffers[obj.pso_id].draws[draw_id] = command;
+}

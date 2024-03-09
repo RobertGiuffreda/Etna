@@ -204,7 +204,7 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &state->render_image);
     ETINFO("Render image created");
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->render_image.handle, "Main render image");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->render_image.handle, "MainRenderImage");
 
     // Depth attachment
     VkImageUsageFlags depth_image_usages = {0};
@@ -218,7 +218,7 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &state->depth_image);
     ETINFO("Depth image created");
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->depth_image.handle, "Main depth image");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->depth_image.handle, "MainDepthImage");
 
     initialize_immediate_submit(state);
 

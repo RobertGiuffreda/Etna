@@ -3,20 +3,11 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
-// NOTE: This shader is just blinn phong without using metal roughness at the moment
-
 #include "input_structures.glsl"
-
-layout(set = 1, binding = 0) readonly buffer blinn_draws_buffer {
-    draw_command blinn_draws[];
-};
 
 struct blinn_inst {
 	vec4 color_factors;
 	uint color_index;
-    float metalness;
-    float roughness;
-	uint metal_rough_index;
 };
 layout(set = 1, binding = 1) readonly buffer mat_inst_buffer {
 	blinn_inst mat_insts[];
@@ -39,8 +30,8 @@ void main() {
     vec3 ambient = frame_data.ambient_color.rgb * frame_data.ambient_color.w;
 
     // In color is the vertex colors applied to the texture
-    vec4 tex_base_color = texture(textures[nonuniformEXT(in_color_id)], in_uv);
-    vec3 diffuse_color = in_color * tex_base_color.rgb;
+    vec3 diffuse_constants = in_color;
+    vec3 diffuse_color = diffuse_constants * texture(textures[nonuniformEXT(in_color_id)], in_uv).rgb;
 
     // From fragment position to light position direction
     vec3 light_dir = frame_data.light_position.xyz - in_position;
