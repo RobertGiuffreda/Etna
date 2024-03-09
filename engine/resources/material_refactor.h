@@ -1,7 +1,8 @@
 #pragma once
 #include "defines.h"
 #include "scene/scene.h"
-#include "renderer/src/vk_types.h"
+#include "resources/resource_types.h"
+#include "renderer/renderer_types.h"
 
 typedef enum mat_set_bindings {
     MAT_DRAWS_BINDING = 0,
@@ -9,28 +10,23 @@ typedef enum mat_set_bindings {
     MAT_BINDING_MAX,
 } mat_set_bindings;
 
-typedef struct mat_id {
-    u32 pipe_id;
-    u32 inst_id;
-} mat_id;
-
 typedef struct mat_pipe {
     // Info for renderer
     VkPipeline pipe;
     VkDescriptorSet set;
     buffer draws_buffer;
 
-    // Data to hold instances
-    u64 inst_size;
-    void* inst_data;
-    u32 inst_count;
-    buffer inst_buffer;
+    // Instance data
+    u32 inst_size;      // Size in bytes
+    u32 inst_count;     // Number of instances created
+    void* inst_data;    // Mapped memory
+    buffer inst_buffer; // GPU memory
 } mat_pipe;
 
 typedef struct mat_pipe_config {
     const char* vert_path;
     const char* frag_path;
-    // TEMP: Until material shader reflection data is used
+    // TEMP: Until shader reflection data is used
     u64 inst_size;
     // TEMP: END
     b8 transparent;

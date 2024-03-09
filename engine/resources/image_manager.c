@@ -5,10 +5,9 @@
 #include "core/logger.h"
 #include "core/etstring.h"
 
-// TEMP: This should be made renderer implementation agnostic
 #include "resource_private.h"
+#include "renderer/src/renderer.h"
 #include "renderer/src/image.h"
-// TEMP: END
 
 b8 image_manager_initialize(image_manager** manager, renderer_state* state) {
     image_manager* new_manager = etallocate(sizeof(image_manager), MEMORY_TAG_RESOURCE);
@@ -47,12 +46,13 @@ image* image_manager_get(image_manager* manager, u32 id) {
     return &manager->images[id];
 }
 
-b8 image2D_submit(image_manager* manager, image_config* config) {
+u32 image2D_submit(image_manager* manager, image2D_config* config) {
     if (manager->image_count >= MAX_IMAGE_COUNT)
-        return false;
+        return INVALID_ID;
 
-    image* new_image = &manager->images[manager->image_count];
-    new_image->id = manager->image_count;
+    u32 id = manager->image_count++;
+    image* new_image = &manager->images[id];
+    new_image->id = id;
     if (config->name) {
         new_image->name = str_duplicate_allocate(config->name);
     } else {
@@ -75,6 +75,5 @@ b8 image2D_submit(image_manager* manager, image_config* config) {
     SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE, new_image->handle, new_image->name);
     SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE_VIEW, new_image->view, new_image->name);
 
-    manager->image_count++;
-    return true;
+    return id;
 }

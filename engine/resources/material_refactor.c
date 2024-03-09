@@ -1,12 +1,14 @@
 #include "resources/resource_private.h"
 #include "resources/material_refactor.h"
+
 #include "core/logger.h"
 #include "core/etfile.h"
 #include "memory/etmemory.h"
+
+#include "renderer/src/renderer.h"
 #include "renderer/src/pipeline.h"
 #include "renderer/src/buffer.h"
 #include "scene/scene_private.h"
-
 
 b8 mat_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_pipe_config* config) {
     material->inst_count = 0;

@@ -3,12 +3,10 @@
 
 #include "core/camera.h"
 #include "core/clock.h"
-#include "math/math_types.h"
-#include "renderer/src/vk_types.h"
+#include "scene/scene_types.h"
 
 #include "resources/resource_private.h"
 #include "resources/material_refactor.h"
-#include "scene/scene_resources.h"
 
 /** TODO:
  * Multiple material shaders with different pipelines
@@ -22,29 +20,6 @@
  * Keep in mind:
  * Genuine Instancing - Hardcoded MAX instance amount for each mesh, controlls offsets into transform buffer.
  */
-
-#define MAX_DRAW_COMMANDS 8192
-#define MAX_OBJECTS 8192
-
-typedef struct blinn_mr_ubo {
-    v4s color;
-    u32 color_id;
-    f32 metalness;
-    f32 roughness;
-    u32 mr_id;
-} blinn_mr_ubo;
-
-typedef struct solid_ubo {
-    v4s color;
-} solid_ubo;
-
-// NOTE: Each one describes a different pipeline object
-typedef enum mat_pipe_type {
-    MAT_PIPE_METAL_ROUGH,
-    MAT_PIPE_SOLID,
-    MAT_PIPE_METAL_ROUGH_TRANSPARENT,
-    MAT_PIPE_MAX,
-} mat_pipe_type;
 
 static const mat_pipe_config scene_mat_configs[MAT_PIPE_MAX] = {
     [MAT_PIPE_METAL_ROUGH] = {

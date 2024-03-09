@@ -21,25 +21,15 @@
 // TODO: Handle cases where parts of the gltf are missing/not present
 // No materials or images, no tex coords, etc... 
 
-// TEMP: Make renderer implementation agnostic
 #include "renderer/src/utilities/vkutils.h"
 #include "renderer/src/renderer.h"
 
 #include "renderer/src/buffer.h"
 #include "renderer/src/image.h"
-// TEMP: END
 
 #include "resources/image_manager.h"
 #include "scene/scene.h"
 #include "scene/scene_private.h"
-#include "scene/scene_resources.h"
-
-// TODO: Replace use of this macro with cgltf functions for getting index
-/** HELPER FOR CGLTF
- * Macro to calculate the index into the backing array of a given pointer
- * @param type the type the pointer is referencing
- */
-#define CGLTF_ARRAY_INDEX(type, array, pointer) (((u64)(pointer) - (u64)(array))/sizeof(type))
 
 static void recurse_print_nodes(cgltf_node* node, u32 depth, u64* node_count);
 static cgltf_accessor* get_accessor_from_attributes(cgltf_attribute* attributes, cgltf_size attributes_count, const char* name);
@@ -55,11 +45,6 @@ static void gltf_combine_paths(char* path, const char* base, const char* uri);
 
 static VkFilter gltf_filter_to_vk_filter(cgltf_int filter);
 static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter);
-
-// TODO: Import function is currently taking advantage of how the manager structures work when submiting resources
-// As well as the fact that no resources are loaded when this function called at the moment.
-// Need to return an ID from the managers and create a mapping from the GLTF index to the 
-// ID returned from the managers
 
 // TODO: Handle loading other parts of gltf, like skeletal animation and cameras 
 b8 import_gltf(scene* scene, const char* path, renderer_state* state) {    
@@ -111,7 +96,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             &height,
             &channels);
         if (image_data) {
-            image_config config = {
+            image2D_config config = {
                 .name = data->images[i].name,
                 .width = width,
                 .height = height,
@@ -125,7 +110,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     }
 
     // NOTE: Structure to convert a gltf file's material indices to my engines mat id system
-    mat_id* mat_index_to_id = dynarray_create(1, sizeof(mat_id));
+    mat_id* material_index_map = dynarray_create(1, sizeof(mat_id));
 
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material* gltf_material = (data->materials + i);
@@ -148,16 +133,16 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         if (gltf_material->has_pbr_metallic_roughness) {
             if (gltf_material->pbr_metallic_roughness.base_color_texture.texture) {
                 cgltf_texture* color_tex = gltf_material->pbr_metallic_roughness.base_color_texture.texture;
-                u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, color_tex->image);
-                u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, color_tex->sampler);
+                u64 img_index = cgltf_image_index(data, color_tex->image);
+                u64 smpl_index = cgltf_sampler_index(data, color_tex->sampler);
 
                 scene_texture_set(scene, img_index, smpl_index);
                 ubo_entry.color_id = img_index;
             }
             if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
                 cgltf_texture* mr_tex = gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
-                u64 img_index = CGLTF_ARRAY_INDEX(cgltf_image, data->images, mr_tex->image);
-                u64 smpl_index = CGLTF_ARRAY_INDEX(cgltf_sampler, data->samplers, mr_tex->sampler);
+                u64 img_index = cgltf_image_index(data, mr_tex->image);
+                u64 smpl_index = cgltf_sampler_index(data, mr_tex->sampler);
                 
                 scene_texture_set(scene, img_index, smpl_index);
                 ubo_entry.mr_id = img_index;
@@ -167,13 +152,11 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         mat_pipe_type material_type;
         switch (gltf_material->alpha_mode)
         {
-        // TODO: Implement alpha masking in engine
-        case cgltf_alpha_mode_mask:
-        // TODO: END
         case cgltf_alpha_mode_blend:
             material_type = MAT_PIPE_METAL_ROUGH_TRANSPARENT;
             break;
-        default:
+        case cgltf_alpha_mode_mask:
+        case cgltf_alpha_mode_opaque:
             material_type = MAT_PIPE_METAL_ROUGH;
             break;
         }
@@ -185,7 +168,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
             // HACK: If unable to create the material instance just use the first one
             .inst_id = (inst_id == INVALID_ID) ? 0 : inst_id,
         };
-        dynarray_push((void**)&mat_index_to_id, &mat_inst);
+        dynarray_push((void**)&material_index_map, &mat_inst);
     }
 
     // TEMP: Big scene index and vertex buffer, Bindless
@@ -312,14 +295,13 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                     }
                 }
             }
-
-            u64 mat_index = (gltf_primitive->material) ? CGLTF_ARRAY_INDEX(cgltf_material, data->materials, gltf_primitive->material) : 0;
-            new_surface->material = mat_index_to_id[mat_index];
+            u64 mat_index = (gltf_primitive->material) ? cgltf_material_index(data, gltf_primitive->material) : 0;
+            new_surface->material = material_index_map[mat_index];
         }
     }
 
     // Gltf material indices have been converted to mat_id for my renderer
-    dynarray_destroy(mat_index_to_id);
+    dynarray_destroy(material_index_map);
 
     // TEMP: cgltf calculates the world transform for us so I can temporary use
     // that function to get a quick and dirty mesh transform buffer to stop using 
@@ -332,7 +314,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
     for (u32 i = 0; i < data->nodes_count; ++i) {
         if (data->nodes[i].mesh) {
-            u32 mesh_index = CGLTF_ARRAY_INDEX(cgltf_mesh, data->meshes, data->nodes[i].mesh);
+            u32 mesh_index = cgltf_mesh_index(data, data->nodes[i].mesh);
 
             m4s new_transform = {0};
             cgltf_node_transform_world(&data->nodes[i], (cgltf_float*)new_transform.raw);

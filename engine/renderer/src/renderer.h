@@ -1,10 +1,6 @@
 #pragma once
 #include "defines.h"
 
-// TEMP: Camera should belong to the scene being rendered. Have camera as a scene member
-#include "core/camera.h"
-// TEMP: END
-
 #include "renderer/src/vk_types.h"
 #include "renderer/src/swapchain.h"
 #include "renderer/src/shader.h"
@@ -52,9 +48,8 @@ typedef struct renderer_state {
     image grey_image;
     image error_image;
 
-    VkSampler sampler_linear;
-    VkSampler sampler_nearest;
-    // NOTE: END
+    VkSampler linear_smpl;
+    VkSampler nearest_smpl;
 } renderer_state;
 
 // TODO: Setup debug names for vulkan objects

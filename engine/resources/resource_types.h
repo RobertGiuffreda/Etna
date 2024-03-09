@@ -1,5 +1,4 @@
 #pragma once
-
 #include "defines.h"
 
 #define INVALID_ID 0xFFFFFFFF
@@ -8,8 +7,34 @@
 typedef struct image image;
 typedef struct image_manager image_manager;
  
-// NOTE: GPU structures that are constructed on scene_render_init after various files have been imported
-// This system will probobly change when UUIDs and a custom file format gets added
+typedef struct mat_id {
+    u32 pipe_id;
+    u32 inst_id;
+} mat_id;
+
+// NOTE: Each one describes a different pipeline object
+typedef enum mat_pipe_type {
+    MAT_PIPE_METAL_ROUGH,
+    MAT_PIPE_SOLID,
+    MAT_PIPE_METAL_ROUGH_TRANSPARENT,
+    MAT_PIPE_MAX,
+} mat_pipe_type;
+
+typedef struct surface {
+    u32 start_index;
+    u32 index_count;
+
+    mat_id material;
+} surface;
+
+typedef struct mesh {
+    u32 vertex_offset;
+    u32 transform_offset;
+    u32 instance_count;
+
+    u32 start_surface;
+    u32 surface_count;
+} mesh;
 
 // TODO: Add bounds for culling
 typedef struct geometry {

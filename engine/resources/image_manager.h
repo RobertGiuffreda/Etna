@@ -13,12 +13,11 @@ void image_manager_increment(image_manager* manager);
 
 image* image_manager_get(image_manager* manager, u32 id);
 
-// TODO: Configurable format here
-typedef struct image_config {
+typedef struct image2D_config {
     char* name;
     u32 width;
     u32 height;
     void* data;
-} image_config;
+} image2D_config;
 
-b8 image2D_submit(image_manager* manager, image_config* config);
+u32 image2D_submit(image_manager* manager, image2D_config* config);

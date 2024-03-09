@@ -444,17 +444,17 @@ static b8 initialize_default_data(renderer_state* state) {
 
     sampler_info.magFilter = VK_FILTER_NEAREST;
     sampler_info.minFilter = VK_FILTER_NEAREST;
-    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->sampler_nearest);
+    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->nearest_smpl);
 
     sampler_info.magFilter = VK_FILTER_LINEAR;
     sampler_info.minFilter = VK_FILTER_LINEAR;
-    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->sampler_linear);
+    vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->linear_smpl);
     return true;
 }
 
 static void shutdown_default_data(renderer_state* state) {
-    vkDestroySampler(state->device.handle, state->sampler_linear, state->allocator);
-    vkDestroySampler(state->device.handle, state->sampler_nearest, state->allocator);
+    vkDestroySampler(state->device.handle, state->linear_smpl, state->allocator);
+    vkDestroySampler(state->device.handle, state->nearest_smpl, state->allocator);
 
     image_destroy(state, &state->error_image);
     image_destroy(state, &state->black_image);

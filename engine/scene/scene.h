@@ -16,3 +16,5 @@ b8 scene_frame_end(scene* scene, renderer_state* state);
 b8 scene_render(scene* scene);
 
 void scene_shutdown(scene* scene);
+
+void scene_texture_set(scene* scene, u32 img_id, u32 sampler_id);

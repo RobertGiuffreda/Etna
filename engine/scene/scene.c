@@ -1,6 +1,5 @@
 #include "scene.h"
 #include "scene/scene_private.h"
-#include "scene/scene_resources.h"
 
 #include "data_structures/dynarray.h"
 
