@@ -3,7 +3,6 @@
 #include "memory/etmemory.h"
 #include "math/math_types.h"
 
-#define DYNARRAY_DEFAULT_CAPACITY 1
 
 /** NOTE: Dynarray impl notes
  * This is a dynamic array imlementation that stores the details needed in a
@@ -47,9 +46,10 @@ void dynarray_resize(void** array_ptr, u64 length);
 // Does not set the length variable
 void dynarray_reserve(void** array_ptr, u64 capacity);
 
-// Assumes the byte count of the array is a multiple of the new types size. 
+// NOTE: Assumes the byte count of the array is a multiple of the new types size. 
 // Otherwise memory tracking on dynarray_destroy would be innacurate
-#define _DYNARRAY_REINTERPRET_TYPE_TO_TYPE_FUNC(old_type, new_type)                       \
+// NOTE: Be careful of reinterpreting to types with required alignment greater than 16 bytes
+#define _DYNARRAY_REINTERPRET_TYPE_AS_TYPE_FUNC(old_type, new_type)                       \
 static inline new_type* dynarray_reinterpret_##old_type##_to_##new_type(old_type* array) {          \
     dynarray* header = (dynarray*)array - 1;                                                        \
     dynarray reinterpret_header = {                                                                 \
@@ -59,15 +59,16 @@ static inline new_type* dynarray_reinterpret_##old_type##_to_##new_type(old_type
         .tag = header->tag,                                                                         \
     };                                                                                              \
     *header = reinterpret_header;                                                                   \
+    return (new_type*)(header + 1);                                                                 \
 }
 
-#define DEFINE_DYNARRAY_REINTERPRET_TYPE_TO_TYPE_FUNCTIONS(type1, type2)    \
-_DYNARRAY_REINTERPRET_TYPE_TO_TYPE_FUNC(type1, type2)                       \
-_DYNARRAY_REINTERPRET_TYPE_TO_TYPE_FUNC(type2, type1)                       \
+#define DEFINE_DYNARRAY_REINTERPRET_TYPE_AS_TYPE_FUNCTIONS(type1, type2)    \
+_DYNARRAY_REINTERPRET_TYPE_AS_TYPE_FUNC(type1, type2)                       \
+_DYNARRAY_REINTERPRET_TYPE_AS_TYPE_FUNC(type2, type1)                       \
 
-DEFINE_DYNARRAY_REINTERPRET_TYPE_TO_TYPE_FUNCTIONS(f32, v4s)
-DEFINE_DYNARRAY_REINTERPRET_TYPE_TO_TYPE_FUNCTIONS(f32, v3s)
-DEFINE_DYNARRAY_REINTERPRET_TYPE_TO_TYPE_FUNCTIONS(f32, v2s)
+DEFINE_DYNARRAY_REINTERPRET_TYPE_AS_TYPE_FUNCTIONS(f32, v4s)
+DEFINE_DYNARRAY_REINTERPRET_TYPE_AS_TYPE_FUNCTIONS(f32, v3s)
+DEFINE_DYNARRAY_REINTERPRET_TYPE_AS_TYPE_FUNCTIONS(f32, v2s)
 
 #define _DYANRRAY_COPY_TYPE_AS_TYPE_FUNC(old_type, new_type)                                                    \
 static inline new_type* dynarray_copy_##old_type##_as_##new_type(old_type* array) {                             \
@@ -78,10 +79,10 @@ static inline new_type* dynarray_copy_##old_type##_as_##new_type(old_type* array
         .stride = sizeof(new_type),                                                                             \
         .tag = header->tag,                                                                                     \
     };                                                                                                          \
-    u64 copy_data_size = reinterpret_header.capacity * sizeof(new_type);                                        \
-    dynarray* copy_header = etallocate(copy_data_size + sizeof(dynarray), MEMORY_TAG_DYNARRAY);                 \
+    u64 data_copy_size = reinterpret_header.capacity * sizeof(new_type);                                        \
+    dynarray* copy_header = etallocate(data_copy_size + sizeof(dynarray), header->tag);                         \
     etcopy_memory(copy_header, &reinterpret_header, sizeof(dynarray));                                          \
-    etcopy_memory(copy_header + 1, array, copy_data_size);                                                      \
+    etcopy_memory(copy_header + 1, array, data_copy_size);                                                      \
     return (new_type*)(copy_header + 1);                                                                        \
 }
 
@@ -92,6 +93,24 @@ _DYANRRAY_COPY_TYPE_AS_TYPE_FUNC(type2, type1)                      \
 DEFINE_DYNARRAY_COPY_TYPE_AS_TYPE_FUNCTIONS(f32, v4s)
 DEFINE_DYNARRAY_COPY_TYPE_AS_TYPE_FUNCTIONS(f32, v3s)
 DEFINE_DYNARRAY_COPY_TYPE_AS_TYPE_FUNCTIONS(f32, v2s)
+
+// returns the length before growing
+static inline u64 dynarray_grow(void** array_ptr, u64 count) {
+    u64 array_length = ((dynarray*)(*array_ptr) - 1)->length;
+    dynarray_resize((void**)array_ptr, array_length + count);
+    return array_length;
+}
+
+#define _DYNARRAY_APPEND_TYPED_FUNC(type)                                               \
+static inline void dynarray_append_##type(type** dst_ptr, type* src) {                  \
+    u64 src_length = ((dynarray*)src - 1)->length;                                      \
+    u64 dst_length = ((dynarray*)(*dst_ptr) - 1)->length;                               \
+    dynarray_resize((void**)dst_ptr, dst_length + src_length);                          \
+    etcopy_memory((*dst_ptr) + dst_length, src, src_length * sizeof(type));             \
+}
+
+_DYNARRAY_APPEND_TYPED_FUNC(vertex)
+_DYNARRAY_APPEND_TYPED_FUNC(u32)
 
 void dynarray_push(void** array_ptr, const void* element);
 void dynarray_pop(void* array, void* dest);

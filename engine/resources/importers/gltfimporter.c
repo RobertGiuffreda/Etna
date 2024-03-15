@@ -506,11 +506,7 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
     dynarray_resize(&payload->images, img_start + data->images_count);
     for (u32 i = 0; i < data->images_count; ++i) {
         imported_image* image = &payload->images[img_start + i];
-        void* stbi_data = load_image_data(&data->images[i], path, &image->width, &image->height, &image->channels);
-        u64 image_size = image->width * image->height * 4;          // TODO: Store more than R8G8B8A8
-        image->data = etallocate(image_size, MEMORY_TAG_IMPORTER);
-        etcopy_memory(image->data, stbi_data, image_size);
-        stbi_image_free(stbi_data);
+        image->data = load_image_data(&data->images[i], path, &image->width, &image->height, &image->channels);
     }
 
     u32 tex_start = dynarray_length(payload->textures);
@@ -531,10 +527,10 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
                 .b = mr.base_color_factor[2],
                 .a = mr.base_color_factor[3],
             },
-            .color_tex_id = 0,
+            .color_tex_id = -1,
             .metalness = mr.metallic_factor,
             .roughness = mr.roughness_factor,
-            .mr_tex_id = 0,
+            .mr_tex_id = -1,
 
             // TODO: Get this from the information once shading models have been figured out
             .shading_model = SHADER_MODEL_PBR,
@@ -570,6 +566,7 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
         
         u32 geo_start = dynarray_length(payload->geometries);
         dynarray_resize((void**)&payload->geometries, geo_start + mesh->count);
+
         for (u32 j = 0; j < data->meshes[i].primitives_count; ++j) {
             cgltf_primitive prim = data->meshes[i].primitives[j];
             imported_geometry* geo = &payload->geometries[geo_start + j];
@@ -616,9 +613,10 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
                         }
                         break;
                     // TODO: Implement
+                    case cgltf_attribute_type_tangent: break;
                     case cgltf_attribute_type_joints: break;
                     case cgltf_attribute_type_weights: break;
-                    case cgltf_attribute_type_custom:
+                    case cgltf_attribute_type_custom: break;
                     // TODO: END
                     default: {
                         ETWARN("Unknown gltf vertex attribute type.");
@@ -627,6 +625,10 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
                 }
             }
             dynarray_destroy(accessor_data);
+
+            payload->meshes[i].geometry_ids[j] = geo_start + j;
+            // TODO: Add default material index into import payload, or use -1 for not present for now
+            payload->meshes[i].material_ids[j] = mat_start + (prim.material) ? cgltf_material_index(data, prim.material) : 0;
         }
     }
 
@@ -656,6 +658,26 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
     // TODO: Animation data
 
     return true;
+}
+
+void import_payload_destroy(import_payload* payload) {
+    dynarray_destroy(payload->geometries);
+    for (u32 i = 0; i < dynarray_length(payload->images); ++i) {
+        stbi_image_free(payload->images[i].data);
+    }
+    dynarray_destroy(payload->textures);
+    dynarray_destroy(payload->materials);
+    u32 mesh_count = dynarray_length(payload->meshes);
+    for (u32 i = 0; i < mesh_count; ++i) {
+        dynarray_destroy(payload->meshes[i].geometry_ids);
+        dynarray_destroy(payload->meshes[i].material_ids);
+    }
+    dynarray_destroy(payload->meshes);
+    u32 node_count = dynarray_length(payload->nodes);
+    for (u32 i = 0; i < node_count; ++i) {
+        dynarray_destroy(payload->nodes[i].children_ids);
+    }
+    dynarray_destroy(payload->nodes);
 }
 
 import_payload import_gltfs_payload(u32 file_count, const char* const* paths) {
