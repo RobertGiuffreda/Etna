@@ -61,7 +61,6 @@ void file_close(etfile* file) {
     }
 }
 
-// TODO: Check if works for not binary mode files
 b8 file_size(etfile* file, u64* out_size) {
     if (file && file->handle) {
         _file_size(file->handle, out_size);
@@ -92,8 +91,6 @@ b8 file_copy(etfile* file, etfile* copy) {
     return true;
 }
 
-// TODO: Custom allocator for file reading
-// TODO: Check if works for not binary mode files
 b8 file_read_bytes(etfile* file, u8* out_bytes, u64 byte_count) {
     if (file && file->handle) {
         u64 bytes_read = fread(out_bytes, 1, byte_count, file->handle);

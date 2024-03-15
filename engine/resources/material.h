@@ -2,7 +2,7 @@
 #include "defines.h"
 #include "scene/scene.h"
 #include "resources/resource_types.h"
-#include "renderer/renderer_types.h"
+#include "renderer/src/vk_types.h"
 
 typedef enum mat_set_bindings {
     MAT_DRAWS_BINDING = 0,

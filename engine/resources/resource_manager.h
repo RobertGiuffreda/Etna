@@ -1,7 +1,7 @@
 #pragma once
 #include "renderer/src/vk_types.h"
 #include "resources/resource_types.h"
-#include "resources/material_refactor.h"
+#include "resources/material.h"
 
 #define MAX_BUFFER_COUNT 1024
 #define MAX_IMAGE_COUNT 512

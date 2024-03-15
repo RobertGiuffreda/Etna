@@ -1,4 +1,5 @@
 #include "gltfimporter.h"
+#include "importer_types.h"
 
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
@@ -9,6 +10,7 @@
 #include "data_structures/dynarray.h"
 
 #include "core/logger.h"
+#include "core/asserts.h"
 #include "core/etstring.h"
 #include "core/etfile.h"
 
@@ -34,20 +36,16 @@
 static void recurse_print_nodes(cgltf_node* node, u32 depth, u64* node_count);
 static cgltf_accessor* get_accessor_from_attributes(cgltf_attribute* attributes, cgltf_size attributes_count, const char* name);
 
-static b8 load_image(cgltf_image* in_image, const char* gltf_path, renderer_state* state, image* out_image);
-
 // Loads the image data from gltf. *data needs to be freed with stb_image_free(*data);
 static void* load_image_data(cgltf_image* in_image, const char* gltf_path, int* width, int* height, int* channels);
-
-static void import_gltf_failure(scene* scn);
 
 static void gltf_combine_paths(char* path, const char* base, const char* uri);
 
 static VkFilter gltf_filter_to_vk_filter(cgltf_int filter);
 static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter);
 
-// TODO: Handle loading other parts of gltf, like skeletal animation and cameras 
-b8 import_gltf(scene* scene, const char* path, renderer_state* state) {    
+// TODO: Handle loading other parts of gltf, like skeletal animation and cameras
+b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     // Attempt to load gltf file data with cgltf library
     cgltf_options options = {0};
     cgltf_data* data = 0;
@@ -133,19 +131,21 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         if (gltf_material->has_pbr_metallic_roughness) {
             if (gltf_material->pbr_metallic_roughness.base_color_texture.texture) {
                 cgltf_texture* color_tex = gltf_material->pbr_metallic_roughness.base_color_texture.texture;
+                u64 tex_index = cgltf_texture_index(data, color_tex);
                 u64 img_index = cgltf_image_index(data, color_tex->image);
                 u64 smpl_index = cgltf_sampler_index(data, color_tex->sampler);
 
-                scene_texture_set(scene, img_index, smpl_index);
-                ubo_entry.color_id = img_index;
+                scene_texture_set(scene, tex_index, img_index, smpl_index);
+                ubo_entry.color_id = tex_index;
             }
             if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
                 cgltf_texture* mr_tex = gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
+                u64 tex_index = cgltf_texture_index(data, mr_tex);
                 u64 img_index = cgltf_image_index(data, mr_tex->image);
                 u64 smpl_index = cgltf_sampler_index(data, mr_tex->sampler);
                 
-                scene_texture_set(scene, img_index, smpl_index);
-                ubo_entry.mr_id = img_index;
+                scene_texture_set(scene, tex_index, img_index, smpl_index);
+                ubo_entry.mr_id = tex_index;
             }
         }
 
@@ -171,7 +171,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         dynarray_push((void**)&material_index_map, &mat_inst);
     }
 
-    // TEMP: Big scene index and vertex buffer, Bindless
     vertex* scene_vertices = dynarray_create(1, sizeof(vertex));
     u32* scene_indices = dynarray_create(1, sizeof(u32));
 
@@ -300,12 +299,8 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
         }
     }
 
-    // Gltf material indices have been converted to mat_id for my renderer
+    // Gltf material indices have been converted to mat_id. So clean up
     dynarray_destroy(material_index_map);
-
-    // TEMP: cgltf calculates the world transform for us so I can temporary use
-    // that function to get a quick and dirty mesh transform buffer to stop using 
-    // updating the push constants for each object draw call
 
     m4s** transforms_from_mesh_index = etallocate(sizeof(m4s*) * dynarray_length(scene_meshes), MEMORY_TAG_SCENE);
     for (u32 i = 0; i < dynarray_length(scene_meshes); ++i) {
@@ -349,7 +344,6 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
     etfree(transforms_from_mesh_index, sizeof(m4s*) * dynarray_length(scene_meshes), MEMORY_TAG_SCENE);
 
-    // TODO: New function that does not take vertex buffer address
     scene->vertex_count = dynarray_length(scene_vertices);
     scene->index_count = dynarray_length(scene_indices);
     mesh_buffers scene_shared_buffers = upload_mesh_immediate(
@@ -413,7 +407,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     scene->index_buffer = scene_shared_buffers.index_buffer;
     scene->vertex_buffer = scene_shared_buffers.vertex_buffer;
 
-    // TEMP: Resources refactor
+    // TEMP: Change surface & mesh concept in engine
     scene->surfaces = scene_surfaces;
     scene->meshes = scene_meshes;
 
@@ -489,6 +483,203 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     return true;
 }
 
+// TODO: Import animations and joints and skins and stuff
+static b8 import_gltf_payload(import_payload* payload, const char* path) {
+    // Attempt to load gltf file data with cgltf library
+    cgltf_options options = {0};
+    cgltf_data* data = 0;
+    cgltf_result result = cgltf_parse_file(&options, path, &data);
+    if (result != cgltf_result_success) {
+        ETERROR("Failed to load gltf file %s.", path);
+        return false;
+    }
+
+    // Attempt to load the data from buffers
+    result = cgltf_load_buffers(&options, data, path);
+    if (result != cgltf_result_success) {
+        ETERROR("Failed to load gltf file %s.", path);
+        cgltf_free(data);
+        return false;
+    }
+
+    u32 img_start = dynarray_length(payload->images);
+    dynarray_resize(&payload->images, img_start + data->images_count);
+    for (u32 i = 0; i < data->images_count; ++i) {
+        imported_image* image = &payload->images[img_start + i];
+        void* stbi_data = load_image_data(&data->images[i], path, &image->width, &image->height, &image->channels);
+        u64 image_size = image->width * image->height * 4;          // TODO: Store more than R8G8B8A8
+        image->data = etallocate(image_size, MEMORY_TAG_IMPORTER);
+        etcopy_memory(image->data, stbi_data, image_size);
+        stbi_image_free(stbi_data);
+    }
+
+    u32 tex_start = dynarray_length(payload->textures);
+    dynarray_resize(&payload->textures, tex_start + data->textures_count);
+    for (u32 i = 0; i < data->textures_count; ++i) {
+        payload->textures[tex_start + i].image_id = img_start + cgltf_image_index(data, data->textures[i].image);
+    }
+
+    u32 mat_start = dynarray_length(payload->materials);
+    dynarray_resize(&payload->materials, mat_start + data->materials_count);
+    for (u32 i = 0; i < data->materials_count; ++i) {
+        cgltf_material mat = data->materials[i];
+        cgltf_pbr_metallic_roughness mr = mat.pbr_metallic_roughness;
+        imported_material material = {
+            .color_factors = {
+                .r = mr.base_color_factor[0],
+                .g = mr.base_color_factor[1],
+                .b = mr.base_color_factor[2],
+                .a = mr.base_color_factor[3],
+            },
+            .color_tex_id = 0,
+            .metalness = mr.metallic_factor,
+            .roughness = mr.roughness_factor,
+            .mr_tex_id = 0,
+
+            // TODO: Get this from the information once shading models have been figured out
+            .shading_model = SHADER_MODEL_PBR,
+            .flags.pbr = PBR_PROPERTY_METAL_ROUGH,
+            // NOTE: This is evil code I will change when I hammer down transparency and pipelines w/alpha masking
+            .alpha = (mat.alpha_mode == cgltf_alpha_mode_blend ) ? ALPHA_MODE_BLEND  :  // if blend then blend or
+                     (mat.alpha_mode == cgltf_alpha_mode_opaque) ? ALPHA_MODE_OPAQUE :  // if opaque then opaque or
+                     (mat.alpha_mode == cgltf_alpha_mode_mask  ) ? ALPHA_MODE_MASK   :  // if mask then mask or 
+                                                                   ALPHA_MODE_UNKNOWN,  // Unknown
+            // NOTE: END
+            // TODO: END
+        };
+
+        if (mr.base_color_texture.texture) {
+            material.color_tex_id = tex_start + cgltf_texture_index(data, mr.base_color_texture.texture);
+        }
+        if (mr.metallic_roughness_texture.texture) {
+            material.mr_tex_id = tex_start + cgltf_texture_index(data, mr.metallic_roughness_texture.texture);
+        }
+
+        payload->materials[mat_start + i] = material;
+    }
+
+    u32 mesh_start = dynarray_length(payload->meshes);    
+    dynarray_resize(&payload->meshes, mesh_start + data->meshes_count);
+    for (u32 i = 0; i < data->meshes_count; ++i) {
+        imported_mesh* mesh = &payload->meshes[mesh_start + i];
+        mesh->count = data->meshes[i].primitives_count;
+        mesh->geometry_ids = dynarray_create(mesh->count, sizeof(u32));
+        mesh->material_ids = dynarray_create(mesh->count, sizeof(u32));
+        dynarray_resize((void**)&mesh->geometry_ids, mesh->count);
+        dynarray_resize((void**)&mesh->material_ids, mesh->count);
+        
+        u32 geo_start = dynarray_length(payload->geometries);
+        dynarray_resize((void**)&payload->geometries, geo_start + mesh->count);
+        for (u32 j = 0; j < data->meshes[i].primitives_count; ++j) {
+            cgltf_primitive prim = data->meshes[i].primitives[j];
+            imported_geometry* geo = &payload->geometries[geo_start + j];
+
+            // NOTE: Converts u16 indices to u32 indices
+            geo->indices = dynarray_create(prim.indices->count, sizeof(u32));
+            dynarray_resize((void**)&geo->indices, prim.indices->count);
+            cgltf_accessor_unpack_indices(prim.indices, geo->indices, sizeof(u32), prim.indices->count);
+            
+            u32 vertex_count = prim.attributes[0].data->count;
+            geo->vertices = dynarray_create(vertex_count, sizeof(vertex));
+            dynarray_resize((void**)&geo->vertices, vertex_count);
+            etzero_memory(geo->vertices, sizeof(vertex) * vertex_count);
+            
+            f32* accessor_data = dynarray_create(1, sizeof(f32));
+            for (u32 k = 0; k < prim.attributes_count; ++k) {
+                u64 float_count = cgltf_accessor_unpack_floats(prim.attributes[k].data, NULL, 0);
+                dynarray_resize((void**)&accessor_data, float_count);
+                cgltf_accessor_unpack_floats(prim.attributes[k].data, accessor_data, float_count);
+                switch (prim.attributes[k].type) {
+                    case cgltf_attribute_type_position:
+                        v3s* positions = (v3s*)accessor_data;
+                        for (u32 l = 0; l < vertex_count; l++) {
+                            geo->vertices[l].position = positions[l];
+                        }
+                        break;
+                    case cgltf_attribute_type_normal:
+                        v3s* normals = (v3s*)accessor_data;
+                        for (u32 l = 0; l < vertex_count; l++) {
+                            geo->vertices[l].normal = normals[l];
+                        }
+                        break;
+                    case cgltf_attribute_type_texcoord:
+                        v2s* uvs = (v2s*)accessor_data;
+                        for (u32 l = 0; l < vertex_count; l++) {
+                            geo->vertices[l].uv_x = uvs[l].x;
+                            geo->vertices[l].uv_y = uvs[l].y;
+                        }
+                        break;
+                    case cgltf_attribute_type_color:
+                        v4s* colors = (v4s*)accessor_data;
+                        for (u32 l = 0; l < vertex_count; l++) {
+                            geo->vertices[l].color = colors[l];
+                        }
+                        break;
+                    // TODO: Implement
+                    case cgltf_attribute_type_joints: break;
+                    case cgltf_attribute_type_weights: break;
+                    case cgltf_attribute_type_custom:
+                    // TODO: END
+                    default: {
+                        ETWARN("Unknown gltf vertex attribute type.");
+                        break;
+                    }
+                }
+            }
+            dynarray_destroy(accessor_data);
+        }
+    }
+
+    u32 node_start = dynarray_length(payload->nodes);
+    dynarray_resize(&payload->nodes, node_start + data->nodes_count);
+    for (u32 i = 0; i < data->nodes_count; ++i) {
+        imported_node node = {0};
+        if (data->nodes[i].mesh != NULL) {
+            node.has_mesh = true;
+            node.mesh_id = mesh_start + cgltf_mesh_index(data, data->nodes[i].mesh);
+        }
+        if (data->nodes[i].parent != NULL) {
+            node.has_parent = true;
+            node.parent_id = node_start + cgltf_node_index(data, data->nodes[i].parent);
+        }
+
+        node.children_ids = dynarray_create(data->nodes[i].children_count, sizeof(u32));
+        dynarray_resize((void**)&node.children_ids, data->nodes[i].children_count);
+        for (u32 j = 0; j < data->nodes[i].children_count; ++j) {
+            node.children_ids[j] = node_start + cgltf_node_index(data, data->nodes[i].children[j]);
+        }
+
+        cgltf_node_transform_local(&data->nodes[i], (cgltf_float*)node.local_transform.raw);
+        cgltf_node_transform_world(&data->nodes[i], (cgltf_float*)node.world_transform.raw);
+    }
+
+    // TODO: Animation data
+
+    return true;
+}
+
+import_payload import_gltfs_payload(u32 file_count, const char* const* paths) {
+    ETASSERT(paths);
+    import_payload payload = {
+        .geometries = dynarray_create(1, sizeof(imported_geometry)),
+        .images = dynarray_create(1, sizeof(imported_image)),
+        .textures = dynarray_create(1, sizeof(imported_texture)),
+        .materials = dynarray_create(1, sizeof(imported_material)),
+        .meshes = dynarray_create(1, sizeof(imported_mesh)),
+        .nodes = dynarray_create(1, sizeof(imported_node)),
+    };
+
+    u32 failure_count = 0;
+    for (u32 i = 0; i < file_count; ++i) {
+        ETASSERT(paths[i]);
+        if (!import_gltf_payload(&payload, paths[i])) {
+            ETWARN("Unable to import gltf file %s.", paths[i]);
+            failure_count++;
+        }
+    }
+    return payload;
+}
+
 b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
     cgltf_options options = {0};
     cgltf_data* data = 0;
@@ -518,125 +709,9 @@ b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
     return true;
 }
 
-static b8 load_image(cgltf_image* in_image, const char* gltf_path, renderer_state* state, image* out_image) {
-    if (in_image->uri == NULL && in_image->buffer_view == NULL) {
-        return false;
-    }
-
-    int width, height, channels;
-
-    if (in_image->buffer_view) {
-        void* buffer_data = in_image->buffer_view->buffer->data;
-        u64 byte_offset = in_image->buffer_view->offset;
-        u64 byte_length = in_image->buffer_view->size;
-
-        void* data = stbi_load_from_memory(
-            (u8*)buffer_data + byte_offset, byte_length, &width, &height, &channels, 4);
-        if (data) {
-            VkExtent3D image_size = {
-                .width = width,
-                .height = height,
-                .depth = 1
-            };
-            image2D_create_data(
-                state,
-                data,
-                image_size,
-                VK_FORMAT_R8G8B8A8_UNORM,
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_IMAGE_ASPECT_COLOR_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                out_image
-            );
-            stbi_image_free(data);
-            return true;
-        }
-        return false;
-    }
-
-    const char* uri = in_image->uri;
-
-    // https://en.wikipedia.org/wiki/Data_URI_scheme
-    // base64 is 6 bits stored in a string character. As a byte is 8 bits, a min of 
-    // string length * (3/4) bytes in memory to hold the resulting data
-    if (strsn_equal(uri, "data:", 5)) {
-        const char* comma = str_char_search(uri, ',');
-        if (comma && comma - uri >= 7 && strsn_equal(comma - 7, ";base64", 7)) {
-            cgltf_options options = {0};
-            cgltf_size size = (str_length(comma - 7) * 3) / 4;
-
-            void* decoded_data;
-            cgltf_result result = cgltf_load_buffer_base64(&options, size, comma, &decoded_data);
-            if (result != cgltf_result_success) {
-                return false;
-            }
-
-            void* data = stbi_load_from_memory(
-                decoded_data, (int)size, &width, &height, &channels, 4);
-            if (data) {
-                VkExtent3D image_size = {
-                    .width = width,
-                    .height = height,
-                    .depth = 1
-                };
-                image2D_create_data(
-                    state,
-                    data,
-                    image_size,
-                    VK_FORMAT_R8G8B8A8_UNORM,
-                    VK_IMAGE_USAGE_SAMPLED_BIT,
-                    VK_IMAGE_ASPECT_COLOR_BIT,
-                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    out_image
-                );
-                stbi_image_free(data);
-                CGLTF_FREE(decoded_data);
-                return true;
-            }
-            CGLTF_FREE(decoded_data);
-            return false;
-        }
-    }
-
-    // Make data URI is not a website URL
-    if (str_str_search(uri, "://") == NULL && gltf_path) {
-        u64 full_path_bytes = str_length(gltf_path) + str_length(uri) + 1;
-        char* full_path = etallocate(
-            full_path_bytes,
-            MEMORY_TAG_STRING);
-        gltf_combine_paths(full_path, gltf_path, uri);
-        cgltf_decode_uri(full_path + str_length(full_path) - str_length(uri));
-        void* data = stbi_load(full_path, &width, &height, &channels, 4);
-        if (data) {
-            VkExtent3D image_size = {
-                .width = width,
-                .height = height,
-                .depth = 1
-            };
-            image2D_create_data(
-                state,
-                data,
-                image_size,
-                VK_FORMAT_R8G8B8_UNORM,
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_IMAGE_ASPECT_COLOR_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                out_image
-            );
-            stbi_image_free(data);
-            etfree(full_path, full_path_bytes, MEMORY_TAG_STRING);
-            return true;
-        }
-        etfree(full_path, full_path_bytes, MEMORY_TAG_STRING);
-        return false;
-    }
-
-    return false;
-}
-
 // TODO: Have this return data to be processed by stbi_load_from_memory
 // Image manager should handle loading in image memory
-static void* load_image_data(
+void* load_image_data(
     cgltf_image* in_image,
     const char* gltf_path,
     int* width,
@@ -701,11 +776,6 @@ static void* load_image_data(
     }
 
     return NULL;
-}
-
-// TODO: Implement this function to call on errors loading the gltf file and freeing memory
-static void import_gltf_failure(scene* scn) {
-    
 }
 
 // From cgltf_implementation

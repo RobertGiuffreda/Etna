@@ -9,28 +9,15 @@
 // are within the bounds of the array. This may not be the case
 // Debug asserts?? Fatal Errors?? Regular Errors??
 
-#define DYNARRAY_RESIZE_FACTOR 2
-#define RESIZE_CAPACITY(curr_capacity) ((curr_capacity + 1) * DYNARRAY_RESIZE_FACTOR)
-
-// 32 Bytes so that v4s & m4s alignment is not disrupted by hidden alloc
-typedef struct dynarray {
-    u64 capacity;
-    u64 length;
-    u64 stride;
-    memory_tag tag;
-} dynarray;
-
-static const u64 header_size = sizeof(dynarray);
-
-static inline dynarray* _dynarray_create(u64 capacity, u64 stride, memory_tag tag);
-static inline dynarray* _dynarray_create_data(u64 capacity, u64 stride, u64 length, memory_tag tag, const void* data);
+static inline dynarray* _dynarray_allocate(u64 capacity, u64 stride, memory_tag tag);
+static inline dynarray* _dynarray_allocate_data(u64 capacity, u64 stride, u64 length, memory_tag tag, const void* data);
 static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity);
 
 static inline dynarray* _dynarray_resize_index(dynarray* header, u64 length, u64 index);
 static inline void _dynarray_shift_index(dynarray* header, u64 index);
 
 void* dynarray_create(u64 capacity, u64 stride) {
-    dynarray* header = _dynarray_create(capacity, stride, MEMORY_TAG_DYNARRAY);
+    dynarray* header = _dynarray_allocate(capacity, stride, MEMORY_TAG_DYNARRAY);
     header->length = 0;
     header->capacity = capacity;
     header->stride = stride;
@@ -40,7 +27,7 @@ void* dynarray_create(u64 capacity, u64 stride) {
 }
 
 void* dynarray_create_tagged(u64 capacity, u64 stride, memory_tag tag) {
-    dynarray* header = _dynarray_create(capacity, stride, tag);
+    dynarray* header = _dynarray_allocate(capacity, stride, tag);
     header->length = 0;
     header->capacity = capacity;
     header->stride = stride;
@@ -52,7 +39,7 @@ void* dynarray_create_tagged(u64 capacity, u64 stride, memory_tag tag) {
 void* dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* data) {
     // If the given capacity is too small to hold all the data. Cut it off
     u64 new_length = (capacity < length) ? capacity : length;
-    dynarray* header = _dynarray_create_data(capacity, stride, new_length, MEMORY_TAG_DYNARRAY, data);
+    dynarray* header = _dynarray_allocate_data(capacity, stride, new_length, MEMORY_TAG_DYNARRAY, data);
     header->capacity = capacity;
     header->length = new_length;
     header->stride = stride;
@@ -63,7 +50,7 @@ void* dynarray_create_data(u64 capacity, u64 stride, u64 length, const void* dat
 void* dynarray_create_data_tagged(u64 capacity, u64 stride, u64 length, memory_tag tag, const void* data) {
     // If the given capacity is too small to hold all the data. Cut it off
     u64 new_length = (capacity < length) ? capacity : length;
-    dynarray* header = _dynarray_create_data(capacity, stride, new_length, tag, data);
+    dynarray* header = _dynarray_allocate_data(capacity, stride, new_length, tag, data);
     header->capacity = capacity;
     header->length = new_length;
     header->stride = stride;
@@ -73,15 +60,14 @@ void* dynarray_create_data_tagged(u64 capacity, u64 stride, u64 length, memory_t
 
 void* dynarray_copy(void* src) {
     dynarray* source = (dynarray*)src - 1;
-    dynarray* dest = _dynarray_create(source->capacity, source->stride, source->tag);
-    etcopy_memory(dest, source, (source->length * source->stride) + header_size);
+    dynarray* dest = _dynarray_allocate(source->capacity, source->stride, source->tag);
+    etcopy_memory(dest, source, (source->length * source->stride) + sizeof(dynarray));
     return (void*)(dest + 1);
 }
 
-void dynarray_destroy(void* array)
-{
+void dynarray_destroy(void* array) {
     dynarray* to_free = (dynarray*)array - 1;
-    etfree(to_free, header_size + to_free->capacity * to_free->stride, to_free->tag);
+    etfree(to_free, sizeof(dynarray) + to_free->capacity * to_free->stride, to_free->tag);
 }
 
 // TODO: Take a value to copy into the array for uninitialized memory??
@@ -102,8 +88,7 @@ void dynarray_reserve(void** array_ptr, u64 capacity) {
     *array_ptr = (void*)(header + 1);
 }
 
-void dynarray_push(void** array_ptr, const void* element)
-{
+void dynarray_push(void** array_ptr, const void* element) {
     dynarray* header = (dynarray*)(*array_ptr) - 1;
     if (header->length >= header->capacity) {
         // Resize the dynarray: Address has changed so:
@@ -118,15 +103,13 @@ void dynarray_push(void** array_ptr, const void* element)
 }
 
 // Will throw fatal error if 
-void dynarray_pop(void* array, void* dest)
-{
+void dynarray_pop(void* array, void* dest) {
     dynarray* header = (dynarray*)array - 1;
     ETASSERT_MESSAGE(header->length > 0, "Tried to pop from an empty (index is zero) dynarray.")
     etcopy_memory(dest, (u8*)array + (--header->length) * header->stride, header->stride);
 }
 
-b8 dynarray_is_empty(void* array)
-{
+b8 dynarray_is_empty(void* array) {
     dynarray* header = ((dynarray*)array - 1);
     return header->length == 0;
 }
@@ -140,8 +123,7 @@ void dynarray_clear(void* array) {
 }
 
 //NOTE: this function cannot insert at the end of an array.
-void dynarray_insert(void** array_ptr, void* element, u64 index)
-{
+void dynarray_insert(void** array_ptr, void* element, u64 index) {
     dynarray* header = (dynarray*)(*array_ptr) - 1;
     if (index >= header->length) {
         ETERROR("Index not in bounds of dynamic array.");
@@ -160,8 +142,7 @@ void dynarray_insert(void** array_ptr, void* element, u64 index)
     header->length++;
 }
 
-void dynarray_remove(void* array, void* dest, u64 index)
-{
+void dynarray_remove(void* array, void* dest, u64 index) {
     dynarray* header = (dynarray*)array - 1;
     u64 stride = header->stride;
     u64 end_index = header->length;
@@ -184,25 +165,24 @@ void dynarray_remove(void* array, void* dest, u64 index)
     header->length--;
 }
 
-static inline dynarray* _dynarray_create(u64 capacity, u64 stride, memory_tag tag) {
-   return (dynarray*)etallocate(header_size + (capacity * stride), tag);
+static inline dynarray* _dynarray_allocate(u64 capacity, u64 stride, memory_tag tag) {
+   return (dynarray*)etallocate(sizeof(dynarray) + (capacity * stride), tag);
 }
 
-static inline dynarray* _dynarray_create_data(u64 capacity, u64 stride, u64 length, memory_tag tag, const void* data) {
-    dynarray* new_dynarray = (dynarray*)etallocate(header_size + (capacity * stride), tag);
+static inline dynarray* _dynarray_allocate_data(u64 capacity, u64 stride, u64 length, memory_tag tag, const void* data) {
+    dynarray* new_dynarray = (dynarray*)etallocate(sizeof(dynarray) + (capacity * stride), tag);
     etcopy_memory((new_dynarray + 1), data, stride * length);
     return new_dynarray;
 }
 
-static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity)
-{
-    dynarray* resized_array = _dynarray_create(capacity, header->stride, header->tag);
+static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity) {
+    dynarray* resized_array = _dynarray_allocate(capacity, header->stride, header->tag);
 
     // Copy data from previous array to new array except:
     etcopy_memory(
         resized_array,
         header,
-        header_size + header->capacity * header->stride
+        sizeof(dynarray) + header->capacity * header->stride
     );
 
     // Set new array capacity as the old one was copied from
@@ -210,39 +190,37 @@ static inline dynarray* _dynarray_resize(dynarray* header, u64 capacity)
     resized_array->capacity = capacity;
 
     // Free old memory staring from header of dynarray
-    etfree(header, header_size + header->capacity * header->stride, header->tag);
+    etfree(header, sizeof(dynarray) + header->capacity * header->stride, header->tag);
     return resized_array;
 }
 
-static inline dynarray* _dynarray_resize_index(dynarray* header, u64 capacity, u64 index)
-{
-    dynarray* resized_array = _dynarray_create(capacity, header->stride, header->tag);
+static inline dynarray* _dynarray_resize_index(dynarray* header, u64 capacity, u64 index) {
+    dynarray* resized_array = _dynarray_allocate(capacity, header->stride, header->tag);
 
     // Copy memory up to the specified index for insertion
     etcopy_memory(
         resized_array,
         header,
-        header_size + (index - 1) * header->stride
+        sizeof(dynarray) + (index - 1) * header->stride
     );
 
     // Copy memory after the specified index for insertion
     etcopy_memory(
-        (u8*)resized_array + header_size + (index + 1) * header->stride,
-        (u8*)header + header_size + index * header->stride,
+        (u8*)resized_array + sizeof(dynarray) + (index + 1) * header->stride,
+        (u8*)header + sizeof(dynarray) + index * header->stride,
         (header->length - index) * header->stride
     );
 
     resized_array->capacity = capacity;
 
     // Free old memory staring from header of dynarray
-    etfree(header, header_size + header->capacity * header->stride, header->tag);
+    etfree(header, sizeof(dynarray) + header->capacity * header->stride, header->tag);
     return resized_array;
 }
 
 // Shifts array entries to the right
 // Assumes header->index != index
-static inline void _dynarray_shift_index(dynarray* header, u64 index)
-{
+static inline void _dynarray_shift_index(dynarray* header, u64 index) {
     u8* index_address = (u8*)(header + 1) + header->stride * index;
     etmove_memory(
         index_address + header->stride,

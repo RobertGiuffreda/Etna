@@ -33,6 +33,7 @@ struct draw_command {
 layout(buffer_reference, std430) writeonly buffer draw_buffer {
 	draw_command draws[];
 };
+
 // Record draw commands per pipeline shader object
 layout(set = 0, binding = 2, std430) readonly buffer draw_buffs {
 	draw_buffer draw_buffers[];

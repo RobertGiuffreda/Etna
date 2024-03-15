@@ -11,6 +11,7 @@
 #include "platform/etwindow.h"
 
 #include "renderer/rendererAPI.h"
+#include "resources/importers/importer_types.h"
 #include "resources/importers/gltfimporter.h"
 #include "scene/scene.h"
 
@@ -99,16 +100,18 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         return false;
     }
 
-
     // TODO: Scene & Scene Renderer Type class
-    scene_initalize(&engine->main_scene, engine->renderer_state);    
-
-    // TODO: Have default values for not present vertex attributes & not present textures (tangents and normal maps)
-    if (!import_gltf(engine->main_scene, engine_details.scene_path, engine->renderer_state)) {
-        ETERROR("Error loading gltf file %s.");
-        return false;
-    }
+    // scene_initalize(&engine->main_scene, engine->renderer_state);    
+    // 
+    // // TODO: Have default values for not present vertex attributes & not present textures (tangents and normal maps)
+    // if (!import_gltf(engine->main_scene, engine_details.scene_path, engine->renderer_state)) {
+    //     ETERROR("Error loading gltf file %s.");
+    //     return false;
+    // }
     // TODO: END
+
+    import_payload test_payload = import_gltfs_payload(1, &engine_details.scene_path);
+    return false;
 
     event_observer_register(EVENT_CODE_KEY_RELEASE, (void*)engine, engine_on_key_event);
     event_observer_register(EVENT_CODE_RESIZE, (void*)engine, engine_on_resize);

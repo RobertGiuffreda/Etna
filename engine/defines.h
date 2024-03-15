@@ -18,7 +18,7 @@ typedef int32_t b32;
 typedef _Bool b8;
 
 // Properly define static assertions
-#if defined(__clang__) || defined(__GNUC__)
+#if defined(__GNUC__)
     #define STATIC_ASSERT _Static_assert
 #else
     #define STATIC_ASSERT static_assert

@@ -15,7 +15,7 @@
 
 #include "resources/image_manager.h"
 #include "resources/resource_private.h"
-#include "resources/material_refactor.h"
+#include "resources/material.h"
 
 #include "renderer/src/vk_types.h"
 #include "renderer/src/renderer.h"
@@ -582,7 +582,7 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
 }
 
 // TODO: Have this return the slot in the descriptor array the new combined image sampler is placed
-void scene_texture_set(scene* scene, u32 img_id, u32 sampler_id) {
+void scene_texture_set(scene* scene, u32 tex_id, u32 img_id, u32 sampler_id) {
     image* img = image_manager_get(scene->image_bank, img_id);
     VkDescriptorImageInfo image_info = {
         .sampler = scene->samplers[sampler_id],
@@ -593,7 +593,7 @@ void scene_texture_set(scene* scene, u32 img_id, u32 sampler_id) {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .pNext = 0,
         .descriptorCount = 1,
-        .dstArrayElement = img_id,
+        .dstArrayElement = tex_id,
         .dstBinding = SCENE_SET_TEXTURES_BINDING,
         .dstSet = scene->scene_set,
         .pImageInfo = &image_info,
@@ -900,4 +900,20 @@ void scene_renderer_descriptors_shutdown(scene* scene, renderer_state* state) {
         scene->scene_set_layout,
         state->allocator
     );
+}
+
+b8 scene_init_import_payload(scene** scn, renderer_state* state, import_payload* payload) {
+    scene* scene = etallocate(sizeof(struct scene), MEMORY_TAG_SCENE);
+
+    // TODO: 1. Create singular vertex buffer, index buffer
+    
+    // TODO: 2. Change nodes into objects and transforms for the meshes.
+    
+    // TODO: 3. Initialize renderer stuff, gpu memory, descriptors, etc...
+    
+    // TODO: 5. Render and test if working
+
+    // TODO: 6. Will create scene & joint/bone hierarchy eventually. Changes 2
+
+    *scn = scene;
 }

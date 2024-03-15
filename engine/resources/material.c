@@ -1,5 +1,5 @@
 #include "resources/resource_private.h"
-#include "resources/material_refactor.h"
+#include "resources/material.h"
 
 #include "core/logger.h"
 #include "core/etfile.h"

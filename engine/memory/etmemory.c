@@ -27,19 +27,13 @@ static const char* memory_strings[MEMORY_TAG_MAX] = {
     "Input:         ",
     "Window:        ",
     "Swapchain:     ",
-    "UI:            ",
     "Renderer:      ",
     "Scene:         ",
-    "Renderable:    ",
     "Shader:        ",
+    "Importer:      ",
     "Resource:      ",
-    "Material:      ",
     "File:          ",
-    "Serialzier:    ",
     "Dynarray:      ",
-    "Descriptor Dyn:",
-    "Pipeline Dyn:  ",
-    "Material Dyn:  ",
     "String:        "
 };
 static const u32 mem_tag_str_len = 16;

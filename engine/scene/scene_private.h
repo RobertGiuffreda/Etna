@@ -1,12 +1,12 @@
 #pragma once
 #include "defines.h"
+#include "scene/scene_types.h"
 
 #include "core/camera.h"
 #include "core/clock.h"
-#include "scene/scene_types.h"
 
 #include "resources/resource_private.h"
-#include "resources/material_refactor.h"
+#include "resources/material.h"
 
 /** TODO:
  * Multiple material shaders with different pipelines
@@ -41,20 +41,6 @@ static const mat_pipe_config scene_mat_configs[MAT_PIPE_MAX] = {
         .transparent = true,
     },
 };
-
-// TODO: Read from shader reflection data.
-// NOTE: Spirv-reflect is dereferencing a null pointer on me at the moment
-typedef enum scene_set_bindings {
-    SCENE_SET_FRAME_UNIFORMS_BINDING = 0,
-    SCENE_SET_DRAW_COUNTS_BINDING,
-    SCENE_SET_DRAW_BUFFERS_BINDING,
-    SCENE_SET_OBJECTS_BINDING,
-    SCENE_SET_GEOMETRIES_BINDING,
-    SCENE_SET_VERTICES_BINDING,
-    SCENE_SET_TRANSFORMS_BINDING,
-    SCENE_SET_TEXTURES_BINDING,
-    SCENE_SET_BINDING_MAX,
-} scene_set_bindings;
 
 typedef struct scene {
     char* name;

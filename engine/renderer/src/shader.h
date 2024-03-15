@@ -46,13 +46,6 @@ typedef enum image_dim {
     IMAGE_DIM_CUBE = 3
 } image_dim;
 
-// TODO: More comprehensive
-// typedef enum image_format {
-//     IMAGE_FORMAT_UNKNOWN = 0,
-//     IMAGE_FORMAT_RGBA32F = 1,
-//     IMAGE_FORMAT_RGBA16F = 2,
-// } image_format;
-
 typedef struct block_variable block_variable;
 struct block_variable {
     char* name;
@@ -99,7 +92,6 @@ typedef struct binding_layout {
         u32 array;
         u32 multisampling;
         u32 sampled;
-        // image_format format;
     } image;
     block_variable block;
     u32 count;

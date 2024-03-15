@@ -48,6 +48,7 @@
         "isWholeLine": false,
     },
     "files.associations": {
+        "*.h": "c",
         "defines.h": "c",
         "etmemory.h": "c",
         "stdio.h": "c",
@@ -194,7 +195,8 @@
         "streambuf": "c",
         "thread": "c",
         "xlocmes": "c",
-        "array": "c"
+        "array": "c",
+        "ratio": "c"
     },
     "C_Cpp.dimInactiveRegions": true,
     "dotnet.defaultSolution": "disable",
