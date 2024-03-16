@@ -7,18 +7,6 @@
 #define MAX_DRAW_COMMANDS 8192
 #define MAX_OBJECTS 8192
 
-typedef struct blinn_mr_ubo {
-    v4s color;
-    u32 color_id;
-    f32 metalness;
-    f32 roughness;
-    u32 mr_id;
-} blinn_mr_ubo;
-
-typedef struct solid_ubo {
-    v4s color;
-} solid_ubo;
-
 // TODO: Read from shader reflection data.
 // NOTE: Spirv-reflect is dereferencing a null pointer on me at the moment
 typedef enum scene_set_bindings {

@@ -25,19 +25,13 @@ static const mat_pipe_config scene_mat_configs[MAT_PIPE_MAX] = {
     [MAT_PIPE_METAL_ROUGH] = {
         .vert_path = "assets/shaders/blinn_mr.vert.spv.opt",
         .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
-        .inst_size = sizeof(blinn_mr_ubo),
-        .transparent = false,
-    },
-    [MAT_PIPE_SOLID] = {
-        .vert_path = "assets/shaders/solid.vert.spv.opt",
-        .frag_path = "assets/shaders/solid.frag.spv.opt",
-        .inst_size = sizeof(solid_ubo),
+        .inst_size = sizeof(blinn_mr_instance),
         .transparent = false,
     },
     [MAT_PIPE_METAL_ROUGH_TRANSPARENT] = {
         .vert_path = "assets/shaders/blinn_mr_tp.vert.spv.opt",
         .frag_path = "assets/shaders/blinn_mr_tp.frag.spv.opt",
-        .inst_size = sizeof(blinn_mr_ubo),
+        .inst_size = sizeof(blinn_mr_instance),
         .transparent = true,
     },
 };
@@ -66,8 +60,8 @@ typedef struct scene {
     // NOTE: END
 
     // NOTE: GPU structures to generate draw calls.
-    geometry* geometries;       // All geometries for testing atm
-    object* objects;            // All objects for testing atm
+    geometry* geometries;
+    object* objects;
     // NOTE: END
 
     // NOTE: GPU Memory Buffers
@@ -79,10 +73,8 @@ typedef struct scene {
     buffer object_buffer;       // Contains Object information used to generate draws
     buffer geometry_buffer;
 
-    // TODO: Rename to suit multiple material pipelines
     buffer counts_buffer;        // Holds the counts for each pipeline draw indirect
     buffer draws_buffer;         // Holds pointers to each material pipelines draw buffers
-    // TODO: END
     // NOTE: END
     
     // NOTE: Per frame rendering primitives

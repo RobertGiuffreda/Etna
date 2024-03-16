@@ -1,32 +1,19 @@
 #pragma once
 #include "defines.h"
 #include "math/math_types.h"
+#include "resources/resource_types.h"
 
 /** NOTE: Importing & Serialization code
  * In infancy
 */
 
-typedef enum import_file_type {
-    IMPORT_FILE_GLTF,
-    IMPORT_FILE_GLB,
-} import_file_type;
-
-typedef enum shader_model {
-    SHADER_MODEL_PBR = 0,
-    SHADER_MODEL_NPR = 1,
-} shader_model;
-
-typedef enum pbr_property_flag_bits {
-    PBR_PROPERTY_METAL_ROUGH = 0x01,
-    PBR_PROPERTY_SPECULAR = 0x02,
-} pbr_property_flag_bits;
-typedef u32 pbr_property_flags;
-
-typedef enum npr_property_flag_bits {
-    NPR_PROPERTY_OUTLINE = 0x01,
-    NPR_PROPERTY_TOON = 0x02,
-} npr_property_flag_bits;
-typedef u32 npr_property_flags;
+typedef struct blinn_mr_instance {
+    v4s color_factors;
+    u32 color_tex_index;
+    f32 metalness;
+    f32 roughness;
+    u32 mr_tex_index;
+} blinn_mr_instance;
 
 typedef enum sampler_property_flag_bits {
     SAMPLER_PROPERTY_ANISOTROPIC = 0x01,
@@ -37,73 +24,78 @@ typedef enum sampler_property_flag_bits {
 } sampler_property_flag_bits;
 typedef u32 sampler_property_flags;
 
-typedef enum alpha_mode {
-    ALPHA_MODE_OPAQUE = 0,
-    ALPHA_MODE_MASK,
-    ALPHA_MODE_BLEND,
-    ALPHA_MODE_UNKNOWN,
-} alpha_mode;
+typedef struct import_geometry {
+    vertex* vertices;       // dynarray, TODO: Regular allocation
+    u32* indices;           // dynarray, TODO: Regular allocation
+} import_geometry;
 
-typedef struct imported_geometry {
-    vertex* vertices;       // dynarray
-    u32* indices;           // dynarray
-} imported_geometry;
-
-typedef struct imported_image {
+typedef struct import_image {
     u32 height;
     u32 width;
     u32 channels;
-    void* data;
-} imported_image;
+    void* data;             // stb_image allocation
+} import_image;
 
-// TODO: Add sampler information.
-// Just use default linear for now
-typedef struct imported_texture {
+// TODO: Add sampler information. Use default linear for now
+typedef struct import_texture {
     u32 image_id;
-} imported_texture;
+} import_texture;
 
-// Modeled after gltf as that is what I am loading for the forseable future
-typedef struct imported_material {
-    v4s color_factors;
-    i32 color_tex_id;  // -1 if not present
-    f32 metalness;
-    f32 roughness;
-    i32 mr_tex_id;     // -1 if not present
-    shader_model shading_model;
-    union {
-        pbr_property_flags pbr;
-        npr_property_flags npr;
-    } flags;
-    alpha_mode alpha;
-} imported_material;
+typedef enum import_pipeline_type {
+    IMPORT_PIPELINE_GLTF_DEFAULT = 0,
+    IMPORT_PIPELINE_DEFAULT_MAX,
+} import_pipeline_type;
+
+// NOTE: Default shaders for importing,
+// as file formats do not include shaders,
+typedef struct import_pipeline {
+    const char* vert_path;
+    const char* frag_path;
+    void* solid_insts;              // dynarray (No hacky macro generics)
+    void* transparent_insts;        // dynarray (No hacky macro generics)
+    u64 inst_size;
+    import_pipeline_type type;
+} import_pipeline;
+
+const static import_pipeline default_import_pipelines[IMPORT_PIPELINE_DEFAULT_MAX] = {
+    [IMPORT_PIPELINE_GLTF_DEFAULT] = {
+        .vert_path = "assets/shaders/blinn_mr.vert.spv.opt",
+        .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
+        .inst_size = sizeof(blinn_mr_instance),
+        .type = IMPORT_PIPELINE_GLTF_DEFAULT,
+        .solid_insts = NULL,
+        .transparent_insts = NULL,
+    },
+};
 
 // TODO: Have materials be per instance of a mesh, as we are bindless and can do that
 // Currently still figuring out aspects like animation so it can wait.
-typedef struct imported_mesh {
-    u32* geometry_ids;      // dynarray
-    u32* material_ids;      // dynarray
+typedef struct import_mesh {
+    u32* geometry_indices;      // dynarray
+    mat_id* material_ids;      // dynarray
     u32 count;
-} imported_mesh;
+} import_mesh;
 
-typedef struct imported_node {
+typedef struct import_node {
     b8 has_mesh;
     b8 has_parent;
-    u32 mesh_id;
-    u32 parent_id;
-    u32* children_ids;      // dynarray
+    u32 mesh_index;
+    u32 parent_index;
+    u32* children_indices;      // dynarray
     m4s local_transform;
     m4s world_transform;
-} imported_node;
+} import_node;
 
 // NOTE: All dynarrays
 typedef struct import_payload {
-    imported_geometry* geometries;
-    imported_image* images;
-    imported_texture* textures;
-    imported_material* materials;
-    imported_mesh* meshes;
+    import_pipeline* pipelines;         // Dynarray
+    
+    import_geometry* geometries;        // Dynarray
+    import_image* images;               // Dynarray
+    import_texture* textures;           // Dynarray
+    import_mesh* meshes;                // Dynarray
 
-    imported_node* nodes;
+    import_node* nodes;                 // Dynarray
 } import_payload;
 
 // Serializing Beginning
@@ -145,13 +137,13 @@ typedef struct serialized_image {
 } serialized_image;
 
 typedef struct serialized_texture {
-    u32 image;
+    u32 image_index;
     // Use default sampler for now
 } serialized_texture;
 
 typedef struct serialized_mat_pipe {
-    blob_view vert;         // Vertex shader blob view for this material pipeline
-    blob_view frag;         // Fragment shader blob view for this material pipeline
+    blob_view vert;         // Vertex shader blob view, this is a path to the vertex shader, null terminated
+    blob_view frag;         // Fragment shader blob view, this is a path to the fragment shader, null terminated
     blob_view instances;    // Instance buffer directly ready to load into buffer with memcpy
 } serialized_mat_pipe;
 

@@ -115,17 +115,17 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
 
         cgltf_pbr_metallic_roughness gltf_pbr_mr = gltf_material->pbr_metallic_roughness;
 
-        blinn_mr_ubo ubo_entry = {
-            .color = {
+        blinn_mr_instance ubo_entry = {
+            .color_factors = {
                 .r = gltf_pbr_mr.base_color_factor[0],
                 .g = gltf_pbr_mr.base_color_factor[1],
                 .b = gltf_pbr_mr.base_color_factor[2],
                 .a = gltf_pbr_mr.base_color_factor[3],
             },
-            .color_id = 0,  // Default
+            .color_tex_index = 0,  // Default
             .metalness = gltf_pbr_mr.metallic_factor,
             .roughness = gltf_pbr_mr.roughness_factor,
-            .mr_id = 0,
+            .mr_tex_index = 0,
         };
 
         if (gltf_material->has_pbr_metallic_roughness) {
@@ -136,7 +136,7 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 u64 smpl_index = cgltf_sampler_index(data, color_tex->sampler);
 
                 scene_texture_set(scene, tex_index, img_index, smpl_index);
-                ubo_entry.color_id = tex_index;
+                ubo_entry.color_tex_index = tex_index;
             }
             if (gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture) {
                 cgltf_texture* mr_tex = gltf_material->pbr_metallic_roughness.metallic_roughness_texture.texture;
@@ -145,23 +145,26 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
                 u64 smpl_index = cgltf_sampler_index(data, mr_tex->sampler);
                 
                 scene_texture_set(scene, tex_index, img_index, smpl_index);
-                ubo_entry.mr_id = tex_index;
+                ubo_entry.mr_tex_index = tex_index;
             }
         }
 
         mat_pipe_type material_type;
-        switch (gltf_material->alpha_mode)
-        {
-        case cgltf_alpha_mode_blend:
-            material_type = MAT_PIPE_METAL_ROUGH_TRANSPARENT;
-            break;
-        case cgltf_alpha_mode_mask:
-        case cgltf_alpha_mode_opaque:
-            material_type = MAT_PIPE_METAL_ROUGH;
-            break;
+        switch (gltf_material->alpha_mode) {
+            case cgltf_alpha_mode_blend:
+                material_type = MAT_PIPE_METAL_ROUGH_TRANSPARENT;
+                break;
+            case cgltf_alpha_mode_mask:
+            case cgltf_alpha_mode_opaque:
+                material_type = MAT_PIPE_METAL_ROUGH;
+                break;
+            default: {
+                material_type = MAT_PIPE_METAL_ROUGH;
+                break;
+            }
         }
         u32 pipe_id = (u32)material_type;
-        u32 inst_id = mat_instance_create(&scene->materials[material_type], state, sizeof(blinn_mr_ubo), &ubo_entry);
+        u32 inst_id = mat_instance_create(&scene->materials[material_type], state, sizeof(blinn_mr_instance), &ubo_entry);
 
         mat_id mat_inst = {
             .pipe_id = pipe_id,
@@ -483,7 +486,16 @@ b8 import_gltf(scene* scene, const char* path, renderer_state* state) {
     return true;
 }
 
-// TODO: Import animations and joints and skins and stuff
+/** TODO: Next:
+ * Put vertex data into single vertex buffer on import
+ * Put index data into single index buffer on import
+ * Assign material data pipeline ids and instance ids on import
+ * Create transform buffer from nodes on import
+ * 
+ * After creating scene from payload
+ * Import animations and joints and skins and stuff
+ * 
+ */
 static b8 import_gltf_payload(import_payload* payload, const char* path) {
     // Attempt to load gltf file data with cgltf library
     cgltf_options options = {0};
@@ -505,7 +517,7 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
     u32 img_start = dynarray_length(payload->images);
     dynarray_resize(&payload->images, img_start + data->images_count);
     for (u32 i = 0; i < data->images_count; ++i) {
-        imported_image* image = &payload->images[img_start + i];
+        import_image* image = &payload->images[img_start + i];
         image->data = load_image_data(&data->images[i], path, &image->width, &image->height, &image->channels);
     }
 
@@ -515,53 +527,82 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
         payload->textures[tex_start + i].image_id = img_start + cgltf_image_index(data, data->textures[i].image);
     }
 
-    u32 mat_start = dynarray_length(payload->materials);
-    dynarray_resize(&payload->materials, mat_start + data->materials_count);
+    // TODO: Place adding defualt pipelines to payload into generic import function that checks 
+    // the file extensions of what is being imported and adding them in there: import_payload_files(...)
+
+    // Check for gltf default pipeline in payload and add if not present
+    i32 pipe_index = -1;
+    u32 pipeline_count = dynarray_length(payload->pipelines);
+    for (u32 i = 0; i < pipeline_count; ++i) {
+        if (payload->pipelines[i].type == IMPORT_PIPELINE_GLTF_DEFAULT) {
+            pipe_index = (i32)i;
+            break;
+        }
+    }
+    if (pipe_index == -1) {
+        import_pipeline gltf_default = default_import_pipelines[IMPORT_PIPELINE_GLTF_DEFAULT];
+        gltf_default.solid_insts = dynarray_create(1, gltf_default.inst_size);
+        gltf_default.transparent_insts = dynarray_create(1, gltf_default.inst_size);
+        dynarray_push((void**)&payload->pipelines, &gltf_default);
+        pipe_index = (i32)pipeline_count;
+    }
+    // TODO: END
+    
+    mat_id* mat_index_to_id = etallocate(sizeof(mat_id) * data->materials_count, MEMORY_TAG_IMPORTER);
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material mat = data->materials[i];
         cgltf_pbr_metallic_roughness mr = mat.pbr_metallic_roughness;
-        imported_material material = {
+        blinn_mr_instance instance = {
             .color_factors = {
                 .r = mr.base_color_factor[0],
                 .g = mr.base_color_factor[1],
                 .b = mr.base_color_factor[2],
                 .a = mr.base_color_factor[3],
             },
-            .color_tex_id = -1,
+            .color_tex_index = 0,
             .metalness = mr.metallic_factor,
             .roughness = mr.roughness_factor,
-            .mr_tex_id = -1,
-
-            // TODO: Get this from the information once shading models have been figured out
-            .shading_model = SHADER_MODEL_PBR,
-            .flags.pbr = PBR_PROPERTY_METAL_ROUGH,
-            // NOTE: This is evil code I will change when I hammer down transparency and pipelines w/alpha masking
-            .alpha = (mat.alpha_mode == cgltf_alpha_mode_blend ) ? ALPHA_MODE_BLEND  :  // if blend then blend or
-                     (mat.alpha_mode == cgltf_alpha_mode_opaque) ? ALPHA_MODE_OPAQUE :  // if opaque then opaque or
-                     (mat.alpha_mode == cgltf_alpha_mode_mask  ) ? ALPHA_MODE_MASK   :  // if mask then mask or 
-                                                                   ALPHA_MODE_UNKNOWN,  // Unknown
-            // NOTE: END
-            // TODO: END
+            .mr_tex_index = 0,
         };
-
         if (mr.base_color_texture.texture) {
-            material.color_tex_id = tex_start + cgltf_texture_index(data, mr.base_color_texture.texture);
+            instance.color_tex_index = tex_start + cgltf_texture_index(data, mr.base_color_texture.texture);
         }
         if (mr.metallic_roughness_texture.texture) {
-            material.mr_tex_id = tex_start + cgltf_texture_index(data, mr.metallic_roughness_texture.texture);
+            instance.mr_tex_index = tex_start + cgltf_texture_index(data, mr.metallic_roughness_texture.texture);
         }
 
-        payload->materials[mat_start + i] = material;
+        i32 inst_id = 0;
+        switch (data->materials[i].alpha_mode) {
+            case cgltf_alpha_mode_blend:
+                inst_id = dynarray_length(payload->pipelines[pipe_index].transparent_insts);
+                dynarray_push((void**)&payload->pipelines[pipe_index].transparent_insts, &instance);
+                break;
+            default:
+                ETWARN("Unknown alpha mode for material %lu in gltf file %s. Setting opaque.", i, path);
+            case cgltf_alpha_mode_opaque:
+            case cgltf_alpha_mode_mask: {
+                inst_id = dynarray_length(payload->pipelines[pipe_index].solid_insts);
+                dynarray_push((void**)&payload->pipelines[pipe_index].solid_insts, &instance);
+                break;
+            }
+        }
+
+        mat_index_to_id[i] = (mat_id) {
+            .pipe_id = pipe_index,
+            .inst_id = inst_id,
+        };
     }
 
+    // TODO: Put vertex data into single vertex buffer
+    // TODO: Put index data into single index buffer
     u32 mesh_start = dynarray_length(payload->meshes);    
     dynarray_resize(&payload->meshes, mesh_start + data->meshes_count);
     for (u32 i = 0; i < data->meshes_count; ++i) {
-        imported_mesh* mesh = &payload->meshes[mesh_start + i];
+        import_mesh* mesh = &payload->meshes[mesh_start + i];
         mesh->count = data->meshes[i].primitives_count;
-        mesh->geometry_ids = dynarray_create(mesh->count, sizeof(u32));
-        mesh->material_ids = dynarray_create(mesh->count, sizeof(u32));
-        dynarray_resize((void**)&mesh->geometry_ids, mesh->count);
+        mesh->geometry_indices = dynarray_create(mesh->count, sizeof(u32));
+        mesh->material_ids = dynarray_create(mesh->count, sizeof(mat_id));
+        dynarray_resize((void**)&mesh->geometry_indices, mesh->count);
         dynarray_resize((void**)&mesh->material_ids, mesh->count);
         
         u32 geo_start = dynarray_length(payload->geometries);
@@ -569,7 +610,7 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
 
         for (u32 j = 0; j < data->meshes[i].primitives_count; ++j) {
             cgltf_primitive prim = data->meshes[i].primitives[j];
-            imported_geometry* geo = &payload->geometries[geo_start + j];
+            import_geometry* geo = &payload->geometries[geo_start + j];
 
             // NOTE: Converts u16 indices to u32 indices
             geo->indices = dynarray_create(prim.indices->count, sizeof(u32));
@@ -626,56 +667,75 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
             }
             dynarray_destroy(accessor_data);
 
-            payload->meshes[i].geometry_ids[j] = geo_start + j;
+            payload->meshes[i].geometry_indices[j] = geo_start + j;
             // TODO: Add default material index into import payload, or use -1 for not present for now
-            payload->meshes[i].material_ids[j] = mat_start + (prim.material) ? cgltf_material_index(data, prim.material) : 0;
+            payload->meshes[i].material_ids[j] = mat_index_to_id[(prim.material) ? cgltf_material_index(data, prim.material) : 0];
         }
     }
+    etfree(mat_index_to_id, sizeof(mat_id) * data->materials_count, MEMORY_TAG_IMPORTER);
 
+    // TODO: Create transform buffer from node transforms, just mesh nodes for now.
     u32 node_start = dynarray_length(payload->nodes);
     dynarray_resize(&payload->nodes, node_start + data->nodes_count);
     for (u32 i = 0; i < data->nodes_count; ++i) {
-        imported_node node = {0};
+        import_node node = {0};
         if (data->nodes[i].mesh != NULL) {
             node.has_mesh = true;
-            node.mesh_id = mesh_start + cgltf_mesh_index(data, data->nodes[i].mesh);
+            node.mesh_index = mesh_start + cgltf_mesh_index(data, data->nodes[i].mesh);
         }
         if (data->nodes[i].parent != NULL) {
             node.has_parent = true;
-            node.parent_id = node_start + cgltf_node_index(data, data->nodes[i].parent);
+            node.parent_index = node_start + cgltf_node_index(data, data->nodes[i].parent);
         }
 
-        node.children_ids = dynarray_create(data->nodes[i].children_count, sizeof(u32));
-        dynarray_resize((void**)&node.children_ids, data->nodes[i].children_count);
+        node.children_indices = dynarray_create(data->nodes[i].children_count, sizeof(u32));
+        dynarray_resize((void**)&node.children_indices, data->nodes[i].children_count);
         for (u32 j = 0; j < data->nodes[i].children_count; ++j) {
-            node.children_ids[j] = node_start + cgltf_node_index(data, data->nodes[i].children[j]);
+            node.children_indices[j] = node_start + cgltf_node_index(data, data->nodes[i].children[j]);
         }
 
         cgltf_node_transform_local(&data->nodes[i], (cgltf_float*)node.local_transform.raw);
         cgltf_node_transform_world(&data->nodes[i], (cgltf_float*)node.world_transform.raw);
     }
 
-    // TODO: Animation data
+    // TODO: Import Animation data & such
 
     return true;
 }
 
 void import_payload_destroy(import_payload* payload) {
+    u32 geometry_count = dynarray_length(payload->geometries);
+    for (u32 i = 0; i < geometry_count; ++i) {
+        dynarray_destroy(payload->geometries[i].vertices);
+        dynarray_destroy(payload->geometries[i].indices);
+    }
     dynarray_destroy(payload->geometries);
-    for (u32 i = 0; i < dynarray_length(payload->images); ++i) {
+
+    u32 image_count = dynarray_length(payload->images);
+    for (u32 i = 0; i < image_count; ++i) {
         stbi_image_free(payload->images[i].data);
     }
+    dynarray_destroy(payload->images);
+
     dynarray_destroy(payload->textures);
-    dynarray_destroy(payload->materials);
+
+    u32 pipeline_count = dynarray_length(payload->pipelines);
+    for (u32 i = 0; i < pipeline_count; ++i) {
+        dynarray_destroy(payload->pipelines[i].solid_insts);
+        dynarray_destroy(payload->pipelines[i].transparent_insts);
+    }
+    dynarray_destroy(payload->pipelines);
+
     u32 mesh_count = dynarray_length(payload->meshes);
     for (u32 i = 0; i < mesh_count; ++i) {
-        dynarray_destroy(payload->meshes[i].geometry_ids);
+        dynarray_destroy(payload->meshes[i].geometry_indices);
         dynarray_destroy(payload->meshes[i].material_ids);
     }
     dynarray_destroy(payload->meshes);
+
     u32 node_count = dynarray_length(payload->nodes);
     for (u32 i = 0; i < node_count; ++i) {
-        dynarray_destroy(payload->nodes[i].children_ids);
+        dynarray_destroy(payload->nodes[i].children_indices);
     }
     dynarray_destroy(payload->nodes);
 }
@@ -683,12 +743,12 @@ void import_payload_destroy(import_payload* payload) {
 import_payload import_gltfs_payload(u32 file_count, const char* const* paths) {
     ETASSERT(paths);
     import_payload payload = {
-        .geometries = dynarray_create(1, sizeof(imported_geometry)),
-        .images = dynarray_create(1, sizeof(imported_image)),
-        .textures = dynarray_create(1, sizeof(imported_texture)),
-        .materials = dynarray_create(1, sizeof(imported_material)),
-        .meshes = dynarray_create(1, sizeof(imported_mesh)),
-        .nodes = dynarray_create(1, sizeof(imported_node)),
+        .geometries = dynarray_create(1, sizeof(import_geometry)),
+        .images = dynarray_create(1, sizeof(import_image)),
+        .textures = dynarray_create(1, sizeof(import_texture)),
+        .pipelines = dynarray_create(1, sizeof(import_pipeline)),
+        .meshes = dynarray_create(1, sizeof(import_mesh)),
+        .nodes = dynarray_create(1, sizeof(import_node)),
     };
 
     u32 failure_count = 0;

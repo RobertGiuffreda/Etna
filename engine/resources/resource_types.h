@@ -15,7 +15,6 @@ typedef struct mat_id {
 // NOTE: Each one describes a different pipeline object
 typedef enum mat_pipe_type {
     MAT_PIPE_METAL_ROUGH,
-    MAT_PIPE_SOLID,
     MAT_PIPE_METAL_ROUGH_TRANSPARENT,
     MAT_PIPE_MAX,
 } mat_pipe_type;

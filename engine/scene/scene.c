@@ -274,11 +274,11 @@ void scene_renderer_init(scene* scene, renderer_state* state) {
         VK_WHOLE_SIZE,
         /* flags */ 0,
         &draw_buffer_addresses));
-    // Initialize the material pipeline container structs
+    // TODO: Retrieve pipelines from a scene config/import_payload
     for (u32 i = 0; i < MAT_PIPE_MAX; ++i) {
         mat_init(&scene->materials[i], scene, state, &scene_mat_configs[i]);
         VkDeviceAddress mat_draws_addr = buffer_get_address(state, &scene->materials[i].draws_buffer);
-        etcopy_memory((u8*)draw_buffer_addresses + i * sizeof(VkDeviceAddress), &mat_draws_addr, sizeof(VkDeviceAddress));
+        etcopy_memory((VkDeviceAddress*)draw_buffer_addresses + i, &mat_draws_addr, sizeof(VkDeviceAddress));
     }
     vkUnmapMemory(state->device.handle, scene->draws_buffer.memory);
 }
@@ -902,51 +902,55 @@ void scene_renderer_descriptors_shutdown(scene* scene, renderer_state* state) {
     );
 }
 
-// TEMP:HACK: Until different material pipelines and shaders are written and supported
-static mat_pipe_type payload_material_to_mat_pipe_type(imported_material* material) {
-    switch (material->alpha) {
-        case ALPHA_MODE_OPAQUE:
-        case ALPHA_MODE_MASK:
-            return MAT_PIPE_METAL_ROUGH;
-        default: {
-            return MAT_PIPE_METAL_ROUGH_TRANSPARENT;
-        }
-    }
-}
-// TEMP:HACK: END
-
 b8 scene_init_import_payload(scene** scn, renderer_state* state, import_payload* payload) {
     scene* scene = etallocate(sizeof(struct scene), MEMORY_TAG_SCENE);
 
-    // TODO: 1. Create singular vertex buffer, index buffer
-    u32 geo_count = dynarray_length(payload->geometries);
-    
+    // 1. Create singular vertex buffer, index buffer
     vertex* vertices = dynarray_create(0, sizeof(vertex));
     u32* indices = dynarray_create(0, sizeof(u32));
+    
+    u32 geo_count = dynarray_length(payload->geometries);
     geometry* geometries = dynarray_create(geo_count, sizeof(geometry));
     dynarray_resize((void**)&geo_count, geo_count);
     for (u32 i = 0; i < geo_count; ++i) {
-        geometries[i].vertex_offset = dynarray_length(vertices);
-        geometries[i].start_index = dynarray_length(indices);
-        geometries[i].index_count = dynarray_length(payload->geometries[i].indices);
+        geometries[i] = (geometry) {
+            .start_index = dynarray_length(indices),
+            .index_count = dynarray_length(payload->geometries[i].indices),
+            .vertex_offset = dynarray_length(vertices),
+        };
 
         dynarray_append_vertex(&vertices, payload->geometries[i].vertices);
         dynarray_append_u32(&indices, payload->geometries[i].indices);
-
-        dynarray_destroy(payload->geometries[i].vertices);
-        dynarray_destroy(payload->geometries[i].indices);
     }
-    dynarray_destroy(payload->geometries);
+    
+    // 2. Change nodes into objects and transforms for the meshes
+    m4s* transforms = dynarray_create(1, sizeof(m4s));
+    object* objects = dynarray_create(1, sizeof(object));
+    u32 node_count = dynarray_length(payload->nodes);
+    for (u32 i = 0; i < node_count; ++i) {
+        if (payload->nodes[i].has_mesh) {
+            u32 transform_index = dynarray_length(transforms);
+            dynarray_push((void**)&transforms, &payload->nodes[i].world_transform);
 
-    // TODO: 2. Convert material data to pipeline_id and instance_id/mat_id for the renderer to use
+            import_mesh mesh = payload->meshes[payload->nodes[i].mesh_index];
+            u64 object_start = dynarray_grow((void**)&objects, mesh.count);
+            for (u32 j = 0; j < mesh.count; ++j) {
+                objects[object_start + j] = (object) {
+                    .pso_id = mesh.material_ids[j].pipe_id,
+                    .mat_id = mesh.material_ids[j].inst_id,
+                    .geo_id = mesh.geometry_indices[j],
+                    .transform_id = transform_index,
+                };
+            }
+        }
+    }
     
-    // TODO: 3. Change nodes into objects and transforms for the meshes.
-    
-    // TODO: 4. Initialize renderer stuff, gpu memory, descriptors, etc...
-    
-    // TODO: 5. Render and test if working
+    // TODO: 3. Initialize renderer stuff, gpu memory, descriptors, etc...
 
-    // TODO: 6. Will create scene & joint/bone hierarchy eventually. Changes 3
+    
+    // TODO: 4. Render and test if working
+
+    // TODO: 5. Will create scene & joint/bone hierarchy eventually. Changes 2
 
     *scn = scene;
     return false;
