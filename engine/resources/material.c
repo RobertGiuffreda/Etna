@@ -11,8 +11,6 @@
 #include "scene/scene_private.h"
 
 b8 mat_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_pipe_config* config) {
-    material->inst_count = 0;
-
     // TODO: Replace with load material shader function
     shader mat_vert;
     if (!load_shader(state, config->vert_path, &mat_vert)) {
@@ -65,10 +63,9 @@ b8 mat_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_p
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &material->draws_buffer);
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, material->draws_buffer.handle, "MatDrawsBuffer");
-    material->inst_size = config->inst_size;
     buffer_create(
         state,
-        MAX_MATERIAL_COUNT * material->inst_size,
+        MAX_MATERIAL_COUNT * config->inst_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &material->inst_buffer);
@@ -80,6 +77,11 @@ b8 mat_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_p
         VK_WHOLE_SIZE,
         /* Flags */ 0,
         &material->inst_data));
+    etcopy_memory(material->inst_data, config->instances, config->inst_count * config->inst_size);
+    material->inst_count = config->inst_count;
+    material->inst_size = config->inst_size;
+
+    // DescriptorSet Stuff
     VkDescriptorSetAllocateInfo allocate_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext = 0,

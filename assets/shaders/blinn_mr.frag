@@ -41,6 +41,7 @@ void main() {
     // In color is the vertex colors applied to the texture
     vec4 tex_base_color = texture(textures[nonuniformEXT(in_color_id)], in_uv);
     vec3 diffuse_color = in_color * tex_base_color.rgb;
+    // vec3 diffuse_color = in_color;
 
     // From fragment position to light position direction
     vec3 light_dir = frame_data.light_position.xyz - in_position;
@@ -69,4 +70,5 @@ void main() {
     vec3 gamma_corrected = pow(color_linear, vec3(1.0f / screen_gamma));
 
     out_frag_color = vec4(gamma_corrected, 1.0f);
+    // out_frag_color = vec4(diffuse_color, 1.0f);
 }

@@ -39,6 +39,9 @@ void main() {
     out_normal = (transpose(inverse(model)) * vec4(v.normal, 0.0f)).xyz;
 
     out_color = v.color.xyz * mat_insts[nonuniformEXT(draw.material_id)].color_factors.xyz;
+    // out_color = v.color.xyz;
+    // out_color = mat_insts[nonuniformEXT(draw.material_id)].color_factors.xyz;
+    // out_color = vec3(v.uv_x, v.uv_y, 0.0f);
     out_uv.x = v.uv_x;
     out_uv.y = v.uv_y;
 

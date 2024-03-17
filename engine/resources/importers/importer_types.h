@@ -34,15 +34,24 @@ typedef struct import_image {
     u32 width;
     u32 channels;
     void* data;             // stb_image allocation
+    char* name;
 } import_image;
+
+typedef struct import_sampler {
+    u8 mag_filter;
+    u8 min_filter;
+    u8 mip_map_mode;
+} import_sampler;
 
 // TODO: Add sampler information. Use default linear for now
 typedef struct import_texture {
     u32 image_id;
+    u32 sampler_id;
 } import_texture;
 
 typedef enum import_pipeline_type {
     IMPORT_PIPELINE_GLTF_DEFAULT = 0,
+    IMPORT_PIPELINE_GLTF_TRANSPARENT,
     IMPORT_PIPELINE_DEFAULT_MAX,
 } import_pipeline_type;
 
@@ -51,10 +60,10 @@ typedef enum import_pipeline_type {
 typedef struct import_pipeline {
     const char* vert_path;
     const char* frag_path;
-    void* solid_insts;              // dynarray (No hacky macro generics)
-    void* transparent_insts;        // dynarray (No hacky macro generics)
+    void* instances;
     u64 inst_size;
     import_pipeline_type type;
+    b8 transparent;
 } import_pipeline;
 
 const static import_pipeline default_import_pipelines[IMPORT_PIPELINE_DEFAULT_MAX] = {
@@ -63,8 +72,16 @@ const static import_pipeline default_import_pipelines[IMPORT_PIPELINE_DEFAULT_MA
         .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
         .inst_size = sizeof(blinn_mr_instance),
         .type = IMPORT_PIPELINE_GLTF_DEFAULT,
-        .solid_insts = NULL,
-        .transparent_insts = NULL,
+        .instances = NULL,
+        .transparent = false,
+    },
+    [IMPORT_PIPELINE_GLTF_TRANSPARENT] = {
+        .vert_path = "assets/shaders/blinn_mr.vert.spv.opt",
+        .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
+        .inst_size = sizeof(blinn_mr_instance),
+        .type = IMPORT_PIPELINE_GLTF_TRANSPARENT,
+        .instances = NULL,
+        .transparent = true,
     },
 };
 
@@ -72,7 +89,7 @@ const static import_pipeline default_import_pipelines[IMPORT_PIPELINE_DEFAULT_MA
 // Currently still figuring out aspects like animation so it can wait.
 typedef struct import_mesh {
     u32* geometry_indices;      // dynarray
-    mat_id* material_ids;      // dynarray
+    u32* material_indices;      // dynarray
     u32 count;
 } import_mesh;
 
@@ -88,10 +105,12 @@ typedef struct import_node {
 
 // NOTE: All dynarrays
 typedef struct import_payload {
+    mat_id* mat_index_to_id;           // Dynarray
     import_pipeline* pipelines;         // Dynarray
     
     import_geometry* geometries;        // Dynarray
     import_image* images;               // Dynarray
+    import_sampler* samplers;
     import_texture* textures;           // Dynarray
     import_mesh* meshes;                // Dynarray
 

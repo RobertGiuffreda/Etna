@@ -29,6 +29,8 @@ typedef struct mat_pipe_config {
     // TEMP: Until shader reflection data is used
     u64 inst_size;
     // TEMP: END
+    u32 inst_count;
+    void* instances;
     b8 transparent;
 } mat_pipe_config;
 

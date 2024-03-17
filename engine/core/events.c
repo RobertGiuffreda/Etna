@@ -56,6 +56,8 @@ void events_shutdown(events_t* event_system_state) {
 // Because this pointer is just a copy of the pointer stored in state, the pointer in
 // the state does not change, leaving it pointing to freed memory, and leaving the new 
 // memory allocation lost
+
+// Hi
 b8 event_observer_register(u16 event_code, void* observer, pfn_on_event on_event) {
     ETASSERT((system_state != 0));
 

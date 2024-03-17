@@ -12,6 +12,10 @@ int main(int argc, char** argv) {
     ETASSERT(argv[0] != NULL);
     ETASSERT(argv[1] != NULL);
 
+    // for (int i = 0; i < argc; ++i) {
+    //     ETINFO("%s", argv[i]);
+    // }
+
     // Default values
     engine_config engine_details = {
         .width = 100,

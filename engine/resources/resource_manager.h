@@ -5,6 +5,7 @@
 
 #define MAX_BUFFER_COUNT 1024
 #define MAX_IMAGE_COUNT 512
+#define MAX_TEXTURE_COUNT 1024
 #define MAX_MATERIAL_COUNT 512
 
 typedef struct resource_manager {

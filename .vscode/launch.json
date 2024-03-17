@@ -7,8 +7,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/sandbox.exe",
             "args": [
-                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
                 "../assets/gltf/structure.glb",
+                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/",
@@ -21,8 +21,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/release/sandbox.exe",
             "args": [
-                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
                 "../assets/gltf/structure.glb",
+                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/",
@@ -35,8 +35,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/RelWithDebInfo/sandbox.exe",
             "args": [
-                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
                 "../assets/gltf/structure.glb",
+                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/",

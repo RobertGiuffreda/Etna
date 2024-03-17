@@ -29,8 +29,8 @@ static const mat_pipe_config scene_mat_configs[MAT_PIPE_MAX] = {
         .transparent = false,
     },
     [MAT_PIPE_METAL_ROUGH_TRANSPARENT] = {
-        .vert_path = "assets/shaders/blinn_mr_tp.vert.spv.opt",
-        .frag_path = "assets/shaders/blinn_mr_tp.frag.spv.opt",
+        .vert_path = "assets/shaders/blinn_mr.vert.spv.opt",
+        .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
         .inst_size = sizeof(blinn_mr_instance),
         .transparent = true,
     },
@@ -96,6 +96,8 @@ typedef struct scene {
     VkDescriptorSetLayout mat_set_layout;
     VkPipelineLayout mat_pipeline_layout;
 
+    u32 mat_count;
+    mat_pipe_config* mat_configs;
     mat_pipe materials[MAT_PIPE_MAX];
 
     // TODO: Update to current GPU Driven architecture
