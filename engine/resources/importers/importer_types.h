@@ -50,10 +50,18 @@ typedef struct import_texture {
 } import_texture;
 
 typedef enum import_pipeline_type {
-    IMPORT_PIPELINE_GLTF_DEFAULT = 0,
-    IMPORT_PIPELINE_GLTF_TRANSPARENT,
-    IMPORT_PIPELINE_DEFAULT_MAX,
+    IMPORT_PIPELINE_TYPE_GLTF_DEFAULT = 0,
+    IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT,
+    IMPORT_PIPELINE_TYPE_MAX,
 } import_pipeline_type;
+
+typedef enum import_pipeline_flag_bits {
+    IMPORT_PIPELINE_FLAG_GLTF_DEFAULT = (1 << IMPORT_PIPELINE_TYPE_GLTF_DEFAULT),
+    IMPORT_PIPELINE_FLAG_GLTF_TRANSPARENT = (1 << IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT),
+} import_pipeline_flag_bits;
+typedef u32 import_pipeline_flags;
+
+#define import_pipeline_type_to_flag(type) (1 << type)
 
 // NOTE: Default shaders for importing,
 // as file formats do not include shaders,
@@ -66,20 +74,20 @@ typedef struct import_pipeline {
     b8 transparent;
 } import_pipeline;
 
-const static import_pipeline default_import_pipelines[IMPORT_PIPELINE_DEFAULT_MAX] = {
-    [IMPORT_PIPELINE_GLTF_DEFAULT] = {
+const static import_pipeline default_import_pipelines[IMPORT_PIPELINE_TYPE_MAX] = {
+    [IMPORT_PIPELINE_TYPE_GLTF_DEFAULT] = {
         .vert_path = "assets/shaders/blinn_mr.vert.spv.opt",
         .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
         .inst_size = sizeof(blinn_mr_instance),
-        .type = IMPORT_PIPELINE_GLTF_DEFAULT,
+        .type = IMPORT_PIPELINE_TYPE_GLTF_DEFAULT,
         .instances = NULL,
         .transparent = false,
     },
-    [IMPORT_PIPELINE_GLTF_TRANSPARENT] = {
+    [IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT] = {
         .vert_path = "assets/shaders/blinn_mr.vert.spv.opt",
         .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
         .inst_size = sizeof(blinn_mr_instance),
-        .type = IMPORT_PIPELINE_GLTF_TRANSPARENT,
+        .type = IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT,
         .instances = NULL,
         .transparent = true,
     },
@@ -105,7 +113,8 @@ typedef struct import_node {
 
 // NOTE: All dynarrays
 typedef struct import_payload {
-    mat_id* mat_index_to_id;           // Dynarray
+    import_pipeline_flags present_pipelines;
+    mat_id* mat_index_to_id;            // Dynarray
     import_pipeline* pipelines;         // Dynarray
     
     import_geometry* geometries;        // Dynarray

@@ -187,6 +187,7 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
         .height = state->swapchain.image_extent.height,
         .depth = 1};
     state->render_extent = render_resolution;
+    // TEMP: HACK: TODO: END
 
     // Rendering attachment images initialization
     

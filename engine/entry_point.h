@@ -12,17 +12,14 @@ int main(int argc, char** argv) {
     ETASSERT(argv[0] != NULL);
     ETASSERT(argv[1] != NULL);
 
-    // for (int i = 0; i < argc; ++i) {
-    //     ETINFO("%s", argv[i]);
-    // }
-
     // Default values
     engine_config engine_details = {
         .width = 100,
         .height = 100,
         .x_start_pos = 0,
         .y_start_pos = 0,
-        .scene_path = argv[1],
+        .path_count = argc - 1,
+        .paths = &argv[1],
     };
     application_config app_details = {0};
 

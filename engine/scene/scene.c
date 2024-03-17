@@ -73,7 +73,7 @@ void scene_shutdown(scene* scene) {
     // NOTE: This is needed to make sure objects are not destroyed while in use
     vkDeviceWaitIdle(state->device.handle);
 
-    // TODO: Update to GPU driven
+    // TODO: Update
     image_manager_shutdown(scene->image_bank);
     // TODO: END
 
@@ -410,29 +410,18 @@ void draw_geometry(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
     vkCmdDispatch(cmd, ceil(object_count / 32.0f), 1, 1);
 
     // NOTE: Clean this up
-    // VkBufferMemoryBarrier2 mat_draws_buffer_barriers[MAT_PIPE_MAX];
-    // for (u32 i = 0; i < MAT_PIPE_MAX; ++i) {
-    //     mat_draws_buffer_barriers[i] = buffer_memory_barrier(
-    //         scene->materials[i].draws_buffer.handle, /* Offset */0, VK_WHOLE_SIZE,
-    //         VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
-    //         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT
-    //     );
-    // }
-    // VkDependencyInfo buffer_barriers = {
-    //     .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
-    //     .bufferMemoryBarrierCount = MAT_PIPE_MAX,
-    //     .pBufferMemoryBarriers = mat_draws_buffer_barriers,
-    // };
-    // vkCmdPipelineBarrier2(cmd, &buffer_barriers);
     for (u32 i = 0; i < scene->mat_count; ++i) {
-        buffer_barrier(cmd, scene->materials[i].draws_buffer.handle, /* Offset */0, VK_WHOLE_SIZE,
+        buffer_barrier(
+            cmd, scene->materials[i].draws_buffer.handle, /* Offset */ 0, VK_WHOLE_SIZE,
             VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT
         );
     }
-    buffer_barrier(cmd, scene->counts_buffer.handle, /* offset: */ 0, VK_WHOLE_SIZE,
+    buffer_barrier(
+        cmd, scene->counts_buffer.handle, /* offset: */ 0, VK_WHOLE_SIZE,
         VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT);
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT
+    );
     // NOTE: END
 
     VkRenderingAttachmentInfo color_attachment = init_color_attachment_info(
@@ -942,8 +931,7 @@ b8 scene_init_import_payload(scene** scn, renderer_state* state, import_payload*
         dynarray_append_u32(&indices, payload->geometries[i].indices);
     }
 
-    
-
+    // Remove default pipelines without any instances
     mat_pipe_config* pipe_configs = dynarray_create(0, sizeof(mat_pipe_config));
     u32 pipeline_count = dynarray_length(payload->pipelines);
     u32* pipe_index_to_id = etallocate(sizeof(u32) * pipeline_count, MEMORY_TAG_SCENE);
@@ -1089,13 +1077,15 @@ b8 scene_init_import_payload(scene** scn, renderer_state* state, import_payload*
     scene->index_buffer = vertex_index.index_buffer;
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->vertex_buffer.handle, "SceneVertexBuffer");
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->index_buffer.handle, "SceneIndexBuffer");
+    scene->vertices = vertices;
+    scene->indices = indices;
 
     buffer_create_data(
         state,
         objects,
         sizeof(object) * dynarray_length(objects),
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->object_buffer);
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->object_buffer.handle, "ObjectBuffer");
     scene->objects = objects;
@@ -1424,11 +1414,11 @@ b8 scene_init_import_payload(scene** scn, renderer_state* state, import_payload*
         /* writeCount: */ 7,
         writes,
         /* copyCount: */ 0,
-        /* copies: */ 0 
+        /* copies: */ 0
     );
     // NOTE: Descriptors init: END
 
-    // HACK:TEMP: Temporary creation of sampler to see if everything is working
+    // Samplers
     scene->sampler_count = dynarray_length(payload->samplers);
     scene->samplers = etallocate(sizeof(VkSampler) * scene->sampler_count, MEMORY_TAG_SCENE);
     for (u32 i = 0; i < scene->sampler_count; ++i) {
@@ -1447,7 +1437,6 @@ b8 scene_init_import_payload(scene** scn, renderer_state* state, import_payload*
             &scene->samplers[i]
         ));
     }
-    // HACK:TEMP: END
 
     // NOTE: Textures after descriptors are init 
     u32 texture_count = dynarray_length(payload->textures);

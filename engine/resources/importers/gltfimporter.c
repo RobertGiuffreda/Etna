@@ -536,32 +536,31 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
         payload->textures[tex_start + i].sampler_id = sampler_start + cgltf_sampler_index(data, data->textures[i].sampler);
     }
 
-    // TODO: Place adding defualt pipelines to payload into generic import function that checks 
-    // the file extensions of what is being imported and adding them in there: import_payload_files(...)
-
-    // Check for gltf default pipeline in payload and add if not present
+    // TODO: Deserialize all files set to be imported, check the material 
+    // specs for each one and place all the deafult pipelines needed into 
+    // the payload before calling this function.  
     i32 opaque_index = -1;
     i32 transparent_index = -1;
     u32 pipeline_count = dynarray_length(payload->pipelines);
     for (u32 i = 0; i < pipeline_count; ++i) {
         switch (payload->pipelines[i].type) {
-            case IMPORT_PIPELINE_GLTF_TRANSPARENT:
+            case IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT:
                 transparent_index = (i32)i;
                 break;
-            case IMPORT_PIPELINE_GLTF_DEFAULT: {
+            case IMPORT_PIPELINE_TYPE_GLTF_DEFAULT: {
                 opaque_index = (i32)i;
                 break;
             }
         }
     }
     if (opaque_index == -1) {
-        import_pipeline gltf_default = default_import_pipelines[IMPORT_PIPELINE_GLTF_DEFAULT];
+        import_pipeline gltf_default = default_import_pipelines[IMPORT_PIPELINE_TYPE_GLTF_DEFAULT];
         gltf_default.instances = dynarray_create(0, gltf_default.inst_size);
         dynarray_push((void**)&payload->pipelines, &gltf_default);
         opaque_index = (i32)pipeline_count++;
     }
     if (transparent_index == -1) {
-        import_pipeline gltf_transparent = default_import_pipelines[IMPORT_PIPELINE_GLTF_TRANSPARENT];
+        import_pipeline gltf_transparent = default_import_pipelines[IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT];
         gltf_transparent.instances = dynarray_create(0, gltf_transparent.inst_size);
         dynarray_push((void**)&payload->pipelines, &gltf_transparent);
         transparent_index = (i32)pipeline_count++;
@@ -613,7 +612,7 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
     }
 
     // TODO: Put vertex data into single vertex buffer & index data 
-    // into single index buffer in this function. 
+    // into single index buffer in this function.
     u32 mesh_start = dynarray_grow((void**)&payload->meshes, data->meshes_count);    
     for (u32 i = 0; i < data->meshes_count; ++i) {
         import_mesh* mesh = &payload->meshes[mesh_start + i];
@@ -695,10 +694,12 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
             dynarray_destroy(accessor_data);
 
             mesh->geometry_indices[j] = geo_start + j;
-            // TODO: Add default material index into import payload, or use -1 for not present for now
+            // TODO: When pipelines are placed before this function, we can store the pipeline_id, instance_id combo here
             mesh->material_indices[j] = (prim.material) ? mat_index_id_offset + cgltf_material_index(data, prim.material) : mat_index_id_offset;
+            // TODO: END
         }
     }
+    // TODO: END
 
     // TODO: Create transform buffer from node transforms, just mesh nodes for now.
     u32 node_start = dynarray_grow((void**)&payload->nodes, data->nodes_count);
@@ -724,6 +725,7 @@ static b8 import_gltf_payload(import_payload* payload, const char* path) {
 
         payload->nodes[node_start + i] = node;
     }
+    // TODO: END
 
     // TODO: Import Animation data & such
 
@@ -769,6 +771,9 @@ void import_payload_destroy(import_payload* payload) {
     dynarray_destroy(payload->nodes);
 }
 
+// TODO: Iterate over the gltf files checking the material data and place necessary 
+// piplines in before calling import.
+// TODO: Detect the file types from the path via file extension. .gltf, .glb
 import_payload import_gltfs_payload(u32 file_count, const char* const* paths) {
     ETASSERT(paths);
     import_payload payload = {
@@ -792,6 +797,7 @@ import_payload import_gltfs_payload(u32 file_count, const char* const* paths) {
     }
     return payload;
 }
+// TODO: END
 
 b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
     cgltf_options options = {0};

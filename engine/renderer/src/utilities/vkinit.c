@@ -297,13 +297,12 @@ VkRenderingAttachmentInfo init_color_attachment_info(VkImageView view, VkClearVa
     VkRenderingAttachmentInfo color_attachment = {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .pNext = 0,
-
         .imageView = view,
         .imageLayout = layout,
-        .loadOp = clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
-        .storeOp = VK_ATTACHMENT_STORE_OP_STORE
+        .clearValue = (clear) ? *clear : (VkClearValue){0},
+        .loadOp = (clear) ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
+        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
     };
-    if (clear) color_attachment.clearValue = *clear;
     return color_attachment;
 }
 
@@ -335,7 +334,7 @@ VkRenderingInfo init_rendering_info(VkExtent2D render_extent, VkRenderingAttachm
         .colorAttachmentCount = 1,
         .pColorAttachments = color_attachment,
         .pDepthAttachment = depthAttachment,
-        .pStencilAttachment = 0
+        .pStencilAttachment = 0,
     };
     return render_info;
 }
