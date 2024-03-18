@@ -36,6 +36,8 @@ char* str_char_search(const char* str, int c);
 
 char* str_str_search(const char* str, const char* sub_str);
 
+char* rev_str_char_search(const char* str, char c);
+
 char* str_duplicate_allocate(const char* str);
 
 // TODO: Calls strlen to free this mem which is bad

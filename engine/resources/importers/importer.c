@@ -1,0 +1,81 @@
+#include "importer.h"
+
+#include "data_structures/dynarray.h"
+
+#include "core/logger.h"
+#include "core/asserts.h"
+
+#include "core/etstring.h"
+
+#include "resources/importers/gltfimporter.h"
+
+// TODO: Iterate over the gltf files checking the material data and place necessary 
+// piplines in before calling import.
+// TODO: Detect the file types from the path via file extension. .gltf, .glb
+import_payload import_files(u32 file_count, const char* const* paths) {
+    ETASSERT(paths);
+    import_payload payload = {
+        .mat_index_to_id = dynarray_create(1, sizeof(mat_id)),
+        .pipelines = dynarray_create(1, sizeof(import_pipeline)),
+        .geometries = dynarray_create(1, sizeof(import_geometry)),
+        .images = dynarray_create(1, sizeof(import_image)),
+        .textures = dynarray_create(1, sizeof(import_texture)),
+        .samplers = dynarray_create(1, sizeof(import_sampler)),
+        .meshes = dynarray_create(1, sizeof(import_mesh)),
+        .nodes = dynarray_create(1, sizeof(import_node)),
+    };
+
+    u32 failure_count = 0;
+    for (u32 i = 0; i < file_count; ++i) {
+        const char* path = paths[i];
+        const char* ext = rev_str_char_search(path, '.');
+        if (strs_equal(ext, ".gltf") || strs_equal(ext, ".glb")) {
+            if (!import_gltf_payload(&payload, path)) {
+                ETWARN("Unable to import gltf file %s.", path);
+                failure_count++;
+            }
+        }
+    }
+    return payload;
+}
+// TODO: END
+
+void import_payload_destroy(import_payload* payload) {
+    dynarray_destroy(payload->mat_index_to_id);
+
+    u32 pipeline_count = dynarray_length(payload->pipelines);
+    for (u32 i = 0; i < pipeline_count; ++i) {
+        dynarray_destroy(payload->pipelines[i].instances);
+    }
+    dynarray_destroy(payload->pipelines);
+
+    u32 geometry_count = dynarray_length(payload->geometries);
+    for (u32 i = 0; i < geometry_count; ++i) {
+        dynarray_destroy(payload->geometries[i].vertices);
+        dynarray_destroy(payload->geometries[i].indices);
+    }
+    dynarray_destroy(payload->geometries);
+
+    dynarray_destroy(payload->textures);
+    dynarray_destroy(payload->samplers);
+
+    u32 image_count = dynarray_length(payload->images);
+    for (u32 i = 0; i < image_count; ++i) {
+        stbi_image_free(payload->images[i].data);
+        str_duplicate_free(payload->images[i].name);
+    }
+    dynarray_destroy(payload->images);
+
+    u32 mesh_count = dynarray_length(payload->meshes);
+    for (u32 i = 0; i < mesh_count; ++i) {
+        dynarray_destroy(payload->meshes[i].geometry_indices);
+        dynarray_destroy(payload->meshes[i].material_indices);
+    }
+    dynarray_destroy(payload->meshes);
+
+    u32 node_count = dynarray_length(payload->nodes);
+    for (u32 i = 0; i < node_count; ++i) {
+        dynarray_destroy(payload->nodes[i].children_indices);
+    }
+    dynarray_destroy(payload->nodes);
+}

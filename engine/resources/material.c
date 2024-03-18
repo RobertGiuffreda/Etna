@@ -10,7 +10,7 @@
 #include "renderer/src/buffer.h"
 #include "scene/scene_private.h"
 
-b8 mat_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_pipe_config* config) {
+b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_pipe_config* config) {
     // TODO: Replace with load material shader function
     shader mat_vert;
     if (!load_shader(state, config->vert_path, &mat_vert)) {
@@ -139,7 +139,7 @@ b8 mat_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_p
 
 // TODO: Handle destroying the descriptor set handle for the pipeline, currently handled when 
 // the scene's descriptor pool is destroyed.
-void mat_shutdown(mat_pipe* material, scene* scene, renderer_state* state) {
+void mat_pipe_shutdown(mat_pipe* material, scene* scene, renderer_state* state) {
     vkUnmapMemory(state->device.handle, material->inst_buffer.memory);
     buffer_destroy(state, &material->inst_buffer);
     buffer_destroy(state, &material->draws_buffer);

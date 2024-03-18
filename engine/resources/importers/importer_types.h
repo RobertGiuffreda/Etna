@@ -7,6 +7,7 @@
  * In infancy
 */
 
+// Currently gltf_default & gltf_transparent
 typedef struct blinn_mr_instance {
     v4s color_factors;
     u32 color_tex_index;
@@ -30,18 +31,20 @@ typedef struct import_geometry {
 } import_geometry;
 
 typedef struct import_image {
+    char* name;
+    void* data;             // stb_image allocation
     u32 height;
     u32 width;
     u32 channels;
-    void* data;             // stb_image allocation
-    char* name;
 } import_image;
 
+// HACK: Quick version
 typedef struct import_sampler {
     u8 mag_filter;
     u8 min_filter;
     u8 mip_map_mode;
 } import_sampler;
+// HACK: END
 
 // TODO: Add sampler information. Use default linear for now
 typedef struct import_texture {
@@ -117,10 +120,10 @@ typedef struct import_payload {
     mat_id* mat_index_to_id;            // Dynarray
     import_pipeline* pipelines;         // Dynarray
     
-    import_geometry* geometries;        // Dynarray
     import_image* images;               // Dynarray
-    import_sampler* samplers;
+    import_sampler* samplers;           // Dynarray
     import_texture* textures;           // Dynarray
+    import_geometry* geometries;        // Dynarray
     import_mesh* meshes;                // Dynarray
 
     import_node* nodes;                 // Dynarray
@@ -166,7 +169,7 @@ typedef struct serialized_image {
 
 typedef struct serialized_texture {
     u32 image_index;
-    // Use default sampler for now
+    u32 sampler_index;
 } serialized_texture;
 
 typedef struct serialized_mat_pipe {

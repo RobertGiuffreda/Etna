@@ -34,8 +34,8 @@ typedef struct mat_pipe_config {
     b8 transparent;
 } mat_pipe_config;
 
-b8 mat_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_pipe_config* config);
-void mat_shutdown(mat_pipe* material, scene* scene, renderer_state* state);
+b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_pipe_config* config);
+void mat_pipe_shutdown(mat_pipe* material, scene* scene, renderer_state* state);
 
 // NOTE: Returns material instance id
 u32 mat_instance_create(mat_pipe* material, renderer_state* state, u64 data_size, void* data);

@@ -33,6 +33,14 @@ char* str_str_search(const char* str, const char* sub_str) {
     return strstr(str, sub_str);
 }
 
+char* rev_str_char_search(const char* str, char c) {
+    u32 str_len = strlen(str);
+    while (--str_len >= 0 && str[str_len] != c);
+    if (str_len < 0) return NULL;
+
+    return (char *)&str[str_len];
+}
+
 char* str_duplicate_allocate(const char* str) {
     u32 len = strlen(str);
     char* str2 = etallocate(sizeof(char) * len + 1, MEMORY_TAG_STRING);
