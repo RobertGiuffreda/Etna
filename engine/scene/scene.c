@@ -658,9 +658,68 @@ b8 scene_renderer_init(scene* scene, renderer_state* state) {
         ));
     }
 
-    // Textures 
+    // // Texture defaults using default samplers and images from renderer_state
+    VkDescriptorImageInfo white_image_info = {
+        .sampler = state->linear_smpl,
+        .imageView = state->default_white.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+    VkWriteDescriptorSet white_image_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = DEFAULT_TEXTURE_WHITE,
+        .dstBinding = SCENE_SET_TEXTURES_BINDING,
+        .dstSet = scene->scene_set,
+        .pImageInfo = &white_image_info,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    };
+    VkDescriptorImageInfo black_image_info = {
+        .sampler = state->linear_smpl,
+        .imageView = state->default_black.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+    VkWriteDescriptorSet black_image_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = DEFAULT_TEXTURE_BLACK,
+        .dstBinding = SCENE_SET_TEXTURES_BINDING,
+        .dstSet = scene->scene_set,
+        .pImageInfo = &black_image_info,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    };
+    VkDescriptorImageInfo normal_image_info = {
+        .sampler = state->linear_smpl,
+        .imageView = state->default_normal.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+    VkWriteDescriptorSet normal_image_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = DEFAULT_TEXTURE_NORMAL,
+        .dstBinding = SCENE_SET_TEXTURES_BINDING,
+        .dstSet = scene->scene_set,
+        .pImageInfo = &normal_image_info,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    };
+    VkWriteDescriptorSet default_image_writes[] = {
+        white_image_write,
+        black_image_write,
+        normal_image_write,
+    };
+    vkUpdateDescriptorSets(
+        state->device.handle,
+        DEFAULT_TEXTURE_COUNT,
+        default_image_writes,
+        /* copy count */ 0,
+        /* copies */ NULL
+    );
+
+    // Textures
     u32 texture_count = dynarray_length(scene->payload.textures);
-    for (u32 i = 0; i < texture_count; ++i) {
+    for (u32 i = DEFAULT_TEXTURE_COUNT; i < texture_count; ++i) {
         scene_texture_set(scene, i, scene->payload.textures[i].image_id, scene->payload.textures[i].sampler_id);
     }
 

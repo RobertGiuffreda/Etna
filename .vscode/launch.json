@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/sandbox.exe",
             "args": [
-                "../assets/gltf/structure.glb",
+                "../../loading/mythra.glb",
                 "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],
             "stopAtEntry": false,
@@ -21,7 +21,6 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/release/sandbox.exe",
             "args": [
-                "../assets/gltf/structure.glb",
                 "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],
             "stopAtEntry": false,
@@ -35,7 +34,6 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/RelWithDebInfo/sandbox.exe",
             "args": [
-                "../assets/gltf/structure.glb",
                 "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],
             "stopAtEntry": false,

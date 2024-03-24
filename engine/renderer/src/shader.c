@@ -67,10 +67,12 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
     }
 
     // NOTE: Spirv-reflect is currently trying to dereference a null pointer while parsing the current shader code
-    // The VkDescriptorSetLayout's are hardcoded at the moment and the code runs so I think its a problem on the librarys end.
-    // I am trying the debug the Issue 
-
-    /*
+    // The VkDescriptorSetLayout's are hardcoded at the moment and the code runs so I think that it is a problem on 
+    // the library's end.
+    // NOTE: The issue is with a runtime array (physical storage buffer) of buffer_references (pointers) 
+    // to a runtime array. I am skirting around the issue at the moment by using an array of 64 bit integers 
+    // and casting them to a buffer_reference(pointer) in the shader. 
+    
     // Shader byte code loaded from file
     SpvReflectShaderModule spv_reflect_module = {0};
     SPIRV_REFLECT_CHECK(spvReflectCreateShaderModule2(SPV_REFLECT_MODULE_FLAG_NONE, code_size, shader_code, &spv_reflect_module));
@@ -131,7 +133,6 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
     etfree(push_blocks, sizeof(SpvReflectBlockVariable*) * push_block_count, MEMORY_TAG_SHADER);
     etfree(sets, sizeof(SpvReflectDescriptorSet*) * set_count, MEMORY_TAG_SHADER);
     spvReflectDestroyShaderModule(&spv_reflect_module);
-    */
 
     // Clean up memoory allocated for shader code and files
     etfree(shader_code, code_size, MEMORY_TAG_RENDERER);
@@ -144,16 +145,13 @@ void unload_shader(renderer_state* state, shader* shader) {
     // The VkDescriptorSetLayout's are hardcoded at the moment and the code runs so I think its a problem on the librarys end.
     // I am trying the debug the Issue 
     
-    /*
     for (u32 i = 0; i < shader->push_block_count; ++i)
         free_block_variables(shader->push_blocks + i);
     etfree(shader->push_blocks, sizeof(block_variable) * shader->push_block_count, MEMORY_TAG_SHADER);
-
     for (u32 i = 0; i < shader->set_count; ++i) {
         set_layout* set = &shader->sets[i];
         for (u32 j = 0; j < set->binding_count; ++j) {
             binding_layout* binding = &set->bindings[j];
-            
             str_duplicate_free(binding->name);
             if (!is_descriptor_type_image(binding->descriptor_type))
                 free_block_variables(&binding->block);
@@ -162,7 +160,6 @@ void unload_shader(renderer_state* state, shader* shader) {
     }
     etfree(shader->sets, sizeof(set_layout) * shader->set_count, MEMORY_TAG_SHADER);
     str_duplicate_free(shader->entry_point);
-    */
 
     vkDestroyShaderModule(state->device.handle, shader->module, state->allocator);
 }

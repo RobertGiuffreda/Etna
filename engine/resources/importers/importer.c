@@ -9,9 +9,7 @@
 
 #include "resources/importers/gltfimporter.h"
 
-// TODO: Iterate over the gltf files checking the material data and place necessary 
-// piplines in before calling import.
-// TODO: Detect the file types from the path via file extension. .gltf, .glb
+// TODO: Place the default pipelines into the pipelines memeber of import_payload
 import_payload import_files(u32 file_count, const char* const* paths) {
     ETASSERT(paths);
     import_payload payload = {
@@ -25,15 +23,29 @@ import_payload import_files(u32 file_count, const char* const* paths) {
         .nodes = dynarray_create(1, sizeof(import_node)),
     };
 
+    // HACK: Place default dummy positions in the texture array for importing
+    // NOTE: there should be a better way than this in the end
+    dynarray_resize((void**)&payload.textures, DEFAULT_TEXTURE_COUNT);
+    // HACK: END
+
     u32 failure_count = 0;
     for (u32 i = 0; i < file_count; ++i) {
         const char* path = paths[i];
         const char* ext = rev_str_char_search(path, '.');
         if (strs_equal(ext, ".gltf") || strs_equal(ext, ".glb")) {
-            if (!import_gltf_payload(&payload, path)) {
+            if (!import_gltf(&payload, path)) {
                 ETWARN("Unable to import gltf file %s.", path);
                 failure_count++;
             }
+        } else if (strs_equal(ext, ".pmx")) {
+            // TODO: Implement the pmx loader files
+            ETASSERT(false);
+            // if (!import_pmx(&payload, path)) {
+            //     ETWARN("Unable to import pmx file %s.", path);
+            // }
+            // TODO: END
+        } else {
+            ETWARN("Attempting to load file %s with unsupported extension %s.", path, ext);
         }
     }
     return payload;

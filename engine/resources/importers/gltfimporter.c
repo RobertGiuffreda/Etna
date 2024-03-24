@@ -44,7 +44,7 @@ static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter);
  * Import animations and joints and skins and stuff
  * 
  */
-b8 import_gltf_payload(import_payload* payload, const char* path) {
+b8 import_gltf(import_payload* payload, const char* path) {
     // Attempt to load gltf file data with cgltf library
     cgltf_options options = {0};
     cgltf_data* data = 0;
@@ -114,30 +114,35 @@ b8 import_gltf_payload(import_payload* payload, const char* path) {
         transparent_index = (i32)pipeline_count++;
     }
     // TODO: END
-    
+
     u32 mat_index_id_offset = dynarray_grow((void**)&payload->mat_index_to_id, data->materials_count);
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material mat = data->materials[i];
         cgltf_pbr_metallic_roughness mr = mat.pbr_metallic_roughness;
-        blinn_mr_instance instance = {
+        pbr_mr_instance instance = {
             .color_factors = {
                 .r = mr.base_color_factor[0],
                 .g = mr.base_color_factor[1],
                 .b = mr.base_color_factor[2],
                 .a = mr.base_color_factor[3],
             },
-            .color_tex_index = 0,
+            .color_tex_index = DEFAULT_TEXTURE_WHITE,
             .metalness = mr.metallic_factor,
             .roughness = mr.roughness_factor,
-            .mr_tex_index = 0,
+            .mr_tex_index = DEFAULT_TEXTURE_WHITE,
+            .normal_index = DEFAULT_TEXTURE_NORMAL,
         };
+
         if (mr.base_color_texture.texture) {
             instance.color_tex_index = tex_start + cgltf_texture_index(data, mr.base_color_texture.texture);
         }
         if (mr.metallic_roughness_texture.texture) {
             instance.mr_tex_index = tex_start + cgltf_texture_index(data, mr.metallic_roughness_texture.texture);
         }
-
+        if (mat.normal_texture.texture) {
+            instance.normal_index = tex_start + cgltf_texture_index(data, mat.normal_texture.texture);
+        }
+        
         mat_id id;
         switch (data->materials[i].alpha_mode) {
             case cgltf_alpha_mode_blend:
@@ -289,22 +294,21 @@ b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
         return false;
     }
 
-    etfile* json_dump_file = NULL;
-    b8 file_result = true;
-    
-    file_result = file_open(dump_file_path, FILE_WRITE_FLAG, &json_dump_file);
+    etfile* json_file = NULL;
+    b8 file_result = file_open(dump_file_path, FILE_WRITE_FLAG, &json_file);
     if (!file_result) {
         ETERROR("%s failed to open.", dump_file_path);
         return false;
     }
 
     u64 bytes_written = 0;
-    file_result = file_write(json_dump_file, data->json_size, (void*)data->json, &bytes_written);
+    file_result = file_write(json_file, data->json_size, (void*)data->json, &bytes_written);
     if (!file_result) {
         ETERROR("Failed to write %s's json data to %s.", gltf_path, dump_file_path);
         return false;
     }
-    file_close(json_dump_file);
+
+    file_close(json_file);
     ETINFO("Json from %s successfully dumped to %s", gltf_path, dump_file_path);
     return true;
 }

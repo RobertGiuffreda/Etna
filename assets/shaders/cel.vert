@@ -2,25 +2,29 @@
 #extension GL_GOOGLE_include_directive : require
 
 #include "input_structures.glsl"
+// SET 1: Material descriptors
 
-layout(set = 1, binding = 0) readonly buffer solid_draws_buffer {
-    draw_command solid_draws[];
+// This needs to be present in each created material
+layout(set = 1, binding = 0) readonly buffer cel_draws_buffer {
+    draw_command cel_draws[];
 };
 
-struct solid_inst {
-    vec4 color;
+struct cel_inst {
+	vec4 color_factors;
+	uint color_index;
 };
-layout(set = 1, binding = 1) readonly buffer solid_inst_buffer {
-	solid_inst mat_insts[];
+layout(set = 1, binding = 1) readonly buffer mat_inst_buffer {
+	cel_inst mat_insts[];
 };
 
 layout (location = 0) out vec3 out_position;
 layout (location = 1) out vec3 out_normal;
 layout (location = 2) out vec3 out_color;
 layout (location = 3) out vec2 out_uv;
+layout (location = 4) flat out uint out_color_id;
 
 void main() {
-    draw_command draw = solid_draws[gl_DrawID];
+    draw_command draw = cel_draws[gl_DrawID];
     vertex v = vertices[gl_VertexIndex];
     mat4 model = transforms[draw.transform_id];
 
@@ -32,7 +36,9 @@ void main() {
     out_normal = (transpose(inverse(model)) * vec4(v.normal, 0.0f)).xyz;
     // out_normal = (push_constants.render_matrix * vec4(v.normal, 0.0f)).xyz;
 
-    out_color = v.color.rgb * mat_insts[draw.material_id].color.rgb;
+    out_color = v.color.rgb * mat_insts[draw.material_id].color_factors.rgb;
     out_uv.x = v.uv_x;
     out_uv.y = v.uv_y;
+
+    out_color_id = mat_insts[draw.material_id].color_index;
 }

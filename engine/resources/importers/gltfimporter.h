@@ -2,7 +2,7 @@
 #include "defines.h"
 #include "importer_types.h"
 
-b8 import_gltf_payload(import_payload* payload, const char* path);
+b8 import_gltf(import_payload* payload, const char* path);
 
 // NOTE: Outputs the read json data from the glb file out to the specified file
 // The file is created if it doesn't exist

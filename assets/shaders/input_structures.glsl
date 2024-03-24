@@ -1,8 +1,7 @@
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_nonuniform_qualifier : require
-
-// TODO: VariablePointersStorageBuffer, binding 2 is causing spirv-reflect to segfault, this sucks.
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require 
 
 // Buffer to record counts per pipeline shader object
 layout(set = 0, binding = 0) uniform frame_data_block {
@@ -36,7 +35,7 @@ layout(buffer_reference, std430) writeonly buffer draw_buffer {
 
 // Record draw commands per pipeline shader object
 layout(set = 0, binding = 2, std430) readonly buffer draw_buffs {
-	draw_buffer draw_buffers[];
+	uint64_t draw_buffers[];
 };
 
 // One for each instance of geometry within a scene, with a material & transform

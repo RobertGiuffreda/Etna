@@ -43,10 +43,11 @@ typedef struct renderer_state {
     VkFence imm_fence;
 
     // NOTE: Defaults
-    image white_image;
-    image black_image;
-    image grey_image;
-    image error_image;
+    image default_white;
+    image default_black;
+    image default_grey;
+    image default_error;
+    image default_normal;
 
     VkSampler linear_smpl;
     VkSampler nearest_smpl;

@@ -192,7 +192,7 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
     // Rendering attachment images initialization
     
     // Color attachment
-    VkImageUsageFlags draw_image_usages = {0};
+    VkImageUsageFlags draw_image_usages = 0;
     draw_image_usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     draw_image_usages |= VK_IMAGE_USAGE_STORAGE_BIT;
     draw_image_usages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -204,8 +204,8 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
         VK_IMAGE_ASPECT_COLOR_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &state->render_image);
-    ETINFO("Render image created");
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->render_image.handle, "MainRenderImage");
+    ETINFO("Render image created");
 
     // Depth attachment
     VkImageUsageFlags depth_image_usages = {0};
@@ -218,8 +218,8 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
         VK_IMAGE_ASPECT_DEPTH_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &state->depth_image);
-    ETINFO("Depth image created");
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->depth_image.handle, "MainDepthImage");
+    ETINFO("Depth image created");
 
     initialize_immediate_submit(state);
 
@@ -396,7 +396,7 @@ static b8 initialize_default_data(renderer_state* state) {
         VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &state->white_image);
+        &state->default_white);
     ETINFO("White default image created.");
 
     u32 grey = 0xFFAAAAAA;
@@ -408,7 +408,7 @@ static b8 initialize_default_data(renderer_state* state) {
         VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &state->grey_image);
+        &state->default_grey);
     ETINFO("Grey default image created.");
 
     u32 black = 0xFF000000;
@@ -420,8 +420,20 @@ static b8 initialize_default_data(renderer_state* state) {
         VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &state->black_image);
+        &state->default_black);
     ETINFO("Black default image created.");
+
+    u32 normal = 0xFFFF7F7F;
+    image2D_create_data(
+        state,
+        &normal,
+        (VkExtent3D){.width = 1, .height = 1, .depth = 1},
+        VK_FORMAT_R8G8B8A8_UNORM,
+        VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &state->default_normal);
+    ETINFO("Normal default image created.");
 
     u32 magenta = 0xFFFF00FF;
     u32 pixels[16 * 16] = {0};
@@ -438,17 +450,23 @@ static b8 initialize_default_data(renderer_state* state) {
         VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_ASPECT_COLOR_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &state->error_image);
+        &state->default_error);
     ETINFO("Checkerboard default image created.");
 
-    VkSamplerCreateInfo sampler_info = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
 
+    VkSamplerCreateInfo sampler_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .maxLod = VK_LOD_CLAMP_NONE,
+        .minLod = 0,
+    };
     sampler_info.magFilter = VK_FILTER_NEAREST;
     sampler_info.minFilter = VK_FILTER_NEAREST;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
     vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->nearest_smpl);
 
     sampler_info.magFilter = VK_FILTER_LINEAR;
     sampler_info.minFilter = VK_FILTER_LINEAR;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     vkCreateSampler(state->device.handle, &sampler_info, state->allocator, &state->linear_smpl);
     return true;
 }
@@ -457,10 +475,11 @@ static void shutdown_default_data(renderer_state* state) {
     vkDestroySampler(state->device.handle, state->linear_smpl, state->allocator);
     vkDestroySampler(state->device.handle, state->nearest_smpl, state->allocator);
 
-    image_destroy(state, &state->error_image);
-    image_destroy(state, &state->black_image);
-    image_destroy(state, &state->grey_image);
-    image_destroy(state, &state->white_image);
+    image_destroy(state, &state->default_normal);
+    image_destroy(state, &state->default_error);
+    image_destroy(state, &state->default_black);
+    image_destroy(state, &state->default_grey);
+    image_destroy(state, &state->default_white);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(

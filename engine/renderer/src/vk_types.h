@@ -53,6 +53,7 @@ typedef struct image {
     VkImageType type;
     VkFormat format;
     VkImageAspectFlags aspects;
+    VkSampleCountFlagBits ms;
 } image;
 
 typedef struct buffer {

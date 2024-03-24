@@ -21,32 +21,29 @@ layout (location = 4) flat in uint in_color_id;
 
 layout(location = 0) out vec4 out_frag_color;
 
+// TODO: Get from material instance
 const vec3 specular_color = vec3(0.3f, 0.3f, 0.3f);
-const float shininess = 32;
+const float shininess = 32.f;
+// TODO: END
+
 const float screen_gamma = 2.2;
 
 void main() {
-    // Ambient lighting color & power gotten from the scene data
     vec3 ambient = frame_data.ambient_color.rgb * frame_data.ambient_color.w;
 
-    // In color is the vertex colors applied to the texture
     vec3 diffuse_constants = in_color;
     vec3 diffuse_color = diffuse_constants * texture(textures[nonuniformEXT(in_color_id)], in_uv).rgb;
 
-    // From fragment position to light position direction
     vec3 light_dir = frame_data.light_position.xyz - in_position;
     float dist = length(light_dir);
     float attenuation = 1 / (dist * dist);
     light_dir = normalize(light_dir);
     
-    // Normalize the normal
     vec3 normal = normalize(in_normal);
 
-    // Lambertian diffuse factor * diffuse color
     float lambertian = max(dot(light_dir, normal), 0.0f);
     vec3 diffuse = lambertian * diffuse_color;
 
-    // From fragment position to view position direction
     vec3 view_dir = normalize(frame_data.view_pos.xyz - in_position);
     vec3 halfway_dir = normalize(light_dir + view_dir);
     float spec = pow(max(dot(normal, halfway_dir), 0.0f), shininess);

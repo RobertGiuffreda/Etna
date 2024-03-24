@@ -27,6 +27,7 @@ typedef struct physical_device_requirements {
     b8 shaderInt64;
     b8 shaderInt16;
     b8 multiDrawIndirect;
+    b8 shaderStorageImageMultisample;
 
     // Vulkan11Features
     b8 shaderDrawParameters;

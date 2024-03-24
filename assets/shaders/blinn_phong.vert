@@ -34,7 +34,6 @@ void main() {
 
     // TODO: Compute the normal matrix on the CPU and not GPU
     out_normal = (transpose(inverse(model)) * vec4(v.normal, 0.0f)).xyz;
-    // out_normal = (push_constants.render_matrix * vec4(v.normal, 0.0f)).xyz;
 
     out_color = v.color.rgb * mat_insts[draw.material_id].color_factors.rgb;
     out_uv.x = v.uv_x;

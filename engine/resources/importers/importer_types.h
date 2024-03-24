@@ -8,13 +8,19 @@
 */
 
 // Currently gltf_default & gltf_transparent
-typedef struct blinn_mr_instance {
+typedef struct pbr_mr_instance {
     v4s color_factors;
     u32 color_tex_index;
     f32 metalness;
     f32 roughness;
     u32 mr_tex_index;
-} blinn_mr_instance;
+    u32 normal_index;
+} pbr_mr_instance;
+
+typedef struct cel_instance {
+    v4s color_factors;
+    u32 color_tex_index;
+} cel_instance;
 
 typedef enum sampler_property_flag_bits {
     SAMPLER_PROPERTY_ANISOTROPIC = 0x01,
@@ -38,7 +44,7 @@ typedef struct import_image {
     u32 channels;
 } import_image;
 
-// HACK: Quick version
+// HACK: Quick version, transfers vulkan enum values from importing to sampler creation
 typedef struct import_sampler {
     u8 mag_filter;
     u8 min_filter;
@@ -46,7 +52,13 @@ typedef struct import_sampler {
 } import_sampler;
 // HACK: END
 
-// TODO: Add sampler information. Use default linear for now
+typedef enum default_texture {
+    DEFAULT_TEXTURE_WHITE = 0,
+    DEFAULT_TEXTURE_BLACK,
+    DEFAULT_TEXTURE_NORMAL,
+    DEFAULT_TEXTURE_COUNT,
+} default_texture;
+
 typedef struct import_texture {
     u32 image_id;
     u32 sampler_id;
@@ -54,12 +66,14 @@ typedef struct import_texture {
 
 typedef enum import_pipeline_type {
     IMPORT_PIPELINE_TYPE_GLTF_DEFAULT = 0,
+    IMPORT_PIPELINE_TYPE_PMX_DEFAULT,
     IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT,
     IMPORT_PIPELINE_TYPE_MAX,
 } import_pipeline_type;
 
 typedef enum import_pipeline_flag_bits {
     IMPORT_PIPELINE_FLAG_GLTF_DEFAULT = (1 << IMPORT_PIPELINE_TYPE_GLTF_DEFAULT),
+    IMPORT_PIPELINE_FLAG_PMX_DEFAULT = (1 << IMPORT_PIPELINE_TYPE_PMX_DEFAULT),
     IMPORT_PIPELINE_FLAG_GLTF_TRANSPARENT = (1 << IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT),
 } import_pipeline_flag_bits;
 typedef u32 import_pipeline_flags;
@@ -79,17 +93,25 @@ typedef struct import_pipeline {
 
 const static import_pipeline default_import_pipelines[IMPORT_PIPELINE_TYPE_MAX] = {
     [IMPORT_PIPELINE_TYPE_GLTF_DEFAULT] = {
-        .vert_path = "assets/shaders/blinn_mr.vert.spv.opt",
-        .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
-        .inst_size = sizeof(blinn_mr_instance),
+        .vert_path = "assets/shaders/pbr_mr.vert.spv.opt",
+        .frag_path = "assets/shaders/pbr_mr.frag.spv.opt",
+        .inst_size = sizeof(pbr_mr_instance),
         .type = IMPORT_PIPELINE_TYPE_GLTF_DEFAULT,
         .instances = NULL,
         .transparent = false,
     },
+    [IMPORT_PIPELINE_TYPE_PMX_DEFAULT] = {
+        .vert_path = "assets/shaders/cel.vert.spv.opt",
+        .frag_path = "assets/shaders/cel.frag.spv.opt",
+        .inst_size = sizeof(cel_instance),
+        .type = IMPORT_PIPELINE_TYPE_PMX_DEFAULT,
+        .instances = NULL,
+        .transparent = false,
+    },
     [IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT] = {
-        .vert_path = "assets/shaders/blinn_mr.vert.spv.opt",
-        .frag_path = "assets/shaders/blinn_mr.frag.spv.opt",
-        .inst_size = sizeof(blinn_mr_instance),
+        .vert_path = "assets/shaders/pbr_mr.vert.spv.opt",
+        .frag_path = "assets/shaders/pbr_mr.frag.spv.opt",
+        .inst_size = sizeof(pbr_mr_instance),
         .type = IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT,
         .instances = NULL,
         .transparent = true,
@@ -129,7 +151,7 @@ typedef struct import_payload {
     import_node* nodes;                 // Dynarray
 } import_payload;
 
-// Serializing Beginning
+// TODO: Serializing Beginning
 typedef enum index_type {
     INDEX_TYPE_U32 = 0,
     INDEX_TYPE_U16,

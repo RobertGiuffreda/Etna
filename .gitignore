@@ -12,6 +12,8 @@ assets/gltf/structure.glb
 
 deprecated/
 
+assets/shaders/TODO.txt
+
 glb_json.json
 etna_log.txt
 etna_err.txt

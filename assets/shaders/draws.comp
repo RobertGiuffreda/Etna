@@ -26,5 +26,12 @@ void main() {
 	command.transform_id = obj.transform_id;
 
 	uint draw_id = atomicAdd(counts[obj.pso_id], 1);
-	draw_buffers[obj.pso_id].draws[draw_id] = command;
+
+	/** NOTE: 
+	 * Using a 64 bit integer and casting it to a pointer to a draw_buffer
+	 * instead of just having an array of pointers is because Spirv-Reflect
+	 * throws a null pointer exception with an array of buffer_references.
+	 */
+	draw_buffer pso_draws = draw_buffer(draw_buffers[obj.pso_id]);
+	pso_draws.draws[draw_id] = command;
 }

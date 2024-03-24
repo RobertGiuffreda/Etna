@@ -15,7 +15,7 @@ b8 image_manager_initialize(image_manager** manager, renderer_state* state) {
     new_manager->state = state;
 
     for (u32 i = 0; i < MAX_IMAGE_COUNT; ++i) {
-        new_manager->images[i] = state->error_image;
+        new_manager->images[i] = state->default_error;
         new_manager->images[i].id = INVALID_ID;
     }
 
