@@ -12,6 +12,7 @@ layout(set = 0, binding = 0) uniform frame_data_block {
 	vec4 ambient_color;
 	vec4 light_color;
     vec4 light_position;
+	vec4 sun_color;
 	vec4 sun_direction;
 	uint max_draw_count;
 } frame_data;

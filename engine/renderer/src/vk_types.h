@@ -78,6 +78,7 @@ typedef struct scene_data {
     v4s ambient_color;
     v4s light_color;
     v4s light_position;
+    v4s sun_color;
     v4s sun_direction;
     u32 max_draw_count;
 } scene_data;

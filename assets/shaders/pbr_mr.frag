@@ -63,22 +63,24 @@ vec3 get_normal_from_map() {
     return normalize(TBN * tangent_normal);
 }
 
-float distribution_GGX(vec3 N, vec3 H, float roughness) {
-    float a = roughness * roughness;
-    float a2 = a * a;
+float distribution_ggx(vec3 N, vec3 H, float roughness) {
+    float a = roughness*roughness;
+    float a2 = a*a;
     float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH * NdotH;
+    float NdotH2 = NdotH*NdotH;
 
-    float nom = a2;
-    float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
+    float nom   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
     denom = PI * denom * denom;
+
     return nom / denom;
 }
 
 float geometry_schlick_ggx(float NdotV, float roughness) {
-    float r = (roughness + 1.0f);
-    float k = (r * r) * 0.125;
-    float nom = NdotV;
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float nom   = NdotV;
     float denom = NdotV * (1.0 - k) + k;
 
     return nom / denom;
@@ -94,7 +96,7 @@ float geometry_smith(vec3 N, vec3 V, vec3 L, float roughness) {
 }
 
 vec3 fresnel_schlick(float cos_theta, vec3 F0) {
-    return F0 + (1.0f - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
 }
 
 void main() {
@@ -107,14 +109,11 @@ void main() {
     vec4 mr_sample = texture(textures[nonuniformEXT(in_mr_id)], in_uv);
     float metallic = mat_insts[nonuniformEXT(in_mat_id)].metalness * mr_sample.b;
     float roughness = mat_insts[nonuniformEXT(in_mat_id)].roughness * mr_sample.g;
-    // float metallic = 0;
-    // float roughness = 0;
     // NOTE: END
     // TODO: END
 
     // TODO: Something is wrong with the default normal map & its sampler, weird artifacts
     vec3 N = get_normal_from_map();
-    // vec3 N = normalize(in_normal);
     // TODO: END
 
     vec3 V = normalize(frame_data.view_pos.xyz - in_position);
@@ -128,8 +127,8 @@ void main() {
     // NOTE: Sun/Skylight contribution, no attenuation
     vec3 Ls = normalize(-frame_data.sun_direction.xyz);
     vec3 Hs = normalize(V + Ls);
-    vec3 s_radiance = frame_data.light_color.rgb;
-    float NDFs = distribution_GGX(N, Hs, roughness);
+    vec3 s_radiance = frame_data.sun_color.rgb;
+    float NDFs = distribution_ggx(N, Hs, roughness);
     float Gs = geometry_smith(N, V, Ls, roughness);
     vec3 Fs = fresnel_schlick(max(dot(Hs, V), 0.0), F0);
 
@@ -142,7 +141,7 @@ void main() {
     kDs *= 1.0 - metallic;
 
     float NdotLs = max(dot(N, Ls), 0.0);
-    vec3 Los = (kDs * albedo / PI + s_specular) * s_radiance * NdotLs;
+    vec3 Los = (kDs * albedo * INV_PI + s_specular) * s_radiance * NdotLs;
     // NOTE: END
 
     // NOTE: Point light, singular for now
@@ -154,7 +153,7 @@ void main() {
     vec3 radiance = frame_data.light_color.rgb * frame_data.light_color.w * attenuation;
 
     // Cook-Torrance BRDF
-    float NDF = distribution_GGX(N, H, roughness);
+    float NDF = distribution_ggx(N, H, roughness);
     float G = geometry_smith(N, V, L, roughness);
     vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
 
@@ -162,24 +161,17 @@ void main() {
     float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
     vec3 specular = numerator / denominator;
 
-    // kS is equal to Fresnel
     vec3 kS = F;
-    // for energy conservation, the diffuse and specular light can't
-    // be above 1.0 (unless the surface emits light); to preserve this
-    // relationship the diffuse component (kD) should equal 1.0 - kS.
     vec3 kD = vec3(1.0) - kS;
-    // multiply kD by the inverse metalness such that only non-metals 
-    // have diffuse lighting, or a linear blend if partly metal (pure metals
-    // have no diffuse light).
     kD *= 1.0 - metallic;
 
     // scale light by NdotL
     float NdotL = max(dot(N, L), 0.0);
 
-    vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
+    vec3 Lo = (kD * albedo * INV_PI + specular) * radiance * NdotL;
     // NOTE: END
 
-    vec3 ambient = vec3(0.008) * albedo;
+    vec3 ambient = vec3(0.03) * albedo;
     vec3 color = Lo + Los + ambient;
 
     // HDR tonemapping
@@ -188,7 +180,4 @@ void main() {
     color = pow(color, gamma_pow);
 
     out_frag_color = vec4(color, 1.0f);
-    // out_frag_color = vec4(N, 1.0f);
-    // out_frag_color = vec4(texture(textures[nonuniformEXT(in_normal_id)], in_uv).xyz * 2.0 - 1.0, 1.0f);
-    // out_frag_color = mr_sample;
 }
