@@ -52,12 +52,15 @@ b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
     scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
 
     // NOTE: This will be passed a config when serialization is implemented
-    v4s a_color = { .raw = {.1f, .1f, .1f, 3.f}};
-    v4s l_color = { .raw = {1.f, 1.f, 1.f, 50.f}};
-    
+    v4s a_color = { .raw = {.1f, .1f, .1f, 1.f}};
     scene->data.ambient_color = a_color;
+
+    v4s l_color = { .raw = {1.f, 1.f, 1.f, 25.f}};
     scene->data.light_color = l_color;
 
+    v4s s_direction = { .raw = {0.0f, -1.0f, 0.0f, 0.0f}};
+    scene->data.sun_direction = s_direction;
+    
     // Create singular vertex buffer, index buffer
     vertex* vertices = dynarray_create(0, sizeof(vertex));
     u32* indices = dynarray_create(0, sizeof(u32));

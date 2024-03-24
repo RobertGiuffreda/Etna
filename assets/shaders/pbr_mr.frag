@@ -124,9 +124,28 @@ void main() {
     vec3 F0 = vec3(0.4);
     F0 = mix(F0, albedo, metallic);
 
-    // TODO: Multiple lights
     // reflectance equation
+    // NOTE: Sun/Skylight contribution, no attenuation
+    vec3 Ls = normalize(-frame_data.sun_direction.xyz);
+    vec3 Hs = normalize(V + Ls);
+    vec3 s_radiance = frame_data.light_color.rgb;
+    float NDFs = distribution_GGX(N, Hs, roughness);
+    float Gs = geometry_smith(N, V, Ls, roughness);
+    vec3 Fs = fresnel_schlick(max(dot(Hs, V), 0.0), F0);
 
+    vec3 s_numerator = NDFs * Gs * Fs;
+    float s_denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, Ls), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
+    vec3 s_specular = s_numerator / s_denominator;
+
+    vec3 kSs = Fs;
+    vec3 kDs = vec3(1.0) - kSs;
+    kDs *= 1.0 - metallic;
+
+    float NdotLs = max(dot(N, Ls), 0.0);
+    vec3 Los = (kDs * albedo / PI + s_specular) * s_radiance * NdotLs;
+    // NOTE: END
+
+    // NOTE: Point light, singular for now
     // calculate per-light radiance
     vec3 L = normalize(frame_data.light_position.xyz - in_position);
     vec3 H = normalize(V + L);
@@ -136,7 +155,7 @@ void main() {
 
     // Cook-Torrance BRDF
     float NDF = distribution_GGX(N, H, roughness);
-    float G = geometry_smith(N, V, L, roughness);      
+    float G = geometry_smith(N, V, L, roughness);
     vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
 
     vec3 numerator = NDF * G * F;
@@ -158,10 +177,10 @@ void main() {
     float NdotL = max(dot(N, L), 0.0);
 
     vec3 Lo = (kD * albedo / PI + specular) * radiance * NdotL;
-    // TODO: END
+    // NOTE: END
 
-    vec3 ambient = vec3(0.03) * albedo;
-    vec3 color = Lo + ambient;
+    vec3 ambient = vec3(0.008) * albedo;
+    vec3 color = Lo + Los + ambient;
 
     // HDR tonemapping
     color = color / (color + vec3(1.0));
