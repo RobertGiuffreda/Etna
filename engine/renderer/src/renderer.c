@@ -155,11 +155,14 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
         .pNext = NULL,
         .flags = 0,
         .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT,
-        .messageType= VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                      VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT,
         .pfnUserCallback = vk_debug_callback,
-        .pUserData = NULL};
+        .pUserData = NULL,
+    };
     VK_CHECK(pfnCreateDebugUtilsMessengerEXT(state->instance, &callback1, NULL, &state->debug_messenger));
     ETDEBUG("Vulkan debug messenger created.");
 #endif
@@ -182,11 +185,11 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
     initialize_swapchain(state, &state->swapchain);
 
     // TEMP: HACK: TODO: Make render image resolution configurable from engine & not the window_extent
-    VkExtent3D render_resolution = {
-        .width = state->swapchain.image_extent.width,
-        .height = state->swapchain.image_extent.height,
-        .depth = 1};
-    state->render_extent = render_resolution;
+    state->render_extent = (VkExtent3D) {
+        .width = state->swapchain.image_extent.width * 2,   // TEMP: SSAA
+        .height = state->swapchain.image_extent.height * 2, // TEMP: SSAA
+        .depth = 1,
+    };
     // TEMP: HACK: TODO: END
 
     // Rendering attachment images initialization

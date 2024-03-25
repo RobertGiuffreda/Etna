@@ -58,7 +58,7 @@ b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
     v4s l_color = { .raw = {1.f, 1.f, 1.f, 1.f}};
     scene->data.light_color = l_color;
 
-    v4s s_color = { .raw = {1.f, 1.f, 1.f, 1.f}};
+    v4s s_color = { .raw = {1.f, 1.f, 1.f, 2.f}};
     scene->data.sun_color = s_color;
 
     v4s s_direction = { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
@@ -76,6 +76,9 @@ b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
             .start_index = dynarray_length(indices),
             .index_count = dynarray_length(payload->geometries[i].indices),
             .vertex_offset = dynarray_length(vertices),
+            .radius = payload->geometries[i].radius,
+            .origin = payload->geometries[i].origin,
+            .extent = payload->geometries[i].extent,
         };
 
         dynarray_append_vertex(&vertices, payload->geometries[i].vertices);
@@ -167,7 +170,7 @@ void scene_shutdown(scene* scene) {
 }
 
 // TEMP: For testing and debugging
-static f32 light_offset = 2.0f;
+static f32 light_offset = 0.0f;
 static b8 light_dynamic = true;
 // TEMP: END
 

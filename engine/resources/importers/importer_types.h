@@ -34,6 +34,9 @@ typedef u32 sampler_property_flags;
 typedef struct import_geometry {
     vertex* vertices;       // dynarray, TODO: Regular allocation
     u32* indices;           // dynarray, TODO: Regular allocation
+    f32 radius;             // Bounding sphere radius
+    v4s origin;             // Bounding box origin
+    v4s extent;             // Bounding box extent
 } import_geometry;
 
 typedef struct import_image {

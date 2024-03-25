@@ -136,9 +136,11 @@ b8 import_gltf(import_payload* payload, const char* path) {
         if (mr.base_color_texture.texture) {
             instance.color_tex_index = tex_start + cgltf_texture_index(data, mr.base_color_texture.texture);
         }
+
         if (mr.metallic_roughness_texture.texture) {
             instance.mr_tex_index = tex_start + cgltf_texture_index(data, mr.metallic_roughness_texture.texture);
         }
+        
         if (mat.normal_texture.texture) {
             instance.normal_index = tex_start + cgltf_texture_index(data, mat.normal_texture.texture);
         }
@@ -152,8 +154,8 @@ b8 import_gltf(import_payload* payload, const char* path) {
                 break;
             default:
                 ETWARN("Unknown alpha mode for material %lu in gltf file %s. Setting opaque.", i, path);
-            case cgltf_alpha_mode_opaque:
-            case cgltf_alpha_mode_mask: {
+            case cgltf_alpha_mode_mask:
+            case cgltf_alpha_mode_opaque: {
                 id.pipe_id = opaque_index;
                 id.inst_id = dynarray_length(payload->pipelines[opaque_index].instances);
                 dynarray_push((void**)&payload->pipelines[opaque_index].instances, &instance);
@@ -245,6 +247,19 @@ b8 import_gltf(import_payload* payload, const char* path) {
                 }
             }
             dynarray_destroy(accessor_data);
+
+            // TEMP: Better frustum culling algo
+            v4s min = glms_vec4(geo->vertices[0].position, 0.0f);
+            v4s max = glms_vec4(geo->vertices[0].position, 0.0f);
+            for (u32 k = 0; k < vertex_count; ++k) {
+                min = glms_vec4_minv(min, glms_vec4(geo->vertices[k].position, 0.0f));
+                max = glms_vec4_maxv(max, glms_vec4(geo->vertices[k].position, 0.0f));
+            }
+
+            geo->origin = glms_vec4_scale(glms_vec4_add(max, min), 0.5f);
+            geo->extent = glms_vec4_scale(glms_vec4_sub(max, min), 0.5f);
+            geo->radius = glms_vec3_norm(glms_vec3(geo->extent));
+            // TEMP: END
 
             mesh->geometry_indices[j] = geo_start + j;
             // TODO: When pipelines are placed before this function, we can store the pipeline_id, instance_id combo here

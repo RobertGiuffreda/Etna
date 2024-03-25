@@ -8,6 +8,41 @@ layout(local_size_x = SUBGROUP_SIZE) in;
 layout(local_size_y = 1) in;
 layout(local_size_z = 1) in;
 
+const vec3 corners[8] = {
+	vec3( 1,  1,  1),
+	vec3( 1,  1, -1),
+	vec3( 1, -1,  1),
+	vec3( 1, -1, -1),
+	vec3(-1,  1,  1),
+	vec3(-1,  1, -1),
+	vec3(-1, -1,  1),
+	vec3(-1, -1, -1),
+};
+
+bool is_visible(mat4 transform, geometry geo) {
+	mat4 mat = frame_data.viewproj * transform;
+
+	vec3 g_min = vec3( 1.5,  1.5,  1.5);
+	vec3 g_max = vec3(-1.5, -1.5, -1.5);
+
+	for (uint i = 0; i < 8; ++i) {
+		vec4 v = mat * vec4(vec3(geo.origin) + (corners[i] * vec3(geo.extent)), 1.0f);
+
+        v.x = v.x / v.w;
+        v.y = v.y / v.w;
+        v.z = v.z / v.w;
+
+		g_min = min(vec3(v), g_min);
+		g_max = max(vec3(v), g_max);
+	}
+
+	if (g_min.z > 1.f || g_max.z < 0.f || g_min.x > 1.f || g_max.x < -1.f || g_min.y > 1.f || g_max.y < -1.f) {
+		return false;
+	}
+	
+	return true;
+}
+
 // Compute shader draw call command generation. 
 void main() {
 	uint gID = gl_GlobalInvocationID.x;
@@ -16,22 +51,25 @@ void main() {
 	}
 	object obj = objects[gID];
     geometry geo = geometries[obj.geo_id];
-	draw_command command;
-	command.index_count = geo.index_count;
-	command.instance_count = 1;
-	command.first_index = geo.start_index;
-	command.vertex_offset = geo.vertex_offset;
-	command.first_instance = 0;
-	command.material_id = obj.mat_id;
-	command.transform_id = obj.transform_id;
 
-	uint draw_id = atomicAdd(counts[obj.pso_id], 1);
+	// NOTE: Currently experiencing pop in, I have done something wrong
+	// if (is_visible(transforms[obj.transform_id], geo)) {
+		draw_command command;
+		command.index_count = geo.index_count;
+		command.instance_count = 1;
+		command.first_index = geo.start_index;
+		command.vertex_offset = geo.vertex_offset;
+		command.first_instance = 0;
+		command.material_id = obj.mat_id;
+		command.transform_id = obj.transform_id;
+		uint draw_id = atomicAdd(counts[obj.pso_id], 1);
 
-	/** NOTE: 
-	 * Using a 64 bit integer and casting it to a pointer to a draw_buffer
-	 * instead of just having an array of pointers is because Spirv-Reflect
-	 * throws a null pointer exception with an array of buffer_references.
-	 */
-	draw_buffer pso_draws = draw_buffer(draw_buffers[obj.pso_id]);
-	pso_draws.draws[draw_id] = command;
+		/** NOTE: 
+		* Using a 64 bit integer and casting it to a pointer to a draw_buffer
+		* instead of just having an array of pointers is because Spirv-Reflect
+		* throws a null pointer exception with an array of buffer_references.
+		*/
+		draw_buffer pso_draws = draw_buffer(draw_buffers[obj.pso_id]);
+		pso_draws.draws[draw_id] = command;
+	// }
 }

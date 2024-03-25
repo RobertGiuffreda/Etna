@@ -35,7 +35,8 @@ layout (location = 7) flat in uint in_normal_id;
 
 layout(location = 0) out vec4 out_frag_color;
 
-const vec3 gamma_pow = vec3(1.0f / 2.2f);
+const vec3 GAMMA = vec3(2.2);
+const vec3 INV_GAMMA = vec3(1.0f / 2.2f);
 const float PI = 3.14159265359;
 const float INV_PI = 1 / PI;
 
@@ -101,33 +102,30 @@ vec3 fresnel_schlick(float cos_theta, vec3 F0) {
 
 void main() {
     // NOTE: Assume the texture is in non linear color space
-    vec3 albedo = pow(texture(textures[nonuniformEXT(in_color_id)], in_uv).rgb, vec3(2.2));
-    albedo *= in_color; // in_colors has the color factors and the vertex colors
+    vec4 albedo_sample = texture(textures[nonuniformEXT(in_color_id)], in_uv);
+    vec3 albedo = pow(albedo_sample.rgb, vec3(GAMMA)) * in_color; // in_colors has the color factors and the vertex colors
+    // vec3 albedo = pow(vec3(1.f), vec3(GAMMA)) * in_color;
 
-    // TODO: There is a weird soft whiteness that I am unsure if it is supposed to be present on sponza
-    // NOTE: I think it is because of lack of IBL, so ambient specular is just a white color, leaving a sheen over the surface
+    // TODO: There is a weird soft whiteness all over that I dont think is supposed to be present on sponza
     vec4 mr_sample = texture(textures[nonuniformEXT(in_mr_id)], in_uv);
-    float metallic = mat_insts[nonuniformEXT(in_mat_id)].metalness * mr_sample.b;
-    float roughness = mat_insts[nonuniformEXT(in_mat_id)].roughness * mr_sample.g;
-    // NOTE: END
+    float metallic = clamp(mat_insts[nonuniformEXT(in_mat_id)].metalness * mr_sample.b, 0.0f, 1.0f);
+    float roughness = clamp(mat_insts[nonuniformEXT(in_mat_id)].roughness * mr_sample.g, 0.0f, 1.0f);
     // TODO: END
 
-    // TODO: Something is wrong with the default normal map & its sampler, weird artifacts
     vec3 N = get_normal_from_map();
-    // TODO: END
 
     vec3 V = normalize(frame_data.view_pos.xyz - in_position);
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
-    vec3 F0 = vec3(0.4);
+    vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
 
     // reflectance equation
     // NOTE: Sun/Skylight contribution, no attenuation
     vec3 Ls = normalize(-frame_data.sun_direction.xyz);
     vec3 Hs = normalize(V + Ls);
-    vec3 s_radiance = frame_data.sun_color.rgb;
+    vec3 s_radiance = frame_data.sun_color.rgb * frame_data.sun_color.a;
     float NDFs = distribution_ggx(N, Hs, roughness);
     float Gs = geometry_smith(N, V, Ls, roughness);
     vec3 Fs = fresnel_schlick(max(dot(Hs, V), 0.0), F0);
@@ -150,7 +148,7 @@ void main() {
     vec3 H = normalize(V + L);
     float dist = length(frame_data.light_position.xyz - in_position);
     float attenuation = 1.0 / (dist * dist);
-    vec3 radiance = frame_data.light_color.rgb * frame_data.light_color.w * attenuation;
+    vec3 radiance = frame_data.light_color.rgb * frame_data.light_color.a * attenuation;
 
     // Cook-Torrance BRDF
     float NDF = distribution_ggx(N, H, roughness);
@@ -171,13 +169,18 @@ void main() {
     vec3 Lo = (kD * albedo * INV_PI + specular) * radiance * NdotL;
     // NOTE: END
 
-    vec3 ambient = vec3(0.03) * albedo;
+    vec3 ambient = vec3(0.03) * albedo * frame_data.ambient_color.a;
     vec3 color = Lo + Los + ambient;
 
     // HDR tonemapping
     color = color / (color + vec3(1.0));
     // gamma correction
-    color = pow(color, gamma_pow);
+    color = pow(color, INV_GAMMA);
 
     out_frag_color = vec4(color, 1.0f);
+    // out_frag_color = mr_sample;
+    // out_frag_color = vec4(N, 1.0);
+    // out_frag_color = vec4(vec3(kDs), 1.0);
+    // out_frag_color = vec4(Fs, 1.0);
+    // out_frag_color = vec4(albedo, 1.0);
 }

@@ -83,6 +83,7 @@ typedef struct scene_data {
     u32 max_draw_count;
 } scene_data;
 
+
 typedef struct draw_command {
     VkDrawIndexedIndirectCommand draw;
     u32 material_inst_id;

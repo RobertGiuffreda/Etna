@@ -31,8 +31,8 @@ b8 initialize_swapchain(renderer_state* state, swapchain* swapchain) {
     for (u32 i = 0; i < format_count; ++i) {
         // Preferred format
         if (formats[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
-            formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-        {    
+            formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+        ) {    
             image_format = formats[i].format;
             color_space = formats[i].colorSpace;
             found = true;

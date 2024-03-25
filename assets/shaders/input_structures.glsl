@@ -56,6 +56,9 @@ struct geometry {
 	uint start_index;
 	uint index_count;
 	int vertex_offset;
+	float radius;
+	vec4 origin;
+	vec4 extent;
 };
 // TODO: END
 layout(set = 0, binding = 4, std430) readonly buffer geometry_buffer {

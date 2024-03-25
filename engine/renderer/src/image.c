@@ -190,7 +190,8 @@ void blit_image2D_to_image2D(
     blit_info.srcImage = src;
     blit_info.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     blit_info.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    blit_info.filter = VK_FILTER_NEAREST;
+    blit_info.filter = VK_FILTER_LINEAR;
+    // blit_info.filter = VK_FILTER_NEAREST;
     blit_info.regionCount = 1;
     blit_info.pRegions = &blit;
 

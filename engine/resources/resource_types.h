@@ -1,5 +1,6 @@
 #pragma once
 #include "defines.h"
+#include "math/math_types.h"
 
 #define INVALID_ID 0xFFFFFFFF
 
@@ -39,7 +40,10 @@ typedef struct mesh {
 typedef struct geometry {
     u32 start_index;
     u32 index_count;
-    i32 vertex_offset;  // TODO: Use this variable
+    i32 vertex_offset;
+    f32 radius;
+    v4s origin;
+    v4s extent;
 } geometry;
 // TODO: END
 
