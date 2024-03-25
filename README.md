@@ -9,17 +9,14 @@ A small `vulkan` renderer written using the `C` programming language. This is wr
 * Image loading using [stb_image](https://github.com/nothings/stb/blob/master/stb_image.h).
 * Vector & Matrix math done using the [cglm](https://github.com/recp/cglm) math libary.
 * Bare bones file reading using stdio.h
-* An event system that is currently blocking
-* Logger outputting log information to log file
-* Basic Scene rendering using forward rendering and blinn-phong lighting with one scene light.
+* Logging to text file
+* Scene rendering using simple Physically Based Rendering, Cook-Torrence BRDF.
 * Depth buffering done using reverse-Z.
-* Mesh vertices passed using buffer device address.
 * Shader compilation to SPV bytecode at project **compile time** using [glslang](https://github.com/KhronosGroup/glslang).
 * `Vulkan 1.3`'s dynamic rendering feature.
-* vkCmdDrawIndirectCount used alongside descriptor indexing to render the scene with only as many draw calls as pipeline shader objects (In the bindless branch).
+* vkCmdDrawIndirectCount used alongside descriptor indexing to render the scene with only as many draw calls as pipeline shader objects.
 * Multiple frames in flight.
 ## Planned
-* Custom material shader support
 * Custom file formats for scenes, materials, and meshes
 * Serialization support to read in these formats as well as write them out
 * Non Blocking event system
