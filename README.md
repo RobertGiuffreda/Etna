@@ -16,8 +16,8 @@ A small `vulkan` renderer written using the `C` programming language. This is wr
 * Mesh vertices passed using buffer device address.
 * Shader compilation to SPV bytecode at project **compile time** using [glslang](https://github.com/KhronosGroup/glslang).
 * `Vulkan 1.3`'s dynamic rendering feature.
-* vkCmdDrawIndirectCount used alongside descriptor indexing to render the scene with only as many draw calls as pipeline shader objects
-* Multiple frames in flight
+* vkCmdDrawIndirectCount used alongside descriptor indexing to render the scene with only as many draw calls as pipeline shader objects (In the bindless branch).
+* Multiple frames in flight.
 ## Planned
 * Custom material shader support
 * Custom file formats for scenes, materials, and meshes
