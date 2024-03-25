@@ -7,14 +7,11 @@
 #include "application.h"
 
 b8 define_configuration(engine_config* engine_details, application_config* app_details) {
-    // engine_details->x_start_pos = 1150;
-    // engine_details->y_start_pos = 100;
-
     engine_details->x_start_pos = 0;
     engine_details->y_start_pos = 0;
 
-    engine_details->width = 1080;
-    engine_details->height = 720;
+    engine_details->width = 1920;
+    engine_details->height = 1080;
 
     app_details->initialize = application_initialize;
     app_details->shutdown = application_shutdown;

@@ -103,8 +103,7 @@ vec3 fresnel_schlick(float cos_theta, vec3 F0) {
 void main() {
     // NOTE: Assume the texture is in non linear color space
     vec4 albedo_sample = texture(textures[nonuniformEXT(in_color_id)], in_uv);
-    vec3 albedo = pow(albedo_sample.rgb, vec3(GAMMA)) * in_color; // in_colors has the color factors and the vertex colors
-    // vec3 albedo = pow(vec3(1.f), vec3(GAMMA)) * in_color;
+    vec3 albedo = pow(albedo_sample.rgb, GAMMA) * in_color; // in_colors has the color factors and the vertex colors
 
     // TODO: There is a weird soft whiteness all over that I dont think is supposed to be present on sponza
     vec4 mr_sample = texture(textures[nonuniformEXT(in_mr_id)], in_uv);
@@ -113,7 +112,6 @@ void main() {
     // TODO: END
 
     vec3 N = get_normal_from_map();
-
     vec3 V = normalize(frame_data.view_pos.xyz - in_position);
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 

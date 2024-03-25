@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/sandbox.exe",
             "args": [
-                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
+                "../../loading/fabs/misc/liyuan.glb",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/",
@@ -20,7 +20,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/release/sandbox.exe",
             "args": [
-                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
+                "../../loading/fabs/misc/liyuan.glb",
+                // "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/",
@@ -33,7 +34,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/RelWithDebInfo/sandbox.exe",
             "args": [
-                "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
+                "../../loading/fabs/misc/liyuan.glb",
+                // "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/",
