@@ -35,7 +35,6 @@
 static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 // TEMP: END
 
-// TODO: Recreate scene renderer init to create the GPU 
 static b8 scene_renderer_init(scene* scene, renderer_state* state);
 static void scene_renderer_shutdown(scene* scene);
 
@@ -52,17 +51,10 @@ b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
     scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
 
     // NOTE: This will be passed a config when serialization is implemented
-    v4s a_color = { .raw = {.1f, .1f, .1f, 1.f}};
-    scene->data.ambient_color = a_color;
-
-    v4s l_color = { .raw = {1.f, 1.f, 1.f, 1.f}};
-    scene->data.light_color = l_color;
-
-    v4s s_color = { .raw = {1.f, 1.f, 1.f, 2.f}};
-    scene->data.sun_color = s_color;
-
-    v4s s_direction = { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
-    scene->data.sun_direction = s_direction;
+    scene->data.ambient_color = (v4s) { .raw = {1.f, 1.f, 1.f, .1f}};
+    scene->data.light_color   = (v4s) { .raw = {1.f, 1.f, 1.f, 5.f}};
+    scene->data.sun_color     = (v4s) { .raw = {1.f, 1.f, 1.f, 4.f}};
+    scene->data.sun_direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
     
     // Create singular vertex buffer, index buffer
     vertex* vertices = dynarray_create(0, sizeof(vertex));
@@ -85,7 +77,7 @@ b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
         dynarray_append_u32(&indices, payload->geometries[i].indices);
     }
 
-    // Remove default pipelines without any instances
+    // Remove default pipelines without empty instance arrays
     mat_pipe_config* mat_pipe_configs = dynarray_create(0, sizeof(mat_pipe_config));
     u32 pipeline_count = dynarray_length(payload->pipelines);
     u32* pipe_index_to_id = etallocate(sizeof(u32) * pipeline_count, MEMORY_TAG_SCENE);
@@ -179,8 +171,6 @@ void scene_update(scene* scene, f64 dt) {
 
     camera_update(&scene->cam, dt);
 
-    scene->data.max_draw_count = MAX_DRAW_COMMANDS;
-
     // TODO: Camera should store near and far values & calculate perspective matrix
     // TODO: Scene should register for event system and update camera stuff itself 
     m4s view = camera_get_view_matrix(&scene->cam);
@@ -189,8 +179,7 @@ void scene_update(scene* scene, f64 dt) {
         ((f32)state->swapchain.image_extent.width/(f32)state->swapchain.image_extent.height), 
         /* near-z: */ 10000.f,
         /* far-z: */ 0.1f);
-    // NOTE: invert the Y direction on projection matrix so that we are more similar
-    // to opengl and gltf axis
+    // NOTE: invert the Y direction on projection matrix so that we are more match gltf axis
     project.raw[1][1] *= -1;
     // NOTE: END
     // TODO: END
@@ -211,7 +200,9 @@ void scene_update(scene* scene, f64 dt) {
 }
 
 b8 scene_renderer_init(scene* scene, renderer_state* state) {
-    // NOTE: Renderer intialization
+    // TEMP:? Something better??
+    scene->data.max_draw_count = MAX_DRAW_COMMANDS;
+
     scene->render_fences = etallocate(
         sizeof(VkFence) * state->swapchain.image_count,
         MEMORY_TAG_SCENE);
