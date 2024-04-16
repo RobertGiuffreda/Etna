@@ -69,14 +69,13 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
     // NOTE: Spirv-reflect is currently trying to dereference a null pointer while parsing the current shader code
     // The VkDescriptorSetLayout's are hardcoded at the moment and the code runs so I think that it is a problem on 
     // the library's end.
-    // NOTE: The issue is with a runtime array (physical storage buffer) of buffer_references (pointers) 
+    // HACK: The issue is with a runtime array (physical storage buffer) of buffer_references (pointers) 
     // to a runtime array. I am skirting around the issue at the moment by using an array of 64 bit integers 
     // and casting them to a buffer_reference(pointer) in the shader. 
     
     // Shader byte code loaded from file
     SpvReflectShaderModule spv_reflect_module = {0};
     SPIRV_REFLECT_CHECK(spvReflectCreateShaderModule2(SPV_REFLECT_MODULE_FLAG_NONE, code_size, shader_code, &spv_reflect_module));
-
 
     shader->entry_point = str_duplicate_allocate(spv_reflect_module.entry_point_name);
     shader->stage = spv_reflect_shader_stage_to_vulkan_shader_stage(spv_reflect_module.shader_stage);
@@ -153,8 +152,9 @@ void unload_shader(renderer_state* state, shader* shader) {
         for (u32 j = 0; j < set->binding_count; ++j) {
             binding_layout* binding = &set->bindings[j];
             str_duplicate_free(binding->name);
-            if (!is_descriptor_type_image(binding->descriptor_type))
+            if (!is_descriptor_type_image(binding->descriptor_type)) {
                 free_block_variables(&binding->block);
+            }
         }
         etfree(set->bindings, sizeof(binding_layout) * set->binding_count, MEMORY_TAG_SHADER);
     }

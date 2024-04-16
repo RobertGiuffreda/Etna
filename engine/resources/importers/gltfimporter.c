@@ -248,18 +248,21 @@ b8 import_gltf(import_payload* payload, const char* path) {
             }
             dynarray_destroy(accessor_data);
 
-            // TEMP: Better frustum culling algo
-            v4s min = glms_vec4(geo->vertices[0].position, 0.0f);
-            v4s max = glms_vec4(geo->vertices[0].position, 0.0f);
+            // TODO: Frustum culling is causing pop-in
+            v4s min_pos = glms_vec4(geo->vertices[0].position, 0.0f);
+            v4s max_pos = glms_vec4(geo->vertices[0].position, 0.0f);
             for (u32 k = 0; k < vertex_count; ++k) {
-                min = glms_vec4_minv(min, glms_vec4(geo->vertices[k].position, 0.0f));
-                max = glms_vec4_maxv(max, glms_vec4(geo->vertices[k].position, 0.0f));
+                min_pos = glms_vec4_minv(min_pos, glms_vec4(geo->vertices[k].position, 0.0f));
+                max_pos = glms_vec4_maxv(max_pos, glms_vec4(geo->vertices[k].position, 0.0f));
             }
 
-            geo->origin = glms_vec4_scale(glms_vec4_add(max, min), 0.5f);
-            geo->extent = glms_vec4_scale(glms_vec4_sub(max, min), 0.5f);
+            geo->origin = glms_vec4_scale(glms_vec4_add(max_pos, min_pos), 0.5f);
+            geo->extent = glms_vec4_scale(glms_vec4_sub(max_pos, min_pos), 0.5f);
             geo->radius = glms_vec3_norm(glms_vec3(geo->extent));
-            // TEMP: END
+            // TODO: END
+
+            ETDEBUG("max_pos: x, y, z | %lf %lf %lf", max_pos.x, max_pos.y, max_pos.z);
+            ETDEBUG("min_pos: x, y, z | %lf %lf %lf", min_pos.x, min_pos.y, min_pos.z);
 
             mesh->geometry_indices[j] = geo_start + j;
             // TODO: When pipelines are placed before this function, we can store the pipeline_id, instance_id combo here

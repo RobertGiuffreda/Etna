@@ -105,11 +105,9 @@ void main() {
     vec4 albedo_sample = texture(textures[nonuniformEXT(in_color_id)], in_uv);
     vec3 albedo = pow(albedo_sample.rgb, GAMMA) * in_color; // in_colors has the color factors and the vertex colors
 
-    // TODO: There is a weird soft whiteness all over that I dont think is supposed to be present on sponza
     vec4 mr_sample = texture(textures[nonuniformEXT(in_mr_id)], in_uv);
     float metallic = clamp(mat_insts[nonuniformEXT(in_mat_id)].metalness * mr_sample.b, 0.0f, 1.0f);
     float roughness = clamp(mat_insts[nonuniformEXT(in_mat_id)].roughness * mr_sample.g, 0.0f, 1.0f);
-    // TODO: END
 
     vec3 N = get_normal_from_map();
     vec3 V = normalize(frame_data.view_pos.xyz - in_position);

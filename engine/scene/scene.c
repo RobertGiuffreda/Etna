@@ -111,7 +111,7 @@ b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
             for (u32 j = 0; j < mesh.count; ++j) {
                 u32 material_index = mesh.material_indices[j];
                 objects[object_start + j] = (object) {
-                    .pso_id = pipe_index_to_id[payload->mat_index_to_id[material_index].pipe_id],
+                    .pipe_id = pipe_index_to_id[payload->mat_index_to_id[material_index].pipe_id],
                     .mat_id = payload->mat_index_to_id[material_index].inst_id,
                     .geo_id = mesh.geometry_indices[j],
                     .transform_id = transform_index,

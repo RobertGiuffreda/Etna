@@ -11,7 +11,7 @@
 #include "scene/scene_private.h"
 
 b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_pipe_config* config) {
-    // TODO: Replace with load material shader function
+    // TODO: Create function to load shaders specifically for material shaders & such 
     shader mat_vert;
     if (!load_shader(state, config->vert_path, &mat_vert)) {
         ETERROR("Unable to load shader %s.", config->vert_path);
@@ -26,13 +26,18 @@ b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const 
     }
     // TODO: END
 
-    // TEMP: Create material pipeline builder
+    // TEMP: Create better pipeline system
     pipeline_builder builder = pipeline_builder_create();
     builder.layout = scene->mat_pipeline_layout;
     pipeline_builder_set_shaders(&builder, mat_vert, mat_frag);
     pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
-    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+
+    // TODO: Figure out culling for multiple things; on now for some models that use it for
+    // the old outline trick (extrude black, invert, cull backfaces)
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    // TODO: END
+
     pipeline_builder_set_multisampling_none(&builder);
 
     // Handle transparency on material pipeline level as a different pipeline object is 
@@ -152,9 +157,10 @@ u32 mat_instance_create(mat_pipe* material, renderer_state* state, u64 data_size
         ETERROR("Max material instances reached.");
         return INVALID_ID;
     }
+    
     u32 inst_index = material->inst_count++;
-
     u64 inst_data_offset = material->inst_size * inst_index;
+    
     etcopy_memory((u8*)material->inst_data + inst_data_offset, data, data_size);
     return inst_index;
 }

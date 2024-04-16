@@ -42,7 +42,7 @@ layout(set = 0, binding = 2, std430) readonly buffer draw_buffs {
 
 // One for each instance of geometry within a scene, with a material & transform
 struct object {
-	uint pso_id;		// PipelineShaderObject, one per shader/material
+	uint pipe_id;		// PipelineShaderObject, one per shader/material
 	uint mat_id;		// Material Instance
 	uint geo_id;		// Geometry
 	uint transform_id;	// Transform
@@ -51,7 +51,6 @@ layout(set = 0, binding = 3, std430) readonly buffer object_buffer {
 	object objects[];
 };
 
-// TODO: Add culling parameters
 struct geometry {
 	uint start_index;
 	uint index_count;
@@ -60,7 +59,6 @@ struct geometry {
 	vec4 origin;
 	vec4 extent;
 };
-// TODO: END
 layout(set = 0, binding = 4, std430) readonly buffer geometry_buffer {
 	geometry geometries[];
 };
