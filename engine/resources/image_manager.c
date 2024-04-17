@@ -35,13 +35,6 @@ void image_manager_shutdown(image_manager* manager) {
     etfree(manager, sizeof(image_manager), MEMORY_TAG_RESOURCE);
 }
 
-// TEMP: Function to increment the image count to skip over images
-// that do not load properly leaving the error_image reference 
-void image_manager_increment(image_manager* manager) {
-    manager->image_count++;
-}
-// TEMP: END
-
 image* image_manager_get(image_manager* manager, u32 id) {
     return &manager->images[id];
 }
@@ -52,28 +45,26 @@ u32 image2D_submit(image_manager* manager, image2D_config* config) {
 
     u32 id = manager->image_count++;
     image* new_image = &manager->images[id];
-    new_image->id = id;
-    if (config->name) {
-        new_image->name = str_duplicate_allocate(config->name);
-    } else {
-        new_image->name = str_duplicate_allocate("Name not found.");
-    }
-    
-    VkExtent3D image_size = {
-        .width = config->width,
-        .height = config->height,
-        .depth = 1};
-    image2D_create_data(
-        manager->state,
-        config->data,
-        image_size,
-        VK_FORMAT_R8G8B8A8_UNORM,
-        VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        new_image);
-    SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE, new_image->handle, new_image->name);
-    SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE_VIEW, new_image->view, new_image->name);
 
+    if (config->data) {
+        new_image->name = (config->name) ? str_duplicate_allocate(config->name) : str_duplicate_allocate("Unknown Name");
+        new_image->id = id;
+
+        VkExtent3D image_size = {
+            .width = config->width,
+            .height = config->height,
+            .depth = 1};
+        image2D_create_data(
+            manager->state,
+            config->data,
+            image_size,
+            VK_FORMAT_R8G8B8A8_UNORM,
+            VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            new_image);
+        SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE, new_image->handle, new_image->name);
+        SET_DEBUG_NAME(manager->state, VK_OBJECT_TYPE_IMAGE_VIEW, new_image->view, new_image->name);
+    }
     return id;
 }

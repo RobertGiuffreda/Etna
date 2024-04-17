@@ -32,8 +32,8 @@ typedef enum sampler_property_flag_bits {
 typedef u32 sampler_property_flags;
 
 typedef struct import_geometry {
-    vertex* vertices;       // dynarray, TODO: Regular allocation
-    u32* indices;           // dynarray, TODO: Regular allocation
+    vertex* vertices;
+    u32* indices;
     f32 radius;             // Bounding sphere radius
     v4s origin;             // Bounding box origin
     v4s extent;             // Bounding box extent
@@ -42,8 +42,8 @@ typedef struct import_geometry {
 typedef struct import_image {
     char* name;
     void* data;             // stb_image allocation
-    u32 height;
     u32 width;
+    u32 height;
     u32 channels;
 } import_image;
 
@@ -141,13 +141,15 @@ typedef struct import_node {
 
 // NOTE: All dynarrays
 typedef struct import_payload {
-    import_pipeline_flags present_pipelines;
-    mat_id* mat_index_to_mat_id;            // Dynarray
+    mat_id* mat_index_to_mat_id;        // Dynarray
     import_pipeline* pipelines;         // Dynarray
     
     import_image* images;               // Dynarray
     import_sampler* samplers;           // Dynarray
     import_texture* textures;           // Dynarray
+
+    u32 vertex_count;
+    u32 index_count;
     import_geometry* geometries;        // Dynarray
     import_mesh* meshes;                // Dynarray
 

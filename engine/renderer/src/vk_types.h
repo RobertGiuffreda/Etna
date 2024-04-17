@@ -80,28 +80,11 @@ typedef struct scene_data {
     u32 max_draw_count;
 } scene_data;
 
-
 typedef struct draw_command {
     VkDrawIndexedIndirectCommand draw;
     u32 material_inst_id;
     u32 transform_id;
 } draw_command;
-
-// TEMP:TODO: Design abstraction to interface with compute shaders in GPU driven manor
-typedef struct compute_push_constants {
-    v4s data1;
-    v4s data2;
-    v4s data3;
-    v4s data4;
-} compute_push_constants;
-
-typedef struct compute_effect {
-    VkPipeline pipeline;
-    VkPipelineLayout layout;
-
-    compute_push_constants data;
-} compute_effect;
-// TEMP:TODO: END
 
 typedef struct device {
     VkDevice handle;

@@ -15,10 +15,14 @@ import_payload import_files(u32 file_count, const char* const* paths) {
     import_payload payload = {
         .mat_index_to_mat_id = dynarray_create(1, sizeof(mat_id)),
         .pipelines = dynarray_create(1, sizeof(import_pipeline)),
-        .geometries = dynarray_create(1, sizeof(import_geometry)),
+        
         .images = dynarray_create(1, sizeof(import_image)),
         .textures = dynarray_create(1, sizeof(import_texture)),
         .samplers = dynarray_create(1, sizeof(import_sampler)),
+        
+        .vertex_count = 0,
+        .index_count = 0,
+        .geometries = dynarray_create(1, sizeof(import_geometry)),
         .meshes = dynarray_create(1, sizeof(import_mesh)),
         .nodes = dynarray_create(1, sizeof(import_node)),
     };

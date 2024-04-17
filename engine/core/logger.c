@@ -78,8 +78,8 @@ struct logger_state {
 
 static struct logger_state* logger;
 
-static char* log_prefix[LOG_LEVEL_MAX];
-static char* log_postfix[LOG_LEVEL_MAX];
+static char* log_prefix[LOG_LEVEL_MAX] = { "" };
+static char* log_postfix[LOG_LEVEL_MAX] = { "" };
 
 static u32 ansi_prefix_lens[LOG_LEVEL_MAX] = {
     [LOG_FATAL] = sizeof(ANSI_FATAL_PREFIX) - 1,

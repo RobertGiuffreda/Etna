@@ -188,11 +188,14 @@ b8 import_gltf(import_payload* payload, const char* path) {
             // NOTE: Converts u16 indices to u32 indices
             geo->indices = dynarray_create(prim.indices->count, sizeof(u32));
             dynarray_resize((void**)&geo->indices, prim.indices->count);
+            payload->index_count += prim.indices->count;
             cgltf_accessor_unpack_indices(prim.indices, geo->indices, sizeof(u32), prim.indices->count);
             
+            // Make sure attribute 0 always has the max number of vertices
             u32 vertex_count = prim.attributes[0].data->count;
             geo->vertices = dynarray_create(vertex_count, sizeof(vertex));
             dynarray_resize((void**)&geo->vertices, vertex_count);
+            payload->vertex_count += vertex_count;
             for (u32 i = 0; i < vertex_count; ++i) {
                 geo->vertices[i] = (vertex) {
                     .position = (v3s) {0, 0, 0},

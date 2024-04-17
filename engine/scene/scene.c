@@ -57,13 +57,14 @@ b8 scene_init(scene** scn, scene_config config) {
     
     import_payload* payload = config.import_payload;
 
-    // Create singular vertex buffer, index buffer
-    vertex* vertices = dynarray_create(0, sizeof(vertex));
-    u32* indices = dynarray_create(0, sizeof(u32));
-    
+    // Create singular vertex buffer, index buffer    
     u32 geo_count = dynarray_length(payload->geometries);
     geometry* geometries = dynarray_create(geo_count, sizeof(geometry));
     dynarray_resize((void**)&geometries, geo_count);
+
+    vertex* vertices = dynarray_create(payload->vertex_count, sizeof(vertex));
+    u32* indices = dynarray_create(payload->index_count, sizeof(u32));
+
     for (u32 i = 0; i < geo_count; ++i) {
         geometries[i] = (geometry) {
             .start_index = dynarray_length(indices),
@@ -136,7 +137,6 @@ b8 scene_init(scene** scn, scene_config config) {
     event_observer_register(EVENT_CODE_KEY_RELEASE, scene, scene_on_key_event);
     *scn = scene;
 
-
     if (!scene_renderer_init(scene, config)) {
         ETFATAL("Scene renderer failed to initialize.");
         return false;
@@ -178,9 +178,9 @@ void scene_update(scene* scene, f64 dt) {
     m4s view = camera_get_view_matrix(&scene->cam);
     m4s project = glms_perspective(
         /* fovy */ glm_rad(70.f),
-        ((f32)state->swapchain.image_extent.width/(f32)state->swapchain.image_extent.height), 
+        ((f32)state->swapchain.image_extent.width/(f32)state->swapchain.image_extent.height),
         /* near-z: */ 10000.f,
-        /* far-z: */ 0.1f);
+        /* far-z: */ 0.1f); // NOTE: Reverse Z for depth
     // NOTE: invert the Y direction on projection matrix so that we are more match gltf axis
     project.raw[1][1] *= -1;
     // NOTE: END
@@ -209,8 +209,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     // Rendering resolution
     scene->render_extent = (VkExtent3D) {
-        .width = config.resolution_width * 2,   // TEMP: Super Sample Anti Aliasing
-        .height = config.resolution_height * 2, // TEMP: Super Sample Anti Aliasing
+        .width = config.resolution_width,   // TEMP: Super Sample Anti Aliasing
+        .height = config.resolution_height, // TEMP: Super Sample Anti Aliasing
         .depth = 1,
     };
 
@@ -662,20 +662,20 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     // Images
     image_manager_initialize(&scene->image_bank, state);
     u32 image_count = dynarray_length(scene->payload.images);
+    image2D_config* image_configs = etallocate(sizeof(image2D_config) * image_count, MEMORY_TAG_SCENE);
     for (u32 i = 0; i < image_count; ++i) {
         import_image image = scene->payload.images[i];
-        if (image.data) {
-            image2D_config image_config = {
-                .name = image.name,
-                .height = image.height,
-                .width = image.width,
-                .data = image.data,
-            };
-            image2D_submit(scene->image_bank, &image_config);
-        } else {
-            image_manager_increment(scene->image_bank);
-        }
+        image_configs[i] = (image2D_config) {
+            .name = image.name,
+            .width = image.width,
+            .height = image.height,
+            .data = image.data,
+        };
     }
+    for (u32 i = 0; i < image_count; ++i) {
+        image2D_submit(scene->image_bank, &image_configs[i]);
+    }
+    etfree(image_configs, sizeof(image2D_config) * image_count, MEMORY_TAG_SCENE);
 
     // Samplers
     scene->sampler_count = dynarray_length(scene->payload.samplers);
