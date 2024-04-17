@@ -12,7 +12,7 @@
 
 #define VK_CHECK(expr) { ETASSERT((expr) == VK_SUCCESS); }
 
-// TEMP: Until descriptor set management refactor
+// TODO: Remove, this is depricated
 typedef struct descriptor_set_layout_builder {
     VkDescriptorSetLayoutCreateInfo layout_info;
     VkDescriptorSetLayoutBinding* binding_infos;  // Dynarray
@@ -38,9 +38,8 @@ typedef struct descriptor_set_allocator {
     VkDescriptorPool* full_pools;   // Dynarray
     u32 sets_per_pool;
 } ds_allocator;
-// TEMP: END
+// TODO: END
 
-// TODO: Remove id as it gives wrong impression & implement suballocation
 typedef struct image {
     u32 id;
     char* name;
@@ -57,12 +56,10 @@ typedef struct image {
 } image;
 
 typedef struct buffer {
-    char* name;
     u64 size;
     VkBuffer handle;
     VkDeviceMemory memory;
 } buffer;
-// TODO: END
 
 // TEMP: Refactor this
 typedef struct mesh_buffers {

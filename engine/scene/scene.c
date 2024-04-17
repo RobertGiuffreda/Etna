@@ -204,8 +204,10 @@ void scene_update(scene* scene, f64 dt) {
 b8 scene_renderer_init(scene* scene, scene_config config) {
     renderer_state* state = config.renderer_state;
     scene->state = state;
+
     scene->data.max_draw_count = MAX_DRAW_COMMANDS; // TODO: Better method??
 
+    // Rendering resolution
     scene->render_extent = (VkExtent3D) {
         .width = config.resolution_width * 2,   // TEMP: Super Sample Anti Aliasing
         .height = config.resolution_height * 2, // TEMP: Super Sample Anti Aliasing
@@ -539,7 +541,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .offset = 0,
         .range = VK_WHOLE_SIZE,
     };
-    VkWriteDescriptorSet uniform_write = {
+    VkWriteDescriptorSet uniform_buffer_write = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .pNext = 0,
         .descriptorCount = 1,
@@ -639,8 +641,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .dstBinding = SCENE_SET_TRANSFORMS_BINDING,
         .pBufferInfo = &transform_buffer_info,
     };
-    VkWriteDescriptorSet writes[] = {
-        uniform_write,
+    VkWriteDescriptorSet buffer_writes[] = {
+        uniform_buffer_write,
         object_buffer_write,
         draw_count_buffer_write,
         draws_buffer_write,
@@ -651,7 +653,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     vkUpdateDescriptorSets(
         state->device.handle,
         /* writeCount: */ 7,
-        writes,
+        buffer_writes,
         /* copyCount: */ 0,
         /* copies: */ 0
     );
@@ -695,7 +697,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         ));
     }
 
-    // // Texture defaults using default samplers and images from renderer_state
+    // Texture defaults using default samplers and images from renderer_state
     VkDescriptorImageInfo white_image_info = {
         .sampler = state->linear_smpl,
         .imageView = state->default_white.view,

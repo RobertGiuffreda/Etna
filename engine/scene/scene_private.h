@@ -74,6 +74,7 @@ typedef struct scene {
     mat_pipe* mat_pipes;
 
     image_manager* image_bank;
+
     u32 sampler_count;
     VkSampler* samplers;
 
