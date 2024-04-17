@@ -19,7 +19,7 @@
  */
 
 typedef struct scene {
-    char* name;
+    const char* name;
 
     // NOTE: Data that will be serialized and loaded
     camera cam;
@@ -43,7 +43,11 @@ typedef struct scene {
 
     buffer counts_buffer;        // Holds the counts for each pipeline draw indirect
     buffer draws_buffer;         // Holds pointers to each material pipelines draw buffers
-    // NOTE: END
+
+    // NOTE: Render image, depth image
+    VkExtent3D render_extent;
+    image render_image;
+    image depth_image;
     
     // NOTE: Per frame rendering primitives
     VkFence* render_fences;

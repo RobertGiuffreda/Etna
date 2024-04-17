@@ -24,13 +24,8 @@
 static void initialize_immediate_submit(renderer_state* state);
 static void shutdown_immediate_submit(renderer_state* state);
 
-// TODO: Move to scene renderer, more programmable
-static void initialize_descriptors(renderer_state* state);
-static void shutdown_descriptors(renderer_state* state);
-
 static b8 initialize_compute_effects(renderer_state* state);
 static void shutdown_compute_effects(renderer_state* state);
-// TODO: END
 
 static b8 initialize_default_data(renderer_state* state);
 static void shutdown_default_data(renderer_state* state);
@@ -183,55 +178,8 @@ b8 renderer_initialize(renderer_state** out_state, renderer_config config) {
     // swapchain current extent is 0xFFFFFFFF. Special value to say the app is in
     // control of the size 
     initialize_swapchain(state, &state->swapchain);
-
-    // TEMP: HACK: TODO: Make render image resolution configurable from engine & not the window_extent
-    state->render_extent = (VkExtent3D) {
-        .width = state->swapchain.image_extent.width * 2,   // TEMP: SSAA
-        .height = state->swapchain.image_extent.height * 2, // TEMP: SSAA
-        .depth = 1,
-    };
-    // TEMP: HACK: TODO: END
-
-    // Rendering attachment images initialization
     
-    // Color attachment
-    VkImageUsageFlags draw_image_usages = 0;
-    draw_image_usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    draw_image_usages |= VK_IMAGE_USAGE_STORAGE_BIT;
-    draw_image_usages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    image2D_create(state,
-        state->render_extent,
-        VK_FORMAT_R16G16B16A16_SFLOAT,
-        draw_image_usages,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &state->render_image);
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->render_image.handle, "MainRenderImage");
-    ETINFO("Render image created");
-
-    // Depth attachment
-    VkImageUsageFlags depth_image_usages = {0};
-    depth_image_usages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-    image2D_create(state, 
-        state->render_extent,
-        VK_FORMAT_D32_SFLOAT,
-        depth_image_usages,
-        VK_IMAGE_ASPECT_DEPTH_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &state->depth_image);
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, state->depth_image.handle, "MainDepthImage");
-    ETINFO("Depth image created");
-
     initialize_immediate_submit(state);
-
-    initialize_descriptors(state);
-
-    if (!initialize_compute_effects(state)) {
-        ETERROR("Could not initialize compute effects.");
-        return false;
-    }
 
     if (!initialize_default_data(state)) {
         ETFATAL("Error intializing data.");
@@ -249,15 +197,7 @@ void renderer_shutdown(renderer_state* state) {
 
     shutdown_default_data(state);
 
-    shutdown_compute_effects(state);
-
-    shutdown_descriptors(state);
-
     shutdown_immediate_submit(state);
-
-    image_destroy(state, &state->depth_image);
-    image_destroy(state, &state->render_image);
-    ETINFO("Rendering attachments (color, depth) destroyed.");
 
     shutdown_swapchain(state, &state->swapchain);
 
@@ -309,82 +249,6 @@ static void shutdown_immediate_submit(renderer_state* state) {
     vkDestroyCommandPool(state->device.handle, state->imm_pool, state->allocator);
     vkDestroyFence(state->device.handle, state->imm_fence, state->allocator); 
     ETINFO("Immediate submission functionality shutdown.");
-}
-
-static void initialize_descriptors(renderer_state* state) {
-    pool_size_ratio global_ratios[] = {
-        { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .ratio = 1},
-        { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .ratio = 1}};
-    descriptor_set_allocator_initialize(&state->global_ds_allocator, 10, 2, global_ratios, state);
-
-    // Descriptor set layout for accessing the render image from a compute shader
-    dsl_builder dsl_builder = descriptor_set_layout_builder_create();
-    descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT);
-    state->draw_image_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
-    descriptor_set_layout_builder_destroy(&dsl_builder);
-
-    state->draw_image_descriptor_set = descriptor_set_allocator_allocate(&state->global_ds_allocator, state->draw_image_descriptor_set_layout, state);
-
-    ds_writer writer = descriptor_set_writer_create_initialize();
-    descriptor_set_writer_write_image(&writer, 0, state->render_image.view, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-    descriptor_set_writer_update_set(&writer, state->draw_image_descriptor_set, state);
-    descriptor_set_writer_shutdown(&writer);
-
-    dsl_builder = descriptor_set_layout_builder_create();
-    descriptor_set_layout_builder_add_binding(&dsl_builder, 0, 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    state->scene_data_descriptor_set_layout = descriptor_set_layout_builder_build(&dsl_builder, state);
-    descriptor_set_layout_builder_destroy(&dsl_builder);
-    ETINFO("Descriptors Initialized");
-}
-
-// TODO: Should be reverse order of creation just for uniformity
-static void shutdown_descriptors(renderer_state* state) {
-    descriptor_set_allocator_shutdown(&state->global_ds_allocator, state);
-    vkDestroyDescriptorSetLayout(state->device.handle, state->scene_data_descriptor_set_layout, state->allocator);
-    vkDestroyDescriptorSetLayout(state->device.handle, state->draw_image_descriptor_set_layout, state->allocator);
-    ETINFO("Descriptors shutdown");
-}
-
-static b8 initialize_compute_effects(renderer_state* state) {
-    if (!load_shader(state, "assets/shaders/gradient.comp.spv", &state->gradient_shader)) {
-        ETERROR("Error loading compute effect shader.");
-        return false;
-    }
-
-    VkPipelineLayoutCreateInfo compute_effect_pipeline_layout_info = init_pipeline_layout_create_info();
-    compute_effect_pipeline_layout_info.setLayoutCount = 1;
-    compute_effect_pipeline_layout_info.pSetLayouts = &state->draw_image_descriptor_set_layout;
-
-    // Push constant structure for compute effect pipelines
-    VkPushConstantRange push_constant = {0};
-    push_constant.offset = 0;
-    push_constant.size = sizeof(compute_push_constants);
-    push_constant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    
-    compute_effect_pipeline_layout_info.pushConstantRangeCount = 1;
-    compute_effect_pipeline_layout_info.pPushConstantRanges = &push_constant;
-    
-    VK_CHECK(vkCreatePipelineLayout(state->device.handle, &compute_effect_pipeline_layout_info, state->allocator, &state->gradient_effect.layout));
-
-    VkPipelineShaderStageCreateInfo compute_effect_pipeline_shader_stage_info = init_pipeline_shader_stage_create_info();
-    compute_effect_pipeline_shader_stage_info.stage = state->gradient_shader.stage;
-    compute_effect_pipeline_shader_stage_info.module = state->gradient_shader.module;
-    compute_effect_pipeline_shader_stage_info.pName = state->gradient_shader.entry_point;
-
-    VkComputePipelineCreateInfo compute_effect_info = init_compute_pipeline_create_info();
-    compute_effect_info.layout = state->gradient_effect.layout;
-    compute_effect_info.stage = compute_effect_pipeline_shader_stage_info;
-
-    VK_CHECK(vkCreateComputePipelines(state->device.handle, VK_NULL_HANDLE, 1, &compute_effect_info, state->allocator, &state->gradient_effect.pipeline));
-    return true;
-}
-
-static void shutdown_compute_effects(renderer_state* state) {
-    vkDestroyPipeline(state->device.handle, state->gradient_effect.pipeline, state->allocator);
-    vkDestroyPipelineLayout(state->device.handle, state->gradient_effect.layout, state->allocator);
-
-    unload_shader(state, &state->gradient_shader);
-    ETINFO("Compute effects shutdown.");
 }
 
 static b8 initialize_default_data(renderer_state* state) {

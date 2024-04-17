@@ -13,7 +13,7 @@
 import_payload import_files(u32 file_count, const char* const* paths) {
     ETASSERT(paths);
     import_payload payload = {
-        .mat_index_to_id = dynarray_create(1, sizeof(mat_id)),
+        .mat_index_to_mat_id = dynarray_create(1, sizeof(mat_id)),
         .pipelines = dynarray_create(1, sizeof(import_pipeline)),
         .geometries = dynarray_create(1, sizeof(import_geometry)),
         .images = dynarray_create(1, sizeof(import_image)),
@@ -38,12 +38,10 @@ import_payload import_files(u32 file_count, const char* const* paths) {
                 failure_count++;
             }
         } else if (strs_equal(ext, ".pmx")) {
-            // TODO: Implement the pmx loader files
             ETASSERT(false);
             // if (!import_pmx(&payload, path)) {
             //     ETWARN("Unable to import pmx file %s.", path);
             // }
-            // TODO: END
         } else {
             ETWARN("Attempting to load file %s with unsupported extension %s.", path, ext);
         }
@@ -53,7 +51,7 @@ import_payload import_files(u32 file_count, const char* const* paths) {
 // TODO: END
 
 void import_payload_destroy(import_payload* payload) {
-    dynarray_destroy(payload->mat_index_to_id);
+    dynarray_destroy(payload->mat_index_to_mat_id);
 
     u32 pipeline_count = dynarray_length(payload->pipelines);
     for (u32 i = 0; i < pipeline_count; ++i) {

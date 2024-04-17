@@ -19,8 +19,8 @@ const vec3 corners[8] = {
 	vec3(-1, -1, -1),
 };
 
-// NOTE: This method can (too many) have false negatives (pop-in) which is unacceptable.
-// TODO: Use a better method for frustum culling
+// NOTE: This method can (will) have false negatives which is unacceptable (pop-in).
+// TODO: Use a better method for frustum culling without false negatives
 bool is_visible(mat4 transform, geometry geo) {
 	mat4 mat = frame_data.viewproj * transform;
 
@@ -54,7 +54,6 @@ void main() {
 	object obj = objects[gID];
 	geometry geo = geometries[obj.geo_id];
 
-	// NOTE: This method can (too many) have false negatives (pop-in) which is unacceptable.
 	if (is_visible(transforms[obj.transform_id], geo)) {
 		draw_command command;
 		command.index_count = geo.index_count;

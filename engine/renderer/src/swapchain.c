@@ -297,6 +297,7 @@ void recreate_swapchain(renderer_state* state, swapchain* swapchain) {
         &format_count,
         formats
     ));
+    
     b8 found = false;
     for (u32 i = 0; i < format_count; ++i) {
         if (formats[i].format == VK_FORMAT_B8G8R8A8_UNORM &&

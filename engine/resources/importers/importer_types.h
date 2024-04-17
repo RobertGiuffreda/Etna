@@ -142,7 +142,7 @@ typedef struct import_node {
 // NOTE: All dynarrays
 typedef struct import_payload {
     import_pipeline_flags present_pipelines;
-    mat_id* mat_index_to_id;            // Dynarray
+    mat_id* mat_index_to_mat_id;            // Dynarray
     import_pipeline* pipelines;         // Dynarray
     
     import_image* images;               // Dynarray

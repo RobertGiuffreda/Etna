@@ -102,7 +102,13 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
     import_payload test_payload = import_files(
         engine_details.path_count,
         engine_details.paths);
-    if (!scene_init(&engine->main_scene, engine->renderer_state, &test_payload)) {
+    scene_config scene_config = {
+        .name = "Etna Scene Testing",
+        .resolution_width = engine_details.width,
+        .resolution_height = engine_details.height,
+        .renderer_state = engine->renderer_state,
+        .import_payload = &test_payload};
+    if (!scene_init(&engine->main_scene, scene_config)) {
         ETFATAL("Unable to initialize scene from payload.");
         return false;
     }
@@ -132,6 +138,7 @@ b8 engine_initialize(engine_config engine_details, application_config app_detail
         ETFATAL("Unable to initialize application. application_initialize returned false.");
         return false;
     }
+
     return true;
 }
 
@@ -150,7 +157,7 @@ b8 engine_run(void) {
             engine->app_update(engine->app, dt);
             
             if (scene_frame_begin(engine->main_scene, engine->renderer_state)) {
-                scene_render(engine->main_scene);
+                scene_render(engine->main_scene, engine->renderer_state);
                 engine->app_render(engine->app);
                 scene_frame_end(engine->main_scene, engine->renderer_state);
             }

@@ -115,7 +115,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
     }
     // TODO: END
 
-    u32 mat_index_id_offset = dynarray_grow((void**)&payload->mat_index_to_id, data->materials_count);
+    u32 mat_index_id_offset = dynarray_grow((void**)&payload->mat_index_to_mat_id, data->materials_count);
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material mat = data->materials[i];
         cgltf_pbr_metallic_roughness mr = mat.pbr_metallic_roughness;
@@ -163,7 +163,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
             }
         }
         
-        payload->mat_index_to_id[mat_index_id_offset + i] = id;
+        payload->mat_index_to_mat_id[mat_index_id_offset + i] = id;
     }
 
     // TODO: Put vertex data into single vertex buffer & index data 
@@ -260,9 +260,6 @@ b8 import_gltf(import_payload* payload, const char* path) {
             geo->extent = glms_vec4_scale(glms_vec4_sub(max_pos, min_pos), 0.5f);
             geo->radius = glms_vec3_norm(glms_vec3(geo->extent));
             // TODO: END
-
-            ETDEBUG("max_pos: x, y, z | %lf %lf %lf", max_pos.x, max_pos.y, max_pos.z);
-            ETDEBUG("min_pos: x, y, z | %lf %lf %lf", min_pos.x, min_pos.y, min_pos.z);
 
             mesh->geometry_indices[j] = geo_start + j;
             // TODO: When pipelines are placed before this function, we can store the pipeline_id, instance_id combo here

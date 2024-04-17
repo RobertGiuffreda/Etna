@@ -18,25 +18,7 @@ typedef struct renderer_state {
     // TODO: Move to window
     swapchain swapchain;
     // TODO: END
-
-    // TODO: Move to scene
-    VkExtent3D render_extent;
-    image render_image;
-    image depth_image;
-    // TODO: END
     
-    // TEMP: Compute effect members, will be removed.
-    ds_allocator global_ds_allocator;
-    
-    shader gradient_shader;
-    compute_effect gradient_effect;
-
-    VkDescriptorSetLayout draw_image_descriptor_set_layout;
-    VkDescriptorSet draw_image_descriptor_set;
-
-    VkDescriptorSetLayout scene_data_descriptor_set_layout;
-    // TEMP: END
-
     // NOTE: Immediate Submission
     VkCommandPool imm_pool;
     VkCommandBuffer imm_buffer;

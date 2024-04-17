@@ -50,8 +50,8 @@ b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const 
         pipeline_builder_enable_depthtest(&builder, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
     }
 
-    pipeline_builder_set_color_attachment_format(&builder, state->render_image.format);
-    pipeline_builder_set_depth_attachment_format(&builder, state->depth_image.format);
+    pipeline_builder_set_color_attachment_format(&builder, scene->render_image.format);
+    pipeline_builder_set_depth_attachment_format(&builder, scene->depth_image.format);
     material->pipe = pipeline_builder_build(&builder, state);
     pipeline_builder_destroy(&builder);
 

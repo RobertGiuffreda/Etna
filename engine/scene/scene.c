@@ -13,6 +13,7 @@
 
 #include "memory/etmemory.h"
 
+#include "resources/importers/importer.h"
 #include "resources/image_manager.h"
 #include "resources/resource_private.h"
 #include "resources/material.h"
@@ -25,7 +26,6 @@
 #include "renderer/src/buffer.h"
 #include "renderer/src/shader.h"
 #include "renderer/src/pipeline.h"
-#include "resources/importers/importer.h"
 
 // TEMP: Until a math library is situated
 #include <math.h>
@@ -35,17 +35,16 @@
 static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 // TEMP: END
 
-static b8 scene_renderer_init(scene* scene, renderer_state* state);
+static b8 scene_renderer_init(scene* scene, scene_config config);
 static void scene_renderer_shutdown(scene* scene);
 
 // TODO: Remove, textures will be set when loading for now, until any kind of streaming
 // is implemented, if it ever is
 void scene_texture_set(scene* scene, u32 tex_id, u32 img_id, u32 sampler_id);
 
-b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
+b8 scene_init(scene** scn, scene_config config) {
     scene* scene = etallocate(sizeof(struct scene), MEMORY_TAG_SCENE);
-    scene->name = "Etna Scene Testing";
-    scene->state = state;
+    scene->name = config.name;
 
     camera_create(&scene->cam);
     scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
@@ -56,6 +55,8 @@ b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
     scene->data.sun_color     = (v4s) { .raw = {1.f, 1.f, 1.f, 4.f}};
     scene->data.sun_direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
     
+    import_payload* payload = config.import_payload;
+
     // Create singular vertex buffer, index buffer
     vertex* vertices = dynarray_create(0, sizeof(vertex));
     u32* indices = dynarray_create(0, sizeof(u32));
@@ -111,8 +112,8 @@ b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
             for (u32 j = 0; j < mesh.count; ++j) {
                 u32 material_index = mesh.material_indices[j];
                 objects[object_start + j] = (object) {
-                    .pipe_id = pipe_index_to_id[payload->mat_index_to_id[material_index].pipe_id],
-                    .mat_id = payload->mat_index_to_id[material_index].inst_id,
+                    .pipe_id = pipe_index_to_id[payload->mat_index_to_mat_id[material_index].pipe_id],
+                    .mat_id = payload->mat_index_to_mat_id[material_index].inst_id,
                     .geo_id = mesh.geometry_indices[j],
                     .transform_id = transform_index,
                 };
@@ -135,7 +136,8 @@ b8 scene_init(scene** scn, renderer_state* state, import_payload* payload) {
     event_observer_register(EVENT_CODE_KEY_RELEASE, scene, scene_on_key_event);
     *scn = scene;
 
-    if (!scene_renderer_init(scene, state)) {
+
+    if (!scene_renderer_init(scene, config)) {
         ETFATAL("Scene renderer failed to initialize.");
         return false;
     }
@@ -172,7 +174,7 @@ void scene_update(scene* scene, f64 dt) {
     camera_update(&scene->cam, dt);
 
     // TODO: Camera should store near and far values & calculate perspective matrix
-    // TODO: Scene should register for event system and update camera stuff itself 
+    // TODO: Scene should register for event system and update camera stuff itself
     m4s view = camera_get_view_matrix(&scene->cam);
     m4s project = glms_perspective(
         /* fovy */ glm_rad(70.f),
@@ -199,9 +201,44 @@ void scene_update(scene* scene, f64 dt) {
     scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
 }
 
-b8 scene_renderer_init(scene* scene, renderer_state* state) {
-    // TEMP:? Something better??
-    scene->data.max_draw_count = MAX_DRAW_COMMANDS;
+b8 scene_renderer_init(scene* scene, scene_config config) {
+    renderer_state* state = config.renderer_state;
+    scene->state = state;
+    scene->data.max_draw_count = MAX_DRAW_COMMANDS; // TODO: Better method??
+
+    scene->render_extent = (VkExtent3D) {
+        .width = config.resolution_width * 2,   // TEMP: Super Sample Anti Aliasing
+        .height = config.resolution_height * 2, // TEMP: Super Sample Anti Aliasing
+        .depth = 1,
+    };
+
+    // Color attachment
+    VkImageUsageFlags draw_image_usages = 0;
+    draw_image_usages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    draw_image_usages |= VK_IMAGE_USAGE_STORAGE_BIT;
+    draw_image_usages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    image2D_create(state,
+        scene->render_extent,
+        VK_FORMAT_R16G16B16A16_SFLOAT,
+        draw_image_usages,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &scene->render_image);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, scene->render_image.handle, "MainRenderImage");
+
+    // Depth attachment
+    VkImageUsageFlags depth_image_usages = {0};
+    depth_image_usages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+    image2D_create(state, 
+        scene->render_extent,
+        VK_FORMAT_D32_SFLOAT,
+        depth_image_usages,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &scene->depth_image);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, scene->depth_image.handle, "MainDepthImage");
 
     scene->render_fences = etallocate(
         sizeof(VkFence) * state->swapchain.image_count,
@@ -851,10 +888,13 @@ void scene_renderer_shutdown(scene* scene) {
     etfree(scene->graphics_command_buffers, sizeof(VkCommandBuffer) * frame_overlap, MEMORY_TAG_SCENE);
     etfree(scene->graphics_pools, sizeof(VkCommandPool) * frame_overlap, MEMORY_TAG_SCENE);
     etfree(scene->render_fences, sizeof(VkFence) * frame_overlap, MEMORY_TAG_SCENE);
+
+    image_destroy(state, &scene->depth_image);
+    image_destroy(state, &scene->render_image);
 }
 
-b8 scene_render(scene* scene) {
-    renderer_state* state = scene->state;
+// TODO: Move this function to scene_renderer_begin??
+b8 scene_render(scene* scene, renderer_state* state) {
     // TEMP:TODO: Create staging buffer to move this instead of vkCmdUpdateBuffer
     VkCommandBuffer cmd = scene->graphics_command_buffers[state->swapchain.frame_index];
     vkCmdUpdateBuffer(cmd,
@@ -953,12 +993,15 @@ void draw_geometry(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
     );
     // NOTE: END
 
+    VkClearValue clear_color = {
+        .color = {0.f,0.f,0.f,0.f},
+    };
     VkRenderingAttachmentInfo color_attachment = init_color_attachment_info(
-        state->render_image.view, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        scene->render_image.view, &clear_color, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     VkRenderingAttachmentInfo depth_attachment = init_depth_attachment_info(
-        state->depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+        scene->depth_image.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    VkExtent2D render_extent = {.width = state->render_extent.width, .height = state->render_extent.height};
+    VkExtent2D render_extent = {.width = scene->render_extent.width, .height = scene->render_extent.height};
     VkRenderingInfo render_info = init_rendering_info(render_extent, &color_attachment, &depth_attachment);
 
     vkCmdBeginRendering(cmd, &render_info);
@@ -1005,32 +1048,12 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
     VkResult result;
     VkCommandBuffer frame_cmd = scene->graphics_command_buffers[state->swapchain.frame_index];
 
-    // TEMP: Hardcode Gradient compute
-    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
-        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-        VK_ACCESS_2_NONE, VK_ACCESS_2_SHADER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_NONE, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+    image_barrier(frame_cmd, scene->render_image.handle, scene->render_image.aspects,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_ACCESS_2_NONE, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+        VK_PIPELINE_STAGE_2_NONE, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-    vkCmdBindPipeline(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.pipeline);
-
-    vkCmdBindDescriptorSets(frame_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, state->gradient_effect.layout, 0, 1, &state->draw_image_descriptor_set, 0, 0);
-
-    compute_push_constants pc = {
-        .data1 = (v4s){1.0f, 0.0f, 0.0f, 1.0f},
-        .data2 = (v4s){0.0f, 0.0f, 1.0f, 1.0f},
-    };
-
-    vkCmdPushConstants(frame_cmd, state->gradient_effect.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compute_push_constants), &pc);
-
-    vkCmdDispatch(frame_cmd, ceil(state->render_extent.width / 16.0f), ceil(state->render_extent.height / 16.0f), 1);
-    // TEMP: END
-
-    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
-        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
-
-    image_barrier(frame_cmd, state->depth_image.handle, state->depth_image.aspects,
+    image_barrier(frame_cmd, scene->depth_image.handle, scene->depth_image.aspects,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
         VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
@@ -1038,7 +1061,7 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
     draw_geometry(state, scene, frame_cmd);
 
     // Make render image optimal layout for transfer source to swapchain image
-    image_barrier(frame_cmd, state->render_image.handle, state->render_image.aspects,
+    image_barrier(frame_cmd, scene->render_image.handle, scene->render_image.aspects,
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT, VK_ACCESS_2_TRANSFER_READ_BIT,
         VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT);
@@ -1052,9 +1075,9 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
     // Copy render image to swapchain image
     blit_image2D_to_image2D(
         frame_cmd,
-        state->render_image.handle,
+        scene->render_image.handle,
         state->swapchain.images[state->swapchain.image_index],
-        state->render_extent,
+        scene->render_extent,
         state->swapchain.image_extent,
         VK_IMAGE_ASPECT_COLOR_BIT);
 
