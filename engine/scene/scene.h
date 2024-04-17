@@ -3,7 +3,7 @@
 #include "math/math_types.h"
 #include "renderer/renderer_types.h"
 
-// TEMP: Eventually scene will deserialize binary format created from import payload, then editing of format
+// TEMP: Eventually scene will deserialize binary format created from import payload
 #include "resources/importers/importer_types.h"
 // TEMP: END
 

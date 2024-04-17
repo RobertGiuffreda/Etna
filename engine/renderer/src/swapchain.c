@@ -264,7 +264,6 @@ void shutdown_swapchain(renderer_state* state, swapchain* swapchain) {
     ETINFO("Swapchain shutdown.");
 }
 
-// TODO: Linear allocator for the swapchain images and views equal to the max number of images
 void recreate_swapchain(renderer_state* state, swapchain* swapchain) {
     // Destroy the old swapchains image views
     for (u32 i = 0; i < swapchain->image_count; ++i) {
@@ -297,7 +296,6 @@ void recreate_swapchain(renderer_state* state, swapchain* swapchain) {
         &format_count,
         formats
     ));
-    
     b8 found = false;
     for (u32 i = 0; i < format_count; ++i) {
         if (formats[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
@@ -339,8 +337,20 @@ void recreate_swapchain(renderer_state* state, swapchain* swapchain) {
     swapchain_extent.width = (clamp_width > max_extent.width) ? max_extent.width : clamp_width;
     swapchain_extent.height = (clamp_height > max_extent.height) ? max_extent.height : clamp_height;
 
+    u32 present_mode_count = 0;
+    VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(state->device.gpu, swapchain->surface, &present_mode_count, 0));
+    VkPresentModeKHR* present_modes = etallocate(sizeof(VkPresentModeKHR) * present_mode_count, MEMORY_TAG_SWAPCHAIN);
+    VK_CHECK(vkGetPhysicalDeviceSurfacePresentModesKHR(state->device.gpu, swapchain->surface, &present_mode_count, present_modes));
+
+    // Get immediate mode if available for testing frame times
     // NOTE: This mode must be supported to adhere to vulkan spec
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    for (u32 i = 0; i < present_mode_count; ++i) {
+        if (present_modes[i] == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+            present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+        }
+    }
+    etfree(present_modes, sizeof(VkPresentModeKHR) * present_mode_count, MEMORY_TAG_SWAPCHAIN);
 
     u32 swapchain_image_count = surface_capabilities.minImageCount + 1;
     if (surface_capabilities.maxImageCount > 0 &&

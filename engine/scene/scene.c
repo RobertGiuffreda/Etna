@@ -36,7 +36,7 @@ static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 // TEMP: END
 
 static b8 scene_renderer_init(scene* scene, scene_config config);
-static void scene_renderer_shutdown(scene* scene);
+static void scene_renderer_shutdown(scene* scene, renderer_state* state);
 
 // TODO: Remove, textures will be set when loading for now, until any kind of streaming
 // is implemented, if it ever is
@@ -149,7 +149,8 @@ void scene_shutdown(scene* scene) {
 
     event_observer_deregister(EVENT_CODE_KEY_RELEASE, scene, scene_on_key_event);
 
-    scene_renderer_shutdown(scene);
+    scene_renderer_shutdown(scene, state);
+
     camera_destroy(&scene->cam);
 
     dynarray_destroy(scene->indices);
@@ -837,9 +838,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     return true;
 }
 
-void scene_renderer_shutdown(scene* scene) {
-    renderer_state* state = scene->state;
-
+void scene_renderer_shutdown(scene* scene, renderer_state* state) {
     // NOTE: This is needed to make sure objects are not destroyed while in use
     vkDeviceWaitIdle(state->device.handle);
 
