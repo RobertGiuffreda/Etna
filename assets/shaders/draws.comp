@@ -28,7 +28,7 @@ bool is_visible(mat4 transform, geometry geo) {
 	vec3 g_max = vec3(-1.5, -1.5, -1.5);
 
 	for (uint i = 0; i < 8; ++i) {
-		vec4 v = mat * vec4(vec3(geo.origin) + (corners[i] * vec3(geo.extent)), 1.0f);
+		vec4 v = transform * vec4(vec3(geo.origin) + (corners[i] * vec3(geo.extent)), 1.0f);
 
 		v.x = v.x / v.w;
 		v.y = v.y / v.w;
@@ -54,7 +54,8 @@ void main() {
 	object obj = objects[gID];
 	geometry geo = geometries[obj.geo_id];
 
-	if (is_visible(transforms[obj.transform_id], geo)) {
+	mat4 mvp = frame_data.viewproj * transforms[obj.transform_id];
+	// if (is_visible(mvp, geo)) {
 		draw_command command;
 		command.index_count = geo.index_count;
 		command.instance_count = 1;
@@ -73,5 +74,5 @@ void main() {
 		*/
 		draw_buffer pso_draws = draw_buffer(draw_buffers[obj.pipe_id]);
 		pso_draws.draws[draw_id] = command;
-	}
+	// }
 }

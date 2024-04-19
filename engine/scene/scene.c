@@ -191,7 +191,8 @@ void scene_update(scene* scene, f64 dt) {
 
     camera_update(&scene->cam, dt);
 
-    // TODO: Camera should store near and far values & calculate perspective matrix
+    // TODO: Camera should store near and far values & calculate perspective matrix itself
+    // Camera should also have the aspect ratio and update on resize
     // TODO: Scene should register for event system and update camera stuff itself
     m4s view = camera_get_view_matrix(&scene->cam);
     m4s project = glms_perspective(
@@ -205,18 +206,25 @@ void scene_update(scene* scene, f64 dt) {
     // TODO: END
     // TODO: END
 
+    m4s vp = glms_mat4_mul(project, view);
+    scene->data.view = view;
+    scene->data.proj = project;
+    scene->data.viewproj = vp;
+    scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
+
+    // TODO: Create the sun/skylights view-projection matrix for shadow pass
+    v4s sun_view;
+    v4s sun_projection;
+    v4s sun_viewproj;
+    scene->data.sun_viewproj = vp;
+    // TODO: END
+    
+    // Update light information
     v4s l_pos = glms_vec4(scene->cam.position, 1.0f);
     if (light_dynamic) {
         scene->data.light_position = l_pos;
         scene->data.light_position.y += light_offset;
     }
-
-    m4s vp = glms_mat4_mul(project, view);
-    scene->data.view = view;
-    scene->data.proj = project;
-    scene->data.viewproj = vp;
-    
-    scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
 }
 
 b8 scene_renderer_init(scene* scene, scene_config config) {
@@ -923,8 +931,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->shadow_draws);    
     scene->data.shadow_draw_id = scene->mat_pipe_count;
-    VkDeviceAddress mat_draws_addr = buffer_get_address(state, &scene->shadow_draws);
-    etcopy_memory((VkDeviceAddress*)draw_buffer_addresses + scene->mat_pipe_count, &mat_draws_addr, sizeof(VkDeviceAddress));
+    VkDeviceAddress shadow_draws_addr = buffer_get_address(state, &scene->shadow_draws);
+    etcopy_memory((VkDeviceAddress*)draw_buffer_addresses + scene->mat_pipe_count, &shadow_draws_addr, sizeof(VkDeviceAddress));
     vkUnmapMemory(state->device.handle, scene->draws_buffer.memory);
 
     shader shadow_draw_gen;
@@ -1206,7 +1214,7 @@ void shadow_pass(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
 
 void geometry_pass(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
     VkClearValue clear_color = {
-        .color = {0.f,0.f,0.f,0.f},
+        .color = {.3f,0.f,.2f,0.f},
     };
     VkRenderingAttachmentInfo color_attachment = init_color_attachment_info(
         scene->render_image.view, &clear_color, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);

@@ -111,6 +111,10 @@ void main() {
     vec3 N = get_normal_from_map();
     vec3 V = normalize(frame_data.view_pos.xyz - in_position);
 
+    // TODO: Get information from shadow map
+    float depth_sample_test = texture(textures[frame_data.shadow_map_id], in_uv).r;
+    // TODO: END
+
     // https://www.khronos.org/opengl/wiki/Sampler_(GLSL)#Non-uniform_flow_control
     // Alpha discard after all texture sampling has been done to preserve uniform control flow
     if (albedo_sample.a < frame_data.alpha_cutoff) {
@@ -179,6 +183,7 @@ void main() {
     color = pow(color, INV_GAMMA);
 
     out_frag_color = vec4(color, 1.0f);
+    // out_frag_color = vec4(vec3(depth_sample_test), 1.0f);
     // out_frag_color = mr_sample;
     // out_frag_color = vec4(N, 1.0);
     // out_frag_color = vec4(vec3(kDs), 1.0);
