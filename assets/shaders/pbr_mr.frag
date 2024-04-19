@@ -6,7 +6,6 @@
 #include "input_structures.glsl"
 
 // NOTE: Much of this is from learnopengl.com's information & code about PBR
-// I am still learning.
 
 layout(set = 1, binding = 0) readonly buffer pbr_draws_buffer {
     draw_command pbr_draws[];
@@ -111,6 +110,12 @@ void main() {
 
     vec3 N = get_normal_from_map();
     vec3 V = normalize(frame_data.view_pos.xyz - in_position);
+
+    // https://www.khronos.org/opengl/wiki/Sampler_(GLSL)#Non-uniform_flow_control
+    // Alpha discard after all texture sampling has been done to preserve uniform control flow
+    if (albedo_sample.a < frame_data.alpha_cutoff) {
+        discard;
+    }
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)

@@ -203,8 +203,10 @@ VkMemoryAllocateFlagsInfo init_memory_allocate_flags_info(VkMemoryAllocateFlags 
 }
 
 VkBindImageMemoryInfo init_bind_image_memory_info(
-    VkImage image, VkDeviceMemory memory, VkDeviceSize memory_offset)
-{
+    VkImage image,
+    VkDeviceMemory memory,
+    VkDeviceSize memory_offset
+) {
     VkBindImageMemoryInfo info = {
         .sType = VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO,
         .pNext = 0,
@@ -215,8 +217,10 @@ VkBindImageMemoryInfo init_bind_image_memory_info(
 }
 
 VkBindBufferMemoryInfo init_bind_buffer_memory_info(
-    VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize memory_offset)
-{
+    VkBuffer buffer,
+    VkDeviceMemory memory,
+    VkDeviceSize memory_offset
+) {
     VkBindBufferMemoryInfo info = {
         .sType = VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO,
         .pNext = 0,
@@ -227,8 +231,8 @@ VkBindBufferMemoryInfo init_bind_buffer_memory_info(
 }
 
 VkDeviceImageMemoryRequirements init_device_image_memory_requirements(
-    const VkImageCreateInfo* image_create_info)
-{
+    const VkImageCreateInfo* image_create_info
+) {
     VkDeviceImageMemoryRequirements requirements = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS,
         .pNext = 0,

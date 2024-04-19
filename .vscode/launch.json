@@ -7,6 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/sandbox.exe",
             "args": [
+                "../../vtubers/hololiveen_council_-_smol_kronii.glb",
                 "../assets/gltf/structure.glb",
                 "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],

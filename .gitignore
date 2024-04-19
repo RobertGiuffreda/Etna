@@ -13,6 +13,7 @@ assets/gltf/structure.glb
 deprecated/
 
 assets/shaders/TODO.txt
+assets/gpugems2_softShadows.frag
 
 glb_json.json
 etna_log.txt

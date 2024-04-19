@@ -48,7 +48,14 @@ typedef struct scene {
     VkExtent3D render_extent;
     image render_image;
     image depth_image;
-    
+
+    // NOTE: Index into draws_buffer for shadow_draws is a scene_data struct member
+    buffer shadow_draws;                    // Draw command buffer for indirect drawing
+    image shadow_map;                       // Depth map on shadow pass, sampler2D on lighting pass
+    VkSampler shadow_map_sampler;
+    VkPipeline shadow_draw_gen_pipeline;    // Uses draw_gen_layout as VkPipelineLayout
+    VkPipeline shadow_pipeline;             // Pipeline to render to the shadow map
+
     // NOTE: Per frame rendering primitives
     VkFence* render_fences;
     VkCommandPool* graphics_pools;
@@ -69,8 +76,11 @@ typedef struct scene {
     VkPipelineLayout mat_pipeline_layout;
 
     // TODO: Clean up implementation
-    u32 mat_pipe_count;
     mat_pipe_config* mat_pipe_configs;
+    // TODO: image2D_config* image_configs;
+    // TODO: END
+
+    u32 mat_pipe_count;
     mat_pipe* mat_pipes;
 
     image_manager* image_bank;

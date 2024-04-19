@@ -3,9 +3,8 @@
 #include "math/math_types.h"
 #include "resources/resource_types.h"
 
-/** NOTE: Importing & Serialization code
- * In infancy
-*/
+// NOTE: Material instances must have a color texture index 
+// and color factors at the moment for the shadow mapping, crashes otherwise
 
 // Currently gltf_default & gltf_transparent
 typedef struct pbr_mr_instance {
@@ -55,12 +54,13 @@ typedef struct import_sampler {
 } import_sampler;
 // HACK: END
 
-typedef enum default_texture {
-    DEFAULT_TEXTURE_WHITE = 0,
-    DEFAULT_TEXTURE_BLACK,
-    DEFAULT_TEXTURE_NORMAL,
-    DEFAULT_TEXTURE_COUNT,
-} default_texture;
+typedef enum reserved_texture_index {
+    RESERVED_TEXTURE_WHITE_INDEX = 0,
+    RESERVED_TEXTURE_BLACK_INDEX,
+    RESERVED_TEXTURE_NORMAL_INDEX,
+    RESERVED_TEXTURE_SHADOW_MAP_INDEX,
+    RESERVED_TEXTURE_INDEX_COUNT,
+} reserved_texture_index;
 
 typedef struct import_texture {
     u32 image_id;

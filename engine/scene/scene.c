@@ -52,7 +52,7 @@ b8 scene_init(scene** scn, scene_config config) {
     // NOTE: This will be passed a config when serialization is implemented
     scene->data.ambient_color = (v4s) { .raw = {1.f, 1.f, 1.f, .1f}};
     scene->data.light_color   = (v4s) { .raw = {1.f, 1.f, 1.f, 5.f}};
-    scene->data.sun_color     = (v4s) { .raw = {1.f, 1.f, 1.f, 4.f}};
+    scene->data.sun_color     = (v4s) { .raw = {1.f, 1.f, 1.f, 10.f}};
     scene->data.sun_direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
     
     import_payload* payload = config.import_payload;
@@ -98,7 +98,17 @@ b8 scene_init(scene** scn, scene_config config) {
             dynarray_push((void**)&mat_pipe_configs, &config);
         }
     }
-    
+
+// HACK:TEMP: Evil awful ugly workaround for getting the albedo/color texture index at this point
+// This is temporary until I have something worked out
+typedef struct material_instance_head {
+    v4s color_factors;
+    u32 color_tex_index;
+} mih;
+#define COLOR_TEX_INDEX(material_pipeline_config, material_instance_index) \
+((mih*)((u8*)material_pipeline_config.instances + (material_pipeline_config.inst_size * material_instance_index)))->color_tex_index
+// HACK:TEMP: END
+
     // Change nodes into objects and transforms for the meshes
     m4s* transforms = dynarray_create(1, sizeof(m4s));
     object* objects = dynarray_create(1, sizeof(object));
@@ -112,11 +122,18 @@ b8 scene_init(scene** scn, scene_config config) {
             u64 object_start = dynarray_grow((void**)&objects, mesh.count);
             for (u32 j = 0; j < mesh.count; ++j) {
                 u32 material_index = mesh.material_indices[j];
+                // HACK:TEMP: Need to build framework for shadow mapping
+                u32 color_index = COLOR_TEX_INDEX(
+                    mat_pipe_configs[pipe_index_to_id[payload->mat_index_to_mat_id[material_index].pipe_id]],
+                    payload->mat_index_to_mat_id[material_index].inst_id
+                );
+                // HACK:TEMP: END
                 objects[object_start + j] = (object) {
                     .pipe_id = pipe_index_to_id[payload->mat_index_to_mat_id[material_index].pipe_id],
                     .mat_id = payload->mat_index_to_mat_id[material_index].inst_id,
                     .geo_id = mesh.geometry_indices[j],
                     .transform_id = transform_index,
+                    .color_id = color_index,
                 };
             }
         }
@@ -180,8 +197,8 @@ void scene_update(scene* scene, f64 dt) {
     m4s project = glms_perspective(
         /* fovy */ glm_rad(70.f),
         ((f32)state->swapchain.image_extent.width/(f32)state->swapchain.image_extent.height),
-        /* near-z: */ 10000.f,
-        /* far-z: */ 0.1f); // NOTE: Reverse Z for depth
+        /* near-z: */ 10000.f,  // NOTE: Reverse Z for depth
+        /* far-z: */ 0.1f);
     // NOTE: invert the Y direction on projection matrix so that we are more match gltf axis
     project.raw[1][1] *= -1;
     // NOTE: END
@@ -206,12 +223,10 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     renderer_state* state = config.renderer_state;
     scene->state = state;
 
-    scene->data.max_draw_count = MAX_DRAW_COMMANDS; // TODO: Better method??
-
     // Rendering resolution
     scene->render_extent = (VkExtent3D) {
-        .width = config.resolution_width,   // TEMP: Super Sample Anti Aliasing
-        .height = config.resolution_height, // TEMP: Super Sample Anti Aliasing
+        .width = config.resolution_width * 2,   // TEMP: Super Sample Anti Aliasing
+        .height = config.resolution_height * 2, // TEMP: Super Sample Anti Aliasing
         .depth = 1,
     };
 
@@ -299,14 +314,14 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->scene_uniforms.handle, "SceneFrameUniformBuffer");
     buffer_create(
         state,
-        sizeof(u32) * scene->mat_pipe_count,
+        sizeof(u32) * (scene->mat_pipe_count + /* Shadow mapping draw commands */1),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->counts_buffer);
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->counts_buffer.handle, "PipelineDrawCountsBuffer");
     buffer_create(
         state,
-        sizeof(VkDeviceAddress) * scene->mat_pipe_count,
+        sizeof(VkDeviceAddress) * (scene->mat_pipe_count + /* Shadow mapping draw commands */1),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->draws_buffer);
@@ -698,68 +713,119 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         ));
     }
 
+    // HACK:TEMP: More robust shadow mapping code
+    VkExtent3D shadow_map_resolution = {
+        .width = 1024,
+        .height = 1024,
+        .depth = 1};
+    image2D_create(
+        state,
+        shadow_map_resolution,
+        VK_FORMAT_D32_SFLOAT,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &scene->shadow_map);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE, scene->shadow_map.handle, "ShadowMapImage");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_IMAGE_VIEW, scene->shadow_map.view, "ShadowMapImageView");
+    VkSamplerCreateInfo shadow_map_sampler_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = VK_FILTER_LINEAR,
+        .minFilter = VK_FILTER_LINEAR,
+        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .maxAnisotropy = 1.0f,
+        .minLod = 0.0f,
+        .maxLod = VK_LOD_CLAMP_NONE,
+        .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE};
+    VK_CHECK(vkCreateSampler(
+        state->device.handle,
+        &shadow_map_sampler_info,
+        state->allocator,
+        &scene->shadow_map_sampler));
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_SAMPLER, scene->shadow_map_sampler, "ShadowMapSampler");
+    // HACK:TEMP: END
+
     // Texture defaults using default samplers and images from renderer_state
-    VkDescriptorImageInfo white_image_info = {
+    VkDescriptorImageInfo white_texture_info = {
         .sampler = state->linear_smpl,
         .imageView = state->default_white.view,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };
-    VkWriteDescriptorSet white_image_write = {
+    VkWriteDescriptorSet white_texture_write = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .pNext = 0,
         .descriptorCount = 1,
-        .dstArrayElement = DEFAULT_TEXTURE_WHITE,
+        .dstArrayElement = RESERVED_TEXTURE_WHITE_INDEX,
         .dstBinding = SCENE_SET_TEXTURES_BINDING,
         .dstSet = scene->scene_set,
-        .pImageInfo = &white_image_info,
+        .pImageInfo = &white_texture_info,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
     };
-    VkDescriptorImageInfo black_image_info = {
+    VkDescriptorImageInfo black_texture_info = {
         .sampler = state->linear_smpl,
         .imageView = state->default_black.view,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };
-    VkWriteDescriptorSet black_image_write = {
+    VkWriteDescriptorSet black_texture_write = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .pNext = 0,
         .descriptorCount = 1,
-        .dstArrayElement = DEFAULT_TEXTURE_BLACK,
+        .dstArrayElement = RESERVED_TEXTURE_BLACK_INDEX,
         .dstBinding = SCENE_SET_TEXTURES_BINDING,
         .dstSet = scene->scene_set,
-        .pImageInfo = &black_image_info,
+        .pImageInfo = &black_texture_info,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
     };
-    VkDescriptorImageInfo normal_image_info = {
+    VkDescriptorImageInfo normal_texture_info = {
         .sampler = state->linear_smpl,
         .imageView = state->default_normal.view,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };
-    VkWriteDescriptorSet normal_image_write = {
+    VkWriteDescriptorSet normal_texture_write = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .pNext = 0,
         .descriptorCount = 1,
-        .dstArrayElement = DEFAULT_TEXTURE_NORMAL,
+        .dstArrayElement = RESERVED_TEXTURE_NORMAL_INDEX,
         .dstBinding = SCENE_SET_TEXTURES_BINDING,
         .dstSet = scene->scene_set,
-        .pImageInfo = &normal_image_info,
+        .pImageInfo = &normal_texture_info,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
     };
-    VkWriteDescriptorSet default_image_writes[] = {
-        white_image_write,
-        black_image_write,
-        normal_image_write,
+    VkDescriptorImageInfo shadow_map_texture_info = {
+        .sampler = scene->shadow_map_sampler,
+        .imageView = scene->shadow_map.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+    VkWriteDescriptorSet shadow_map_texture_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = RESERVED_TEXTURE_SHADOW_MAP_INDEX,
+        .dstBinding = SCENE_SET_TEXTURES_BINDING,
+        .dstSet = scene->scene_set,
+        .pImageInfo = &shadow_map_texture_info,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    };
+    VkWriteDescriptorSet reserved_texture_writes[RESERVED_TEXTURE_INDEX_COUNT] = {
+        white_texture_write,
+        black_texture_write,
+        normal_texture_write,
+        shadow_map_texture_write,
     };
     vkUpdateDescriptorSets(
         state->device.handle,
-        DEFAULT_TEXTURE_COUNT,
-        default_image_writes,
+        RESERVED_TEXTURE_INDEX_COUNT,
+        reserved_texture_writes,
         /* copy count */ 0,
         /* copies */ NULL
     );
 
     // Textures
     u32 texture_count = dynarray_length(scene->payload.textures);
-    for (u32 i = DEFAULT_TEXTURE_COUNT; i < texture_count; ++i) {
+    for (u32 i = RESERVED_TEXTURE_INDEX_COUNT; i < texture_count; ++i) {
         scene_texture_set(scene, i, scene->payload.textures[i].image_id, scene->payload.textures[i].sampler_id);
     }
 
@@ -828,13 +894,94 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         VK_WHOLE_SIZE,
         /* flags */ 0,
         &draw_buffer_addresses));
-    scene->mat_pipes =  etallocate(sizeof(mat_pipe) * scene->mat_pipe_count, MEMORY_TAG_SCENE);
+    scene->mat_pipes = etallocate(sizeof(mat_pipe) * scene->mat_pipe_count, MEMORY_TAG_SCENE);
     for (u32 i = 0; i < scene->mat_pipe_count; ++i) {
-        mat_pipe_init(&scene->mat_pipes[i], scene, state, &scene->mat_pipe_configs[i]);
+        if (!mat_pipe_init(&scene->mat_pipes[i], scene, state, &scene->mat_pipe_configs[i])) {
+            ETERROR(
+                "Unable to initialize material pipeline with vertex shader %s & fragment shader %s.",
+                scene->mat_pipe_configs[i].vert_path,
+                scene->mat_pipe_configs[i].frag_path
+            );
+            return false;
+        }
         VkDeviceAddress mat_draws_addr = buffer_get_address(state, &scene->mat_pipes[i].draws_buffer);
         etcopy_memory((VkDeviceAddress*)draw_buffer_addresses + i, &mat_draws_addr, sizeof(VkDeviceAddress));
     }
+
+    // TEMP: Quick and dirty placement of this data
+    scene->data.max_draw_count = MAX_DRAW_COMMANDS;
+    scene->data.alpha_cutoff = 0.5f;
+    scene->data.shadow_draw_id = scene->mat_pipe_count;
+    scene->data.shadow_map_id = RESERVED_TEXTURE_SHADOW_MAP_INDEX;
+    // TEMP: END
+
+    // TEMP: Shadow mapping code placement here is temporary
+    buffer_create(
+        state,
+        sizeof(draw_command) * MAX_DRAW_COMMANDS,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &scene->shadow_draws);    
+    scene->data.shadow_draw_id = scene->mat_pipe_count;
+    VkDeviceAddress mat_draws_addr = buffer_get_address(state, &scene->shadow_draws);
+    etcopy_memory((VkDeviceAddress*)draw_buffer_addresses + scene->mat_pipe_count, &mat_draws_addr, sizeof(VkDeviceAddress));
     vkUnmapMemory(state->device.handle, scene->draws_buffer.memory);
+
+    shader shadow_draw_gen;
+    if (!load_shader(state, "assets/shaders/shadow_draws.comp.spv.opt", &shadow_draw_gen)) {
+        return false;
+    }
+    VkPipelineShaderStageCreateInfo shadow_draw_stage_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pNext = 0,
+        .pName = shadow_draw_gen.entry_point,
+        .stage = shadow_draw_gen.stage,
+        .module = shadow_draw_gen.module};
+    VkComputePipelineCreateInfo shadow_draw_pipeline_info = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .pNext = 0,
+        .layout = scene->draw_gen_layout,
+        .stage = shadow_draw_stage_info};
+    VK_CHECK(vkCreateComputePipelines(
+        state->device.handle,
+        VK_NULL_HANDLE,
+        /* CreateInfoCount */ 1,
+        &shadow_draw_pipeline_info,
+        state->allocator,
+        &scene->shadow_draw_gen_pipeline));
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE, scene->shadow_draw_gen_pipeline, "ShadowDrawGenerationPipeline");
+    unload_shader(state, &shadow_draw_gen);
+
+    shader shadow_map_vert;
+    if (!load_shader(state, "assets/shaders/shadow.vert.spv.opt", &shadow_map_vert)) {
+        return false;
+    };
+
+    shader shadow_map_frag;
+    if (!load_shader(state, "assets/shaders/shadow.frag.spv.opt", &shadow_map_frag)) {
+        unload_shader(state, &shadow_map_vert);
+        return false;
+    }
+
+    pipeline_builder builder = pipeline_builder_create();
+    builder.layout = scene->draw_gen_layout;    // Uses draw gen layout as there is no pipeline
+    pipeline_builder_set_shaders(&builder, shadow_map_vert, shadow_map_frag);
+    pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
+
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    pipeline_builder_set_multisampling_none(&builder);
+
+    pipeline_builder_disable_blending(&builder);
+    pipeline_builder_enable_depthtest(&builder, true, VK_COMPARE_OP_GREATER_OR_EQUAL);
+
+    pipeline_builder_set_depth_attachment_format(&builder, scene->shadow_map.format);
+    scene->shadow_pipeline = pipeline_builder_build(&builder, state);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE, scene->shadow_pipeline, "ShadowMapPipeline");
+    pipeline_builder_destroy(&builder);
+
+    unload_shader(state, &shadow_map_vert);
+    unload_shader(state, &shadow_map_frag);
     return true;
 }
 
@@ -906,7 +1053,7 @@ b8 scene_render(scene* scene, renderer_state* state) {
     vkCmdFillBuffer(cmd,
         scene->counts_buffer.handle,
         /* Offset: */ 0,
-        sizeof(u32) * scene->mat_pipe_count,
+        sizeof(u32) * (scene->mat_pipe_count + /* shadow map draws buffer */ 1),
         (u32)0);
     buffer_barrier(cmd, scene->scene_uniforms.handle, /* Offset: */ 0, VK_WHOLE_SIZE,
         VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
@@ -973,11 +1120,27 @@ b8 scene_frame_begin(scene* scene, renderer_state* state) {
     return true;
 }
 
-void draw_geometry(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
+void draw_command_generation(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
+    // Shadow draw command generation compute
     u32 object_count = dynarray_length(scene->objects);
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_pipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_layout, 0, 1, &scene->scene_set, 0, NULL);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->shadow_draw_gen_pipeline);
     vkCmdDispatch(cmd, ceil(object_count / 32.0f), 1, 1);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_pipeline);
+    vkCmdDispatch(cmd, ceil(object_count / 32.0f), 1, 1);
+
+    // Wait for shadow draw generation before reading from indirect command buffer
+    buffer_barrier(
+        cmd, scene->shadow_draws.handle, /* Offset */ 0, VK_WHOLE_SIZE,
+        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT);
+    buffer_barrier(
+        cmd, scene->counts_buffer.handle, sizeof(u32) * scene->mat_pipe_count, sizeof(u32),
+        VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT
+    );
 
     // NOTE: Clean this up
     for (u32 i = 0; i < scene->mat_pipe_count; ++i) {
@@ -988,12 +1151,60 @@ void draw_geometry(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
         );
     }
     buffer_barrier(
-        cmd, scene->counts_buffer.handle, /* offset: */ 0, VK_WHOLE_SIZE,
+        cmd, scene->counts_buffer.handle, /* offset: */ 0, sizeof(u32) * scene->mat_pipe_count,
         VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT
     );
     // NOTE: END
+}
 
+void shadow_pass(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
+    VkRenderingAttachmentInfo depth_attachment = init_depth_attachment_info(
+        scene->shadow_map.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    
+    VkRect2D render_rect = {
+        .extent = {
+            .width = scene->shadow_map.extent.width,
+            .height = scene->shadow_map.extent.height,
+        },
+    };
+    VkRenderingInfo render_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+        .pNext = 0,
+        .renderArea = render_rect,
+        .layerCount = 1,
+        .pDepthAttachment = &depth_attachment,
+        .pStencilAttachment = 0,
+    };
+
+    vkCmdBeginRendering(cmd, &render_info);
+
+    VkViewport viewport = {
+        .width = render_rect.extent.width,
+        .height = render_rect.extent.height,
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f};
+    VkRect2D scissor = render_rect;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    vkCmdBindIndexBuffer(cmd, scene->index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->draw_gen_layout, 0, 1, &scene->scene_set, 0, NULL);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->shadow_pipeline);
+
+    vkCmdDrawIndexedIndirectCount(cmd,
+        scene->shadow_draws.handle,
+        /* Offset: */ 0,
+        scene->counts_buffer.handle,
+        sizeof(u32) * scene->mat_pipe_count,
+        MAX_DRAW_COMMANDS,
+        sizeof(draw_command)
+    );
+
+    vkCmdEndRendering(cmd);
+}
+
+void geometry_pass(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
     VkClearValue clear_color = {
         .color = {0.f,0.f,0.f,0.f},
     };
@@ -1049,17 +1260,31 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
     VkResult result;
     VkCommandBuffer frame_cmd = scene->graphics_command_buffers[state->swapchain.frame_index];
 
+    // Generate draw commands
+    draw_command_generation(state, scene, frame_cmd);
+    
+    // Get shadow map ready to render to
+    image_barrier(frame_cmd, scene->shadow_map.handle, scene->shadow_map.aspects,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
+    shadow_pass(state, scene, frame_cmd);
+    // Do not sample from shadow map until the shadow pass has reached
+    image_barrier(frame_cmd, scene->shadow_map.handle, scene->shadow_map.aspects,
+        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+        VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+
+    // Get color attachment and depth attachment ready to render to
     image_barrier(frame_cmd, scene->render_image.handle, scene->render_image.aspects,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         VK_ACCESS_2_NONE, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
         VK_PIPELINE_STAGE_2_NONE, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
-
     image_barrier(frame_cmd, scene->depth_image.handle, scene->depth_image.aspects,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
         VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
-
-    draw_geometry(state, scene, frame_cmd);
+    geometry_pass(state, scene, frame_cmd);
 
     // Make render image optimal layout for transfer source to swapchain image
     image_barrier(frame_cmd, scene->render_image.handle, scene->render_image.aspects,
@@ -1106,7 +1331,7 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
         1, &signal_submit);
     
     result = vkQueueSubmit2(
-        state->device.graphics_queue, 
+        state->device.graphics_queue,
         /* submitCount */ 1,
         &submit_info,
         scene->render_fences[state->swapchain.frame_index]);

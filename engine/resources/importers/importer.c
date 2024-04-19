@@ -29,7 +29,7 @@ import_payload import_files(u32 file_count, const char* const* paths) {
 
     // HACK: Place default dummy positions in the texture array for importing
     // NOTE: there should be a better way than this in the end
-    dynarray_resize((void**)&payload.textures, DEFAULT_TEXTURE_COUNT);
+    dynarray_resize((void**)&payload.textures, RESERVED_TEXTURE_INDEX_COUNT);
     // HACK: END
 
     u32 failure_count = 0;

@@ -36,4 +36,5 @@ typedef struct object {
     u32 mat_id;             // Material instance index
     u32 geo_id;             // Geometry index
     u32 transform_id;       // Transform index
+    u32 color_id;
 } object;

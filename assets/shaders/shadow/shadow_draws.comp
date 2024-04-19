@@ -1,7 +1,7 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
-#include "input_structures.glsl"
+#include "../input_structures.glsl"
 
 #define SUBGROUP_SIZE 32
 layout(local_size_x = SUBGROUP_SIZE) in;
@@ -64,14 +64,14 @@ void main() {
 		command.material_id = obj.mat_id;
 		command.transform_id = obj.transform_id;
 		command.color_id = obj.color_id;
-		uint draw_id = atomicAdd(counts[obj.pipe_id], 1);
+		uint draw_id = atomicAdd(counts[frame_data.shadow_draws_id], 1);
 
 		/** NOTE:HACK: Avoiding a SPIRV-REFLECT Error when parsing this shader
 		* Using a 64 bit integer and casting it to a pointer to a draw_buffer
 		* instead of just having an array of pointers is because Spirv-Reflect
 		* throws a null pointer exception with an array of buffer_references.
 		*/
-		draw_buffer pso_draws = draw_buffer(draw_buffers[obj.pipe_id]);
-		pso_draws.draws[draw_id] = command;
+		draw_buffer shadow_draws = draw_buffer(draw_buffers[frame_data.shadow_draws_id]);
+		shadow_draws.draws[draw_id] = command;
 	}
 }

@@ -126,11 +126,11 @@ b8 import_gltf(import_payload* payload, const char* path) {
                 .b = mr.base_color_factor[2],
                 .a = mr.base_color_factor[3],
             },
-            .color_tex_index = DEFAULT_TEXTURE_WHITE,
+            .color_tex_index = RESERVED_TEXTURE_WHITE_INDEX,
             .metalness = mr.metallic_factor,
             .roughness = mr.roughness_factor,
-            .mr_tex_index = DEFAULT_TEXTURE_WHITE,
-            .normal_index = DEFAULT_TEXTURE_NORMAL,
+            .mr_tex_index = RESERVED_TEXTURE_WHITE_INDEX,
+            .normal_index = RESERVED_TEXTURE_NORMAL_INDEX,
         };
 
         if (mr.base_color_texture.texture) {

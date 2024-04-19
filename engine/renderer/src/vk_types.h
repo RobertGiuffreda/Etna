@@ -68,22 +68,33 @@ typedef struct mesh_buffers {
 } mesh_buffers;
 
 typedef struct scene_data {
+    // Camera/View
     m4s view;
     m4s proj;
     m4s viewproj;
     v4s view_pos;
+
+    // TEMP: Eventually define multiple lights
     v4s ambient_color;
     v4s light_color;
     v4s light_position;
+    m4s sun_viewproj;
     v4s sun_color;
     v4s sun_direction;
+    // TEMP: END
+    
+    // Kinda hacky spaghetti placement of this info
+    float alpha_cutoff;
     u32 max_draw_count;
+    u32 shadow_draw_id;
+    u32 shadow_map_id;
 } scene_data;
 
 typedef struct draw_command {
     VkDrawIndexedIndirectCommand draw;
     u32 material_inst_id;
     u32 transform_id;
+    u32 color_id;
 } draw_command;
 
 typedef struct device {
