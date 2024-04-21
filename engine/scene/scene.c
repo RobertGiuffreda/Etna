@@ -53,7 +53,10 @@ b8 scene_init(scene** scn, scene_config config) {
     scene->data.ambient_color = (v4s) { .raw = {1.f, 1.f, 1.f, .1f}};
     scene->data.light_color   = (v4s) { .raw = {1.f, 1.f, 1.f, 5.f}};
     scene->data.sun_color     = (v4s) { .raw = {1.f, 1.f, 1.f, 10.f}};
-    scene->data.sun_direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
+    // scene->data.sun_direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
+    scene->data.sun_direction = (v4s) { .raw = {-0.000001f, -1.0, 0.0f, 0.0f}};
+
+    scene->data.debug_view = DEBUG_VIEW_TYPE_OFF;
     
     import_payload* payload = config.import_payload;
 
@@ -184,6 +187,8 @@ void scene_shutdown(scene* scene) {
 // TEMP: For testing and debugging
 static f32 light_offset = 0.0f;
 static b8 light_dynamic = true;
+static b8 sun_pov = false;
+static b8 sun_pov_persp = false;
 // TEMP: END
 
 void scene_update(scene* scene, f64 dt) {
@@ -195,30 +200,38 @@ void scene_update(scene* scene, f64 dt) {
     // Camera should also have the aspect ratio and update on resize
     // TODO: Scene should register for event system and update camera stuff itself
     m4s view = camera_get_view_matrix(&scene->cam);
-    m4s project = glms_perspective(
-        /* fovy */ glm_rad(70.f),
-        ((f32)state->swapchain.image_extent.width/(f32)state->swapchain.image_extent.height),
-        /* near-z: */ 10000.f,  // NOTE: Reverse Z for depth
-        /* far-z: */ 0.1f);
-    // NOTE: invert the Y direction on projection matrix so that we are more match gltf axis
+    // NOTE: invert the Y direction on projection matrix so that we match gltf axis
+    float aspect_ratio = ((f32)state->swapchain.image_extent.width/(f32)state->swapchain.image_extent.height);
+    m4s project = glms_perspective(glm_rad(70.f), aspect_ratio, 1000.f, 0.1f);
     project.raw[1][1] *= -1;
     // NOTE: END
     // TODO: END
     // TODO: END
 
-    m4s vp = glms_mat4_mul(project, view);
     scene->data.view = view;
     scene->data.proj = project;
-    scene->data.viewproj = vp;
+    scene->data.viewproj = glms_mat4_mul(project, view);
     scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
 
-    // TODO: Create the sun/skylights view-projection matrix for shadow pass
-    v4s sun_view;
-    v4s sun_projection;
-    v4s sun_viewproj;
-    scene->data.sun_viewproj = vp;
-    // TODO: END
+    v3s sun_position = glms_vec3_add(glms_vec3(glms_vec4_scale(scene->data.sun_direction, -20.f)), scene->cam.position);
+    m4s sun_view = glms_look(
+        sun_position,
+        glms_vec3(scene->data.sun_direction),
+        (v3s){ .raw = {0.0f, 1.0f, 0.0f}}
+    );
     
+    // NOTE: invert the Y direction on projection matrix so that we match gltf axis
+    m4s sun_projection = glms_ortho(-15.f, 15.f, -15.f, 15.f, 1000.f, 0.0f);
+    sun_projection.raw[1][1] *= -1;
+
+    m4s sun_viewproj = glms_mat4_mul(sun_projection, sun_view);
+    scene->data.sun_viewproj = sun_viewproj;
+
+    if (sun_pov) {
+        if (sun_pov_persp) sun_viewproj = glms_mat4_mul(project, sun_view);
+        scene->data.viewproj = sun_viewproj;
+    }
+
     // Update light information
     v4s l_pos = glms_vec4(scene->cam.position, 1.0f);
     if (light_dynamic) {
@@ -723,8 +736,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     // HACK:TEMP: More robust shadow mapping code
     VkExtent3D shadow_map_resolution = {
-        .width = 1024,
-        .height = 1024,
+        .width = 2048,
+        .height = 2048,
         .depth = 1};
     image2D_create(
         state,
@@ -741,12 +754,12 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .magFilter = VK_FILTER_LINEAR,
         .minFilter = VK_FILTER_LINEAR,
         .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
         .maxAnisotropy = 1.0f,
         .minLod = 0.0f,
-        .maxLod = VK_LOD_CLAMP_NONE,
+        .maxLod = 1.0f,
         .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE};
     VK_CHECK(vkCreateSampler(
         state->device.handle,
@@ -929,7 +942,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         sizeof(draw_command) * MAX_DRAW_COMMANDS,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &scene->shadow_draws);    
+        &scene->shadow_draws);
     scene->data.shadow_draw_id = scene->mat_pipe_count;
     VkDeviceAddress shadow_draws_addr = buffer_get_address(state, &scene->shadow_draws);
     etcopy_memory((VkDeviceAddress*)draw_buffer_addresses + scene->mat_pipe_count, &shadow_draws_addr, sizeof(VkDeviceAddress));
@@ -1394,16 +1407,35 @@ void scene_texture_set(scene* scene, u32 tex_id, u32 img_id, u32 sampler_id) {
 static b8 scene_on_key_event(u16 code, void* scne, event_data data) {
     scene* s = (scene*)scne;
     keys key = EVENT_DATA_KEY(data);
-    switch (key)
-    {
-    case KEY_L:
-        light_offset += 2.0f;
-        break;
-    case KEY_K:
-        light_offset -= 2.0f; 
-        break;
-    case KEY_J:
-        light_dynamic = !light_dynamic;
+    switch (key) {
+        case KEY_L:
+            light_offset += 2.0f;
+            break;
+        case KEY_K:
+            light_offset -= 2.0f; 
+            break;
+        case KEY_J:
+            light_dynamic = !light_dynamic;
+            break;
+        case KEY_Q:
+            sun_pov = true;
+            break;
+        case KEY_E:
+            sun_pov = false;
+            break;
+        case KEY_F:
+            sun_pov_persp = false;
+            break;
+        case KEY_G:
+            sun_pov_persp = true;
+            break;
+        case KEY_Y:
+            s->data.debug_view = (s->data.debug_view + 1) % DEBUG_VIEW_TYPE_MAX;
+            break;
+        case KEY_T: {
+            s->data.debug_view = (s->data.debug_view) ? s->data.debug_view - 1 : DEBUG_VIEW_TYPE_MAX - 1;
+            break;
+        }
     }
     return false;
 }

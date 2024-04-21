@@ -66,7 +66,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
     for (u32 i = 0; i < data->images_count; ++i) {
         import_image* image = &payload->images[img_start + i];
         image->data = load_image_data(&data->images[i], path, &image->width, &image->height, &image->channels);
-        image->name = (data->images[i].name) ? str_duplicate_allocate(data->images[i].name) : str_duplicate_allocate("COCK");
+        image->name = (data->images[i].name) ? str_duplicate_allocate(data->images[i].name) : str_duplicate_allocate("Default Name");
     }
 
     u32 sampler_start = dynarray_grow((void**)&payload->samplers, data->samplers_count);

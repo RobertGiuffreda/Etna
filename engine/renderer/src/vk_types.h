@@ -67,6 +67,16 @@ typedef struct mesh_buffers {
     buffer vertex_buffer;
 } mesh_buffers;
 
+typedef enum debug_view_type {
+    DEBUG_VIEW_TYPE_OFF = 0,
+    DEBUG_VIEW_TYPE_SHADOW,
+    DEBUG_VIEW_TYPE_CURRENT_DEPTH,
+    DEBUG_VIEW_TYPE_CLOSEST_DEPTH,
+    DEBUG_VIEW_TYPE_METAL_ROUGH,
+    DEBUG_VIEW_TYPE_NORMAL,
+    DEBUG_VIEW_TYPE_MAX,
+} debug_view_type;
+
 typedef struct scene_data {
     // Camera/View
     m4s view;
@@ -88,6 +98,7 @@ typedef struct scene_data {
     u32 max_draw_count;
     u32 shadow_draw_id;
     u32 shadow_map_id;
+    u32 debug_view;
 } scene_data;
 
 typedef struct draw_command {

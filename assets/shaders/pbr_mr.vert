@@ -20,13 +20,14 @@ layout(set = 1, binding = 1) readonly buffer mat_inst_buffer {
 };
 
 layout (location = 0) out vec3 out_position;
-layout (location = 1) out vec3 out_normal;
-layout (location = 2) out vec3 out_color;
-layout (location = 3) out vec2 out_uv;
-layout (location = 4) flat out uint out_mat_id;
-layout (location = 5) flat out uint out_color_id;
-layout (location = 6) flat out uint out_mr_id;
-layout (location = 7) flat out uint out_normal_id;
+layout (location = 1) out vec4 out_sun_position;
+layout (location = 2) out vec3 out_normal;
+layout (location = 3) out vec3 out_color;
+layout (location = 4) out vec2 out_uv;
+layout (location = 5) flat out uint out_mat_id;
+layout (location = 6) flat out uint out_color_id;
+layout (location = 7) flat out uint out_mr_id;
+layout (location = 8) flat out uint out_normal_id;
 
 void main() {
     draw_command draw = pbr_draws[gl_DrawID];
@@ -35,7 +36,9 @@ void main() {
 
     gl_Position = frame_data.viewproj * model * vec4(v.position, 1.0f);
 
-    out_position = (model * vec4(v.position, 1.0f)).xyz;
+    vec3 world_pos = (model * vec4(v.position, 1.0f)).xyz;
+    out_position = world_pos;
+    out_sun_position = frame_data.sun_viewproj * vec4(world_pos, 1.0f);
 
     // TODO: Compute the normal matrix on the CPU and not GPU
     out_normal = (transpose(inverse(model)) * vec4(v.normal, 0.0f)).xyz;

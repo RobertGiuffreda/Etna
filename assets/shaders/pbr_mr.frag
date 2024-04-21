@@ -24,13 +24,14 @@ layout(set = 1, binding = 1) readonly buffer mat_inst_buffer {
 };
 
 layout (location = 0) in vec3 in_position;
-layout (location = 1) in vec3 in_normal;
-layout (location = 2) in vec3 in_color;
-layout (location = 3) in vec2 in_uv;
-layout (location = 4) flat in uint in_mat_id;
-layout (location = 5) flat in uint in_color_id;
-layout (location = 6) flat in uint in_mr_id;
-layout (location = 7) flat in uint in_normal_id;
+layout (location = 1) in vec4 in_sun_position;
+layout (location = 2) in vec3 in_normal;
+layout (location = 3) in vec3 in_color;
+layout (location = 4) in vec2 in_uv;
+layout (location = 5) flat in uint in_mat_id;
+layout (location = 6) flat in uint in_color_id;
+layout (location = 7) flat in uint in_mr_id;
+layout (location = 8) flat in uint in_normal_id;
 
 layout(location = 0) out vec4 out_frag_color;
 
@@ -111,16 +112,6 @@ void main() {
     vec3 N = get_normal_from_map();
     vec3 V = normalize(frame_data.view_pos.xyz - in_position);
 
-    // TODO: Get information from shadow map
-    float depth_sample_test = texture(textures[frame_data.shadow_map_id], in_uv).r;
-    // TODO: END
-
-    // https://www.khronos.org/opengl/wiki/Sampler_(GLSL)#Non-uniform_flow_control
-    // Alpha discard after all texture sampling has been done to preserve uniform control flow
-    if (albedo_sample.a < frame_data.alpha_cutoff) {
-        discard;
-    }
-
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
     vec3 F0 = vec3(0.04);
@@ -143,8 +134,23 @@ void main() {
     vec3 kDs = vec3(1.0) - kSs;
     kDs *= 1.0 - metallic;
 
+    // TEMP: Shadow calculation function or something
+    vec3 shadow_coords = (in_sun_position.xyz / in_sun_position.w) * 0.5f + 0.5f;
+    float closest_depth = texture(textures[frame_data.shadow_map_id], shadow_coords.xy).x;
+    float current_depth = shadow_coords.z;
+    float bias_factor = 0.008f;
+    // float bias = max(bias_factor * (1.0f - dot(N, Ls)), bias_factor);
+    float bias = bias_factor;
+    float shadow = (current_depth - bias > closest_depth) ? 0.0f : 1.0f;
+
+    // https://www.khronos.org/opengl/wiki/Sampler_(GLSL)#Non-uniform_flow_control
+    // Alpha discard after all texture sampling has been done to preserve uniform control flow
+    if (albedo_sample.a < frame_data.alpha_cutoff) {
+        discard;
+    }
+
     float NdotLs = max(dot(N, Ls), 0.0);
-    vec3 Los = (kDs * albedo * INV_PI + s_specular) * s_radiance * NdotLs;
+    vec3 Los = (1.f - shadow) * (kDs * albedo * INV_PI + s_specular) * s_radiance * NdotLs;
     // NOTE: END
 
     // NOTE: Point light, singular for now
@@ -183,10 +189,15 @@ void main() {
     color = pow(color, INV_GAMMA);
 
     out_frag_color = vec4(color, 1.0f);
-    // out_frag_color = vec4(vec3(depth_sample_test), 1.0f);
-    // out_frag_color = mr_sample;
-    // out_frag_color = vec4(N, 1.0);
-    // out_frag_color = vec4(vec3(kDs), 1.0);
-    // out_frag_color = vec4(Fs, 1.0);
-    // out_frag_color = vec4(albedo, 1.0);
+    if (frame_data.debug_view == DEBUG_VIEW_TYPE_SHADOW) {
+        out_frag_color = vec4(vec3(shadow), 1.0f);
+    } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_CURRENT_DEPTH) {
+        out_frag_color = vec4(current_depth, 0.0f, 0.0f, 1.0f);
+    } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_CLOSEST_DEPTH) {
+        out_frag_color = vec4(closest_depth, 0.0f, 0.0f, 1.0f);
+    } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_METAL_ROUGH) {
+        out_frag_color = vec4(shadow_coords.xy, 0.0f, 1.0f);
+    } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_NORMAL) {
+        out_frag_color = vec4(N, 1.0);
+    }
 }
