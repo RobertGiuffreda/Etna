@@ -103,13 +103,13 @@ b8 scene_init(scene** scn, scene_config config) {
     }
 
 // HACK:TEMP: Evil awful ugly workaround for getting the albedo/color texture index at this point
-// This is temporary until I have something worked out
+// This is temporary until I architect something better for shadow map alpha mask
 typedef struct material_instance_head {
     v4s color_factors;
     u32 color_tex_index;
 } mih;
 #define COLOR_TEX_INDEX(material_pipeline_config, material_instance_index) \
-((mih*)((u8*)material_pipeline_config.instances + (material_pipeline_config.inst_size * material_instance_index)))->color_tex_index
+(((mih*)((u8*)material_pipeline_config.instances + (material_pipeline_config.inst_size * material_instance_index)))->color_tex_index)
 // HACK:TEMP: END
 
     // Change nodes into objects and transforms for the meshes
@@ -213,15 +213,14 @@ void scene_update(scene* scene, f64 dt) {
     scene->data.viewproj = glms_mat4_mul(project, view);
     scene->data.view_pos = glms_vec4(scene->cam.position, 1.0f);
 
-    v3s sun_position = glms_vec3_add(glms_vec3(glms_vec4_scale(scene->data.sun_direction, -20.f)), scene->cam.position);
     m4s sun_view = glms_look(
-        sun_position,
+        (v3s){ .raw = {0.0f, 0.0f, 0.0f}},
         glms_vec3(scene->data.sun_direction),
         (v3s){ .raw = {0.0f, 1.0f, 0.0f}}
     );
     
     // NOTE: invert the Y direction on projection matrix so that we match gltf axis
-    m4s sun_projection = glms_ortho(-15.f, 15.f, -15.f, 15.f, 1000.f, 0.0f);
+    m4s sun_projection = glms_ortho(-25.f, 25.f, -25.f, 25.f, 25.f, -25.f);
     sun_projection.raw[1][1] *= -1;
 
     m4s sun_viewproj = glms_mat4_mul(sun_projection, sun_view);
@@ -990,7 +989,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
 
-    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     pipeline_builder_set_multisampling_none(&builder);
 
     pipeline_builder_disable_blending(&builder);

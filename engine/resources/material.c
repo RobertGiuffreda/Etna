@@ -35,7 +35,7 @@ b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const 
 
     // TODO: Figure out culling for multiple things; on now for some models that use it for
     // the old outline trick (extrude black, invert, cull backfaces)
-    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     // TODO: END
 
     pipeline_builder_set_multisampling_none(&builder);

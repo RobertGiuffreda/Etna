@@ -36,9 +36,9 @@ void main() {
 
     gl_Position = frame_data.viewproj * model * vec4(v.position, 1.0f);
 
-    vec3 world_pos = (model * vec4(v.position, 1.0f)).xyz;
-    out_position = world_pos;
-    out_sun_position = frame_data.sun_viewproj * vec4(world_pos, 1.0f);
+    vec4 world_pos = model * vec4(v.position, 1.0f);
+    out_position = world_pos.xyz;
+    out_sun_position = frame_data.sun_viewproj * world_pos;
 
     // TODO: Compute the normal matrix on the CPU and not GPU
     out_normal = (transpose(inverse(model)) * vec4(v.normal, 0.0f)).xyz;

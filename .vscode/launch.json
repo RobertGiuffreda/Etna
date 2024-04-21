@@ -7,7 +7,6 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/sandbox.exe",
             "args": [
-                "../../vtubers/beegsmol_irys_birthday_costume_-_hololive_en.glb",
                 "../assets/gltf/structure.glb",
                 "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],

@@ -12,6 +12,7 @@
 
 #include "renderer/rendererAPI.h"
 #include "scene/scene.h"
+#include "scene/scene_private.h"
 #include "resources/importers/importer.h"
 
 #include "application_types.h"
@@ -150,7 +151,7 @@ b8 engine_run(void) {
         if (!engine->is_minimized) {
             clock_time(&engine->frame);
             f64 dt = engine->frame.elapsed;
-            printf("Frame time: %.8llfms\r", dt * 1000);
+            printf("Frame time: %.8llfms | y: %lf\r", dt * 1000, engine->main_scene->cam.position.y);
             clock_start(&engine->frame);
 
             scene_update(engine->main_scene, dt);

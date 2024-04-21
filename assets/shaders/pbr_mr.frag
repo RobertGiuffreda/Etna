@@ -135,13 +135,15 @@ void main() {
     kDs *= 1.0 - metallic;
 
     // TEMP: Shadow calculation function or something
-    vec3 shadow_coords = (in_sun_position.xyz / in_sun_position.w) * 0.5f + 0.5f;
-    float closest_depth = texture(textures[frame_data.shadow_map_id], shadow_coords.xy).x;
+    vec3 shadow_coords = in_sun_position.xyz;
+    // shadow_coords.y = -shadow_coords.y;
+    vec2 shadow_uv = shadow_coords.xy * 0.5f + 0.5f;
+    float closest_depth = texture(textures[frame_data.shadow_map_id], shadow_uv).x;
     float current_depth = shadow_coords.z;
-    float bias_factor = 0.008f;
-    // float bias = max(bias_factor * (1.0f - dot(N, Ls)), bias_factor);
-    float bias = bias_factor;
-    float shadow = (current_depth - bias > closest_depth) ? 0.0f : 1.0f;
+    float min_bias_factor = 0.008f;
+    float max_bias_factor = 0.08f;
+    float bias = max(max_bias_factor * (1.0f - dot(N, Ls)), min_bias_factor);
+    float shadow = (current_depth + bias < closest_depth) ? 1.0f : 0.0f;
 
     // https://www.khronos.org/opengl/wiki/Sampler_(GLSL)#Non-uniform_flow_control
     // Alpha discard after all texture sampling has been done to preserve uniform control flow
@@ -192,9 +194,9 @@ void main() {
     if (frame_data.debug_view == DEBUG_VIEW_TYPE_SHADOW) {
         out_frag_color = vec4(vec3(shadow), 1.0f);
     } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_CURRENT_DEPTH) {
-        out_frag_color = vec4(current_depth, 0.0f, 0.0f, 1.0f);
+        out_frag_color = vec4(vec3(current_depth), 1.0f);
     } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_CLOSEST_DEPTH) {
-        out_frag_color = vec4(closest_depth, 0.0f, 0.0f, 1.0f);
+        out_frag_color = vec4(vec3(closest_depth), 1.0f);
     } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_METAL_ROUGH) {
         out_frag_color = vec4(shadow_coords.xy, 0.0f, 1.0f);
     } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_NORMAL) {
