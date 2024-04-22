@@ -16,6 +16,7 @@ A small `vulkan` renderer written using the `C` programming language. This is wr
 * `Vulkan 1.3`'s dynamic rendering feature.
 * vkCmdDrawIndirectCount used alongside descriptor indexing to render the scene with only as many draw calls as pipeline shader objects.
 * Multiple frames in flight.
+* Directional Skylight shadow map 
 ## Planned
 * Custom file formats for scenes, materials, and meshes
 * Serialization support to read in these formats as well as write them out
