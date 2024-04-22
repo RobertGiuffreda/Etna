@@ -13,9 +13,6 @@
  * 
  * Parent child relationship between objects/transforms to make scene graph.
  * (Double Ended Queue / Ring queue) for traversing the scene graph
- * 
- * Keep in mind:
- * Genuine Instancing - Hardcoded MAX instance amount for each mesh, controlls offsets into transform buffer.
  */
 
 typedef struct scene {
@@ -78,10 +75,10 @@ typedef struct scene {
     // TODO: Clean up implementation
     mat_pipe_config* mat_pipe_configs;
     // TODO: image2D_config* image_configs;
-    // TODO: END
 
     u32 mat_pipe_count;
     mat_pipe* mat_pipes;
+    // TODO: END
 
     image_manager* image_bank;
 

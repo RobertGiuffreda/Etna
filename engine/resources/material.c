@@ -29,13 +29,13 @@ b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const 
     // TEMP: Create better pipeline system
     pipeline_builder builder = pipeline_builder_create();
     builder.layout = scene->mat_pipeline_layout;
-    pipeline_builder_set_shaders(&builder, mat_vert, mat_frag);
+    pipeline_builder_set_vertex_fragment(&builder, mat_vert, mat_frag);
     pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
 
     // TODO: Figure out culling for multiple things; on now for some models that use it for
     // the old outline trick (extrude black, invert, cull backfaces)
-    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     // TODO: END
 
     pipeline_builder_set_multisampling_none(&builder);
@@ -70,7 +70,7 @@ b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const 
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, material->draws_buffer.handle, "MatDrawsBuffer");
     buffer_create(
         state,
-        MAX_MATERIAL_COUNT * config->inst_size,
+        config->inst_size * MAX_MATERIAL_COUNT,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &material->inst_buffer);
@@ -132,13 +132,7 @@ b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const 
         draws_buffer_write,
         inst_buffer_write,
     };
-    vkUpdateDescriptorSets(
-        state->device.handle,
-        /* writeCount */ 2,
-        writes,
-        /* copyCount */ 0,
-        /* copies */ NULL
-    );
+    vkUpdateDescriptorSets(state->device.handle, 2, writes, 0, NULL);
     return true;
 }
 

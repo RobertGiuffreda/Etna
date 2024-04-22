@@ -8,6 +8,7 @@
 #define DEFAULT_FRAGMENT_STAGE_INDEX 1
 
 typedef struct pipeline_builder {
+    u32 stage_count;
     VkPipelineShaderStageCreateInfo stages[DEFAULT_GRAPHICS_PIPELINE_STAGE_COUNT];
     VkPipelineInputAssemblyStateCreateInfo input_assembly;
     VkPipelineRasterizationStateCreateInfo rasterizer;
@@ -25,7 +26,10 @@ void pipeline_builder_destroy(pipeline_builder* builder);
 
 VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* state);
 
-void pipeline_builder_set_shaders(pipeline_builder* builder, shader vertex, shader fragment);
+// Opaque depth pass
+void pipeline_builder_set_vertex_only(pipeline_builder* builder, shader vertex);
+
+void pipeline_builder_set_vertex_fragment(pipeline_builder* builder, shader vertex, shader fragment);
 
 void pipeline_builder_set_input_topology(pipeline_builder* builder, VkPrimitiveTopology topology);
 

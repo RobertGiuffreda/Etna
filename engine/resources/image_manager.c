@@ -25,7 +25,6 @@ b8 image_manager_initialize(image_manager** manager, renderer_state* state) {
 
 void image_manager_shutdown(image_manager* manager) {
     for (u32 i = 0; i < manager->image_count; ++i) {
-        // Skip to not destroy the error image
         if (manager->images[i].id == INVALID_ID) {
             continue;
         }

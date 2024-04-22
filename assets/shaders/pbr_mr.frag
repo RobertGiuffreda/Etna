@@ -1,9 +1,8 @@
-// TODO: Move to view space calculations
-// TODO: v/x --> v * 1/x
 #version 460
 #extension GL_GOOGLE_include_directive : require
 
 #include "input_structures.glsl"
+#include "common.glsl"
 
 // NOTE: Much of this is from learnopengl.com's information & code about PBR
 
@@ -35,11 +34,6 @@ layout (location = 8) flat in uint in_normal_id;
 
 layout(location = 0) out vec4 out_frag_color;
 
-const vec3 GAMMA = vec3(2.2);
-const vec3 INV_GAMMA = vec3(1.0f / 2.2f);
-const float PI = 3.14159265359;
-const float INV_PI = 1 / PI;
-
 vec3 get_normal_from_map() {
     vec3 tangent_normal = texture(textures[nonuniformEXT(in_normal_id)], in_uv).xyz * 2.0 - 1.0;
 
@@ -64,42 +58,6 @@ vec3 get_normal_from_map() {
     return normalize(TBN * tangent_normal);
 }
 
-float distribution_ggx(vec3 N, vec3 H, float roughness) {
-    float a = roughness*roughness;
-    float a2 = a*a;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH*NdotH;
-
-    float nom   = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
-
-    return nom / denom;
-}
-
-float geometry_schlick_ggx(float NdotV, float roughness) {
-    float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
-
-    float nom   = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
-
-    return nom / denom;
-}
-
-float geometry_smith(vec3 N, vec3 V, vec3 L, float roughness) {
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
-    float ggx2 = geometry_schlick_ggx(NdotV, roughness);
-    float ggx1 = geometry_schlick_ggx(NdotL, roughness);
-
-    return ggx1 * ggx2;
-}
-
-vec3 fresnel_schlick(float cos_theta, vec3 F0) {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
-}
-
 void main() {
     // NOTE: Assume the texture is in non linear color space
     vec4 albedo_sample = texture(textures[nonuniformEXT(in_color_id)], in_uv);
@@ -112,16 +70,15 @@ void main() {
     vec3 N = get_normal_from_map();
     vec3 V = normalize(frame_data.view_pos.xyz - in_position);
 
-    // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
+    // calculate reflectance at normal incidence; if dielectric (like plastic) use F0 
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
 
-    // reflectance equation
     // NOTE: Sun/Skylight contribution, no attenuation
-    vec3 Ls = normalize(-frame_data.sun_direction.xyz);
+    vec3 Ls = normalize(-frame_data.sun.direction.xyz);
     vec3 Hs = normalize(V + Ls);
-    vec3 s_radiance = frame_data.sun_color.rgb * frame_data.sun_color.a;
+    vec3 s_radiance = frame_data.sun.color.rgb * frame_data.sun.color.a;
     float NDFs = distribution_ggx(N, Hs, roughness);
     float Gs = geometry_smith(N, V, Ls, roughness);
     vec3 Fs = fresnel_schlick(max(dot(Hs, V), 0.0), F0);
@@ -134,15 +91,16 @@ void main() {
     vec3 kDs = vec3(1.0) - kSs;
     kDs *= 1.0 - metallic;
 
-    // TEMP: Shadow calculation function or something
+    float NdotLs = max(dot(N, Ls), 0.0);
+
+    // TEMP: Create calculate_shadow function
     vec3 shadow_coords = in_sun_position.xyz;
-    // shadow_coords.y = -shadow_coords.y;
     vec2 shadow_uv = shadow_coords.xy * 0.5f + 0.5f;
     float closest_depth = texture(textures[frame_data.shadow_map_id], shadow_uv).x;
     float current_depth = shadow_coords.z;
-    float min_bias_factor = 0.008f;
-    float max_bias_factor = 0.08f;
-    float bias = max(max_bias_factor * (1.0f - dot(N, Ls)), min_bias_factor);
+    float min_bias_factor = 0.002f;
+    float max_bias_factor = 0.005f;
+    float bias = max(max_bias_factor * (1.0f - NdotLs), min_bias_factor);
     float shadow = (current_depth + bias < closest_depth) ? 1.0f : 0.0f;
 
     // https://www.khronos.org/opengl/wiki/Sampler_(GLSL)#Non-uniform_flow_control
@@ -151,17 +109,15 @@ void main() {
         discard;
     }
 
-    float NdotLs = max(dot(N, Ls), 0.0);
     vec3 Los = (1.f - shadow) * (kDs * albedo * INV_PI + s_specular) * s_radiance * NdotLs;
     // NOTE: END
 
     // NOTE: Point light, singular for now
-    // calculate per-light radiance
-    vec3 L = normalize(frame_data.light_position.xyz - in_position);
+    vec3 L = normalize(frame_data.light.position.xyz - in_position);
     vec3 H = normalize(V + L);
-    float dist = length(frame_data.light_position.xyz - in_position);
+    float dist = length(frame_data.light.position.xyz - in_position);
     float attenuation = 1.0 / (dist * dist);
-    vec3 radiance = frame_data.light_color.rgb * frame_data.light_color.a * attenuation;
+    vec3 radiance = frame_data.light.color.rgb * frame_data.light.color.a * attenuation;
 
     // Cook-Torrance BRDF
     float NDF = distribution_ggx(N, H, roughness);
@@ -176,9 +132,7 @@ void main() {
     vec3 kD = vec3(1.0) - kS;
     kD *= 1.0 - metallic;
 
-    // scale light by NdotL
     float NdotL = max(dot(N, L), 0.0);
-
     vec3 Lo = (kD * albedo * INV_PI + specular) * radiance * NdotL;
     // NOTE: END
 
@@ -192,7 +146,7 @@ void main() {
 
     out_frag_color = vec4(color, 1.0f);
     if (frame_data.debug_view == DEBUG_VIEW_TYPE_SHADOW) {
-        out_frag_color = vec4(vec3(shadow), 1.0f);
+        out_frag_color = vec4(vec3(1.f - shadow), 1.0f);
     } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_CURRENT_DEPTH) {
         out_frag_color = vec4(vec3(current_depth), 1.0f);
     } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_CLOSEST_DEPTH) {

@@ -38,6 +38,9 @@ static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 static b8 scene_renderer_init(scene* scene, scene_config config);
 static void scene_renderer_shutdown(scene* scene, renderer_state* state);
 
+static b8 create_shadow_pass(scene* scene, renderer_state* state);
+static b8 destroy_shadow_pass(scene* scene, renderer_state* state);
+
 // TODO: Remove, textures will be set when loading for now, until any kind of streaming
 // is implemented, if it ever is
 void scene_texture_set(scene* scene, u32 tex_id, u32 img_id, u32 sampler_id);
@@ -51,10 +54,9 @@ b8 scene_init(scene** scn, scene_config config) {
 
     // NOTE: This will be passed a config when serialization is implemented
     scene->data.ambient_color = (v4s) { .raw = {1.f, 1.f, 1.f, .1f}};
-    scene->data.light_color   = (v4s) { .raw = {1.f, 1.f, 1.f, 5.f}};
-    scene->data.sun_color     = (v4s) { .raw = {1.f, 1.f, 1.f, 10.f}};
-    // scene->data.sun_direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
-    scene->data.sun_direction = (v4s) { .raw = {-0.000001f, -1.0, 0.0f, 0.0f}};
+    scene->data.light.color   = (v4s) { .raw = {1.f, 1.f, 1.f, 5.f}};
+    scene->data.sun.color     = (v4s) { .raw = {1.f, 1.f, 1.f, 10.f}};
+    scene->data.sun.direction = (v4s) { .raw = {-0.000001f, -1.0, 0.0f, 0.0f}};
 
     scene->data.debug_view = DEBUG_VIEW_TYPE_OFF;
     
@@ -215,12 +217,12 @@ void scene_update(scene* scene, f64 dt) {
 
     m4s sun_view = glms_look(
         (v3s){ .raw = {0.0f, 0.0f, 0.0f}},
-        glms_vec3(scene->data.sun_direction),
+        glms_vec3(scene->data.sun.direction),
         (v3s){ .raw = {0.0f, 1.0f, 0.0f}}
     );
     
     // NOTE: invert the Y direction on projection matrix so that we match gltf axis
-    m4s sun_projection = glms_ortho(-25.f, 25.f, -25.f, 25.f, 25.f, -25.f);
+    m4s sun_projection = glms_ortho(-15.f, 15.f, -15.f, 15.f, 15.f, -15.f);
     sun_projection.raw[1][1] *= -1;
 
     m4s sun_viewproj = glms_mat4_mul(sun_projection, sun_view);
@@ -234,8 +236,8 @@ void scene_update(scene* scene, f64 dt) {
     // Update light information
     v4s l_pos = glms_vec4(scene->cam.position, 1.0f);
     if (light_dynamic) {
-        scene->data.light_position = l_pos;
-        scene->data.light_position.y += light_offset;
+        scene->data.light.position = l_pos;
+        scene->data.light.position.y += light_offset;
     }
 }
 
@@ -245,10 +247,14 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     // Rendering resolution
     scene->render_extent = (VkExtent3D) {
-        .width = config.resolution_width * 2,   // TEMP: Super Sample Anti Aliasing
-        .height = config.resolution_height * 2, // TEMP: Super Sample Anti Aliasing
+        .width = config.resolution_width,
+        .height = config.resolution_height,
         .depth = 1,
     };
+
+    // TEMP: SSAA, Super Sample Anti Aliasing
+    // scene->render_extent.width *= 2;
+    // scene->render_extent.height *= 2;
 
     // Color attachment
     VkImageUsageFlags draw_image_usages = 0;
@@ -929,7 +935,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     }
 
     // TEMP: Quick and dirty placement of this data
-    scene->data.max_draw_count = MAX_DRAW_COMMANDS;
+    scene->data.max_draw_count = MAX_DRAW_COMMANDS * scene->mat_pipe_count;
     scene->data.alpha_cutoff = 0.5f;
     scene->data.shadow_draw_id = scene->mat_pipe_count;
     scene->data.shadow_map_id = RESERVED_TEXTURE_SHADOW_MAP_INDEX;
@@ -972,20 +978,22 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE, scene->shadow_draw_gen_pipeline, "ShadowDrawGenerationPipeline");
     unload_shader(state, &shadow_draw_gen);
 
+    // NOTE:TODO: Need to more elegantly implement alpha-mask vs opaque for rendering shadow maps
     shader shadow_map_vert;
-    if (!load_shader(state, "assets/shaders/shadow.vert.spv.opt", &shadow_map_vert)) {
+    if (!load_shader(state, "assets/shaders/shadow_mask.vert.spv.opt", &shadow_map_vert)) {
         return false;
     };
 
     shader shadow_map_frag;
-    if (!load_shader(state, "assets/shaders/shadow.frag.spv.opt", &shadow_map_frag)) {
+    if (!load_shader(state, "assets/shaders/shadow_mask.frag.spv.opt", &shadow_map_frag)) {
         unload_shader(state, &shadow_map_vert);
         return false;
     }
 
     pipeline_builder builder = pipeline_builder_create();
-    builder.layout = scene->draw_gen_layout;    // Uses draw gen layout as there is no pipeline
-    pipeline_builder_set_shaders(&builder, shadow_map_vert, shadow_map_frag);
+    builder.layout = scene->draw_gen_layout;
+    // pipeline_builder_set_vertex_only(&builder, shadow_map_vert);
+    pipeline_builder_set_vertex_fragment(&builder, shadow_map_vert, shadow_map_frag);
     pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
 
@@ -1061,7 +1069,7 @@ void scene_renderer_shutdown(scene* scene, renderer_state* state) {
     image_destroy(state, &scene->render_image);
 }
 
-// TODO: Move this function to scene_renderer_begin??
+// TODO: Data transfer commands to load information
 b8 scene_render(scene* scene, renderer_state* state) {
     // TEMP:TODO: Create staging buffer to move this instead of vkCmdUpdateBuffer
     VkCommandBuffer cmd = scene->graphics_command_buffers[state->swapchain.frame_index];

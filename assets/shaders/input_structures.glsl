@@ -1,7 +1,17 @@
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_buffer_reference2 : require
 #extension GL_EXT_nonuniform_qualifier : require
-#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require 
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+struct point_light {
+	vec4 color;
+	vec4 position;
+};
+
+struct direction_light {
+	vec4 color;
+	vec4 direction;
+};
 
 // Buffer to record counts per pipeline shader object
 layout(set = 0, binding = 0) uniform frame_data_block {
@@ -10,15 +20,13 @@ layout(set = 0, binding = 0) uniform frame_data_block {
 	mat4 viewproj;
 	vec4 view_pos;
 
-	// TODO: Create point light system supporting multiple
 	vec4 ambient_color;
-	vec4 light_color;
-    vec4 light_position;
+
+	point_light light;
 
 	// Sun (Directional light) information
-	mat4 sun_viewproj;	// For ShadowMapping
-	vec4 sun_color;		// Color of the sun
-	vec4 sun_direction;	// Direction of the sun
+	mat4 sun_viewproj;		// For ShadowMapping
+	direction_light sun;
 
 	// Alpha masking info
 	float alpha_cutoff;
@@ -74,7 +82,9 @@ struct object {
 	uint mat_id;		// Material Instance
 	uint geo_id;		// Geometry
 	uint transform_id;	// Transform
-	uint color_id;
+	// HACK: Passing through for shadow map
+    uint color_id;
+    // HACK: END
 };
 layout(set = 0, binding = 3, std430) readonly buffer object_buffer {
 	object objects[];

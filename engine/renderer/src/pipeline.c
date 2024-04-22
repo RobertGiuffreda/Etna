@@ -71,7 +71,7 @@ VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* sta
     VkGraphicsPipelineCreateInfo pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &builder->render_info,
-        .stageCount = DEFAULT_GRAPHICS_PIPELINE_STAGE_COUNT,
+        .stageCount = builder->stage_count,
         .pStages = builder->stages,
         .pVertexInputState = &vertex_input_info,
         .pInputAssemblyState = &builder->input_assembly,
@@ -100,7 +100,7 @@ VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* sta
 }
 
 // NOTE: Just vertex & fragment shaders supported for now
-void pipeline_builder_set_shaders(pipeline_builder* builder, shader vertex, shader fragment) {
+void pipeline_builder_set_vertex_fragment(pipeline_builder* builder, shader vertex, shader fragment) {
     builder->stages[DEFAULT_VERTEX_STAGE_INDEX].stage = vertex.stage;
     builder->stages[DEFAULT_VERTEX_STAGE_INDEX].module = vertex.module;
     builder->stages[DEFAULT_VERTEX_STAGE_INDEX].pName = vertex.entry_point;
@@ -108,6 +108,16 @@ void pipeline_builder_set_shaders(pipeline_builder* builder, shader vertex, shad
     builder->stages[DEFAULT_FRAGMENT_STAGE_INDEX].stage = fragment.stage;
     builder->stages[DEFAULT_FRAGMENT_STAGE_INDEX].module = fragment.module;
     builder->stages[DEFAULT_FRAGMENT_STAGE_INDEX].pName = fragment.entry_point;
+
+    builder->stage_count = DEFAULT_GRAPHICS_PIPELINE_STAGE_COUNT;
+}
+
+void pipeline_builder_set_vertex_only(pipeline_builder* builder, shader vertex) {
+    builder->stages[DEFAULT_VERTEX_STAGE_INDEX].stage = vertex.stage;
+    builder->stages[DEFAULT_VERTEX_STAGE_INDEX].module = vertex.module;
+    builder->stages[DEFAULT_VERTEX_STAGE_INDEX].pName = vertex.entry_point;
+
+    builder->stage_count = 1;
 }
 
 void pipeline_builder_set_input_topology(pipeline_builder* builder, VkPrimitiveTopology topology) {

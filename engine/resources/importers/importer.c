@@ -8,6 +8,7 @@
 #include "core/etstring.h"
 
 #include "resources/importers/gltfimporter.h"
+#include "resources/importers/pmximporter.h"
 
 // TODO: Place the default pipelines into the pipelines memeber of import_payload
 import_payload import_files(u32 file_count, const char* const* paths) {
@@ -17,7 +18,7 @@ import_payload import_files(u32 file_count, const char* const* paths) {
         .pipelines = dynarray_create(1, sizeof(import_pipeline)),
         
         .images = dynarray_create(1, sizeof(import_image)),
-        .textures = dynarray_create(1, sizeof(import_texture)),
+        .textures = dynarray_create(RESERVED_TEXTURE_INDEX_COUNT, sizeof(import_texture)),
         .samplers = dynarray_create(1, sizeof(import_sampler)),
         
         .vertex_count = 0,
@@ -28,7 +29,7 @@ import_payload import_files(u32 file_count, const char* const* paths) {
     };
 
     // HACK: Place default dummy positions in the texture array for importing
-    // NOTE: there should be a better way than this in the end
+    // NOTE: there should be a better way than this
     dynarray_resize((void**)&payload.textures, RESERVED_TEXTURE_INDEX_COUNT);
     // HACK: END
 
@@ -43,9 +44,9 @@ import_payload import_files(u32 file_count, const char* const* paths) {
             }
         } else if (strs_equal(ext, ".pmx")) {
             ETASSERT(false);
-            // if (!import_pmx(&payload, path)) {
-            //     ETWARN("Unable to import pmx file %s.", path);
-            // }
+            if (!import_pmx(&payload, path)) {
+                ETWARN("Unable to import pmx file %s.", path);
+            }
         } else {
             ETWARN("Attempting to load file %s with unsupported extension %s.", path, ext);
         }

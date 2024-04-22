@@ -35,7 +35,7 @@ const vec3 gamma_pow = vec3(1.0f / 2.2f);
 void main() {
     vec3 diffuse_color = in_color * texture(textures[nonuniformEXT(in_color_id)], in_uv).rgb;
 
-    vec3 light_dir = frame_data.light_position.xyz - in_position;
+    vec3 light_dir = frame_data.light.position.xyz - in_position;
     float dist = length(light_dir);
     float attenuation = 1 / (dist * dist);
     light_dir = normalize(light_dir);
@@ -55,8 +55,8 @@ void main() {
     vec3 specular = specular_color * spec; // assuming bright white light color
 
     vec3 color_linear = 
-        (diffuse * frame_data.light_color.rgb * frame_data.light_color.w * attenuation) +
-        (specular * frame_data.light_color.rgb * frame_data.light_color.w * attenuation);
+        (diffuse * frame_data.light.color.rgb * frame_data.light.color.w * attenuation) +
+        (specular * frame_data.light.color.rgb * frame_data.light.color.w * attenuation);
 
     vec3 gamma_corrected = pow(color_linear, gamma_pow);
     out_frag_color = vec4(gamma_corrected, 1.0f);

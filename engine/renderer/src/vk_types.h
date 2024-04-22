@@ -77,6 +77,16 @@ typedef enum debug_view_type {
     DEBUG_VIEW_TYPE_MAX,
 } debug_view_type;
 
+typedef struct point_light {
+	v4s color;
+	v4s position;
+} point_light;
+
+typedef struct direction_light {
+	v4s color;
+	v4s direction;
+} direction_light;
+
 typedef struct scene_data {
     // Camera/View
     m4s view;
@@ -86,11 +96,10 @@ typedef struct scene_data {
 
     // TEMP: Eventually define multiple lights
     v4s ambient_color;
-    v4s light_color;
-    v4s light_position;
-    m4s sun_viewproj;
-    v4s sun_color;
-    v4s sun_direction;
+    point_light light;
+
+    m4s sun_viewproj;   // For shadow mapping
+    direction_light sun;
     // TEMP: END
     
     // Kinda hacky spaghetti placement of this info
@@ -105,7 +114,9 @@ typedef struct draw_command {
     VkDrawIndexedIndirectCommand draw;
     u32 material_inst_id;
     u32 transform_id;
+    // HACK: Passing through for shadow map
     u32 color_id;
+    // HACK: END
 } draw_command;
 
 typedef struct device {
