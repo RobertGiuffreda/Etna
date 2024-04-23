@@ -60,9 +60,6 @@ struct draw_command {
 
 	uint material_id;
 	uint transform_id;
-	// HACK: Temporarily putting this here for alpha masking compatability with shadow mapping
-	uint color_id;
-	// HACK: END
 };
 layout(buffer_reference, std430) writeonly buffer draw_buffer {
 	draw_command draws[];
@@ -82,9 +79,6 @@ struct object {
 	uint mat_id;		// Material Instance
 	uint geo_id;		// Geometry
 	uint transform_id;	// Transform
-	// HACK: Passing through for shadow map
-    uint color_id;
-    // HACK: END
 };
 layout(set = 0, binding = 3, std430) readonly buffer object_buffer {
 	object objects[];

@@ -114,9 +114,6 @@ typedef struct draw_command {
     VkDrawIndexedIndirectCommand draw;
     u32 material_inst_id;
     u32 transform_id;
-    // HACK: Passing through for shadow map
-    u32 color_id;
-    // HACK: END
 } draw_command;
 
 typedef struct device {

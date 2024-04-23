@@ -104,16 +104,6 @@ b8 scene_init(scene** scn, scene_config config) {
         }
     }
 
-// HACK:TEMP: Evil awful ugly workaround for getting the albedo/color texture index at this point
-// This is temporary until I architect something better for shadow map alpha mask
-typedef struct material_instance_head {
-    v4s color_factors;
-    u32 color_tex_index;
-} mih;
-#define COLOR_TEX_INDEX(material_pipeline_config, material_instance_index) \
-(((mih*)((u8*)material_pipeline_config.instances + (material_pipeline_config.inst_size * material_instance_index)))->color_tex_index)
-// HACK:TEMP: END
-
     // Change nodes into objects and transforms for the meshes
     m4s* transforms = dynarray_create(1, sizeof(m4s));
     object* objects = dynarray_create(1, sizeof(object));
@@ -127,18 +117,11 @@ typedef struct material_instance_head {
             u64 object_start = dynarray_grow((void**)&objects, mesh.count);
             for (u32 j = 0; j < mesh.count; ++j) {
                 u32 material_index = mesh.material_indices[j];
-                // HACK:TEMP: Need to build framework for shadow mapping
-                u32 color_index = COLOR_TEX_INDEX(
-                    mat_pipe_configs[pipe_index_to_id[payload->mat_index_to_mat_id[material_index].pipe_id]],
-                    payload->mat_index_to_mat_id[material_index].inst_id
-                );
-                // HACK:TEMP: END
                 objects[object_start + j] = (object) {
                     .pipe_id = pipe_index_to_id[payload->mat_index_to_mat_id[material_index].pipe_id],
                     .mat_id = payload->mat_index_to_mat_id[material_index].inst_id,
                     .geo_id = mesh.geometry_indices[j],
                     .transform_id = transform_index,
-                    .color_id = color_index,
                 };
             }
         }
@@ -980,20 +963,13 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     // NOTE:TODO: Need to more elegantly implement alpha-mask vs opaque for rendering shadow maps
     shader shadow_map_vert;
-    if (!load_shader(state, "assets/shaders/shadow_mask.vert.spv.opt", &shadow_map_vert)) {
+    if (!load_shader(state, "assets/shaders/shadow.vert.spv.opt", &shadow_map_vert)) {
         return false;
     };
 
-    shader shadow_map_frag;
-    if (!load_shader(state, "assets/shaders/shadow_mask.frag.spv.opt", &shadow_map_frag)) {
-        unload_shader(state, &shadow_map_vert);
-        return false;
-    }
-
     pipeline_builder builder = pipeline_builder_create();
     builder.layout = scene->draw_gen_layout;
-    // pipeline_builder_set_vertex_only(&builder, shadow_map_vert);
-    pipeline_builder_set_vertex_fragment(&builder, shadow_map_vert, shadow_map_frag);
+    pipeline_builder_set_vertex_only(&builder, shadow_map_vert);
     pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
 
@@ -1009,7 +985,6 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     pipeline_builder_destroy(&builder);
 
     unload_shader(state, &shadow_map_vert);
-    unload_shader(state, &shadow_map_frag);
     return true;
 }
 

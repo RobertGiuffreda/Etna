@@ -64,7 +64,6 @@ void main() {
 		command.first_instance = 0;
 		command.material_id = obj.mat_id;
 		command.transform_id = obj.transform_id;
-		command.color_id = obj.color_id;
 		uint draw_id = atomicAdd(counts[obj.pipe_id], 1);
 
 		/** NOTE:HACK: Avoiding a SPIRV-REFLECT Error when parsing this shader

@@ -15,5 +15,6 @@ void main() {
     gl_Position = frame_data.sun_viewproj * model * vec4(v.position, 1.0f);
 
     out_uv = vec2(v.uv_x, v.uv_y);
-    out_color_id = draw.color_id;
+    // out_color_id = draw.color_id;
+    out_color_id = 0;
 }

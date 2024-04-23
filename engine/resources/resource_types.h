@@ -35,7 +35,4 @@ typedef struct object {
     u32 mat_id;             // Material instance index
     u32 geo_id;             // Geometry index
     u32 transform_id;       // Transform index
-    // HACK: Passing through for shadow map
-    u32 color_id;
-    // HACK: END
 } object;
