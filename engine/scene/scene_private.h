@@ -53,7 +53,6 @@ typedef struct scene {
     VkPipeline shadow_draw_gen_pipeline;    // Uses draw_gen_layout as VkPipelineLayout
     VkPipeline shadow_pipeline;             // Pipeline to render to the shadow map
 
-    // NOTE: Per frame rendering primitives
     VkFence* render_fences;
     VkCommandPool* graphics_pools;
     VkCommandBuffer* graphics_command_buffers;

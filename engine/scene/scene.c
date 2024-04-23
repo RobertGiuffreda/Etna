@@ -56,7 +56,8 @@ b8 scene_init(scene** scn, scene_config config) {
     scene->data.ambient_color = (v4s) { .raw = {1.f, 1.f, 1.f, .1f}};
     scene->data.light.color   = (v4s) { .raw = {1.f, 1.f, 1.f, 5.f}};
     scene->data.sun.color     = (v4s) { .raw = {1.f, 1.f, 1.f, 10.f}};
-    scene->data.sun.direction = (v4s) { .raw = {-0.000001f, -1.0, 0.0f, 0.0f}};
+    scene->data.sun.direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
+    // scene->data.sun.direction = (v4s) { .raw = {-0.000001f, -1.0, 0.0f, 0.0f}};
 
     scene->data.debug_view = DEBUG_VIEW_TYPE_OFF;
     
@@ -178,7 +179,6 @@ static b8 sun_pov_persp = false;
 
 void scene_update(scene* scene, f64 dt) {
     renderer_state* state = scene->state;
-
     camera_update(&scene->cam, dt);
 
     // TODO: Camera should store near and far values & calculate perspective matrix itself
@@ -320,7 +320,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->scene_uniforms);
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->scene_uniforms.handle, "SceneFrameUniformBuffer");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->scene_uniforms.handle, "FrameUniformsBuffer");
     buffer_create(
         state,
         sizeof(u32) * (scene->mat_pipe_count + /* Shadow mapping draw commands */1),
@@ -346,8 +346,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         scene->vertices);
     scene->vertex_buffer = vertex_index.vertex_buffer;
     scene->index_buffer = vertex_index.index_buffer;
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->vertex_buffer.handle, "SceneVertexBuffer");
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->index_buffer.handle, "SceneIndexBuffer");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->vertex_buffer.handle, "VertexBuffer");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->index_buffer.handle, "IndexBuffer");
 
     buffer_create_data(
         state,
@@ -924,7 +924,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     scene->data.shadow_map_id = RESERVED_TEXTURE_SHADOW_MAP_INDEX;
     // TEMP: END
 
-    // TEMP: Shadow mapping code placement here is temporary
+    // NOTE: Shadow mapping start
     buffer_create(
         state,
         sizeof(draw_command) * MAX_DRAW_COMMANDS,
@@ -961,7 +961,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE, scene->shadow_draw_gen_pipeline, "ShadowDrawGenerationPipeline");
     unload_shader(state, &shadow_draw_gen);
 
-    // NOTE:TODO: Need to more elegantly implement alpha-mask vs opaque for rendering shadow maps
+    // TODO: Alpha passthrough for alpha-mask
     shader shadow_map_vert;
     if (!load_shader(state, "assets/shaders/shadow.vert.spv.opt", &shadow_map_vert)) {
         return false;
@@ -985,6 +985,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     pipeline_builder_destroy(&builder);
 
     unload_shader(state, &shadow_map_vert);
+    // NOTE: Shadow Mapping end
     return true;
 }
 
@@ -1021,6 +1022,13 @@ void scene_renderer_shutdown(scene* scene, renderer_state* state) {
     // TODO: Update to some kind of texture/image management
     image_manager_shutdown(scene->image_bank);
     // TODO: END
+
+    // Shadow Pass shutdown
+    buffer_destroy(state, &scene->shadow_draws);
+    image_destroy(state, &scene->shadow_map);
+    vkDestroySampler(state->device.handle, scene->shadow_map_sampler, state->allocator);
+    vkDestroyPipeline(state->device.handle, scene->shadow_draw_gen_pipeline, state->allocator);
+    vkDestroyPipeline(state->device.handle, scene->shadow_pipeline, state->allocator);
 
     for (u32 i = 0; i < scene->sampler_count; ++i)
         vkDestroySampler(state->device.handle, scene->samplers[i], state->allocator);
