@@ -63,7 +63,7 @@ b8 scene_init(scene** scn, scene_config config) {
     
     import_payload* payload = config.import_payload;
 
-    // Create singular vertex buffer, index buffer    
+    // Create singular vertex buffer, index buffer
     u32 geo_count = dynarray_length(payload->geometries);
     geometry* geometries = dynarray_create(geo_count, sizeof(geometry));
     dynarray_resize((void**)&geometries, geo_count);
