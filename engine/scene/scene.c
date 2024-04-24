@@ -202,7 +202,7 @@ void scene_update(scene* scene, f64 dt) {
     );
     
     // NOTE: invert the Y direction on projection matrix so that we match gltf axis
-    m4s sun_projection = glms_ortho(-20.f, 20.f, -20.f, 20.f, 30.f, -30.f);
+    m4s sun_projection = glms_ortho(-20.f, 20.f, -20.f, 20.f, 25.f, -25.f);
     sun_projection.raw[1][1] *= -1;
 
     m4s sun_viewproj = glms_mat4_mul(sun_projection, sun_view);
@@ -970,7 +970,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
 
-    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     pipeline_builder_set_multisampling_none(&builder);
 
     pipeline_builder_disable_blending(&builder);
