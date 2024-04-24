@@ -23,7 +23,7 @@ A small `vulkan` renderer written using the `C` programming language. This is wr
 * Editor using C bindings for ImGui [cimgui](https://github.com/cimgui/cimgui/tree/docking_inter)
 
 ## Screenshots
-![Screenshot 1](https://github.com/RobertGiuffreda/TestEtna/blob/main/demonstration/EtnaScreenshot.png)
+![Screenshot 1](https://github.com/RobertGiuffreda/TestEtna/blob/main/demonstration/EtnaScreenshotShow.png)
 
 ## About
 I am making this renderer in order to learn about render engines, shaders, and graphics programming in general.

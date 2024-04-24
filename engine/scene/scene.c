@@ -53,7 +53,7 @@ b8 scene_init(scene** scn, scene_config config) {
     scene->data.ambient_color = (v4s) { .raw = {1.f, 1.f, 1.f, .1f}};
     scene->data.light.color   = (v4s) { .raw = {1.f, 1.f, 1.f, 5.f}};
     scene->data.sun.color     = (v4s) { .raw = {1.f, 1.f, 1.f, 10.f}};
-    scene->data.sun.direction = (v4s) { .raw = {-0.000001f, -1.0, 0.0f, 0.0f}};
+    scene->data.sun.direction = (v4s) { .raw = {0.00001f, -1.f, 0.00001f, 0.0f}};
     // scene->data.sun.direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
 
     scene->data.debug_view = DEBUG_VIEW_TYPE_OFF;
@@ -202,7 +202,7 @@ void scene_update(scene* scene, f64 dt) {
     );
     
     // NOTE: invert the Y direction on projection matrix so that we match gltf axis
-    m4s sun_projection = glms_ortho(-15.f, 15.f, -15.f, 15.f, 15.f, -15.f);
+    m4s sun_projection = glms_ortho(-20.f, 20.f, -20.f, 20.f, 30.f, -30.f);
     sun_projection.raw[1][1] *= -1;
 
     m4s sun_viewproj = glms_mat4_mul(sun_projection, sun_view);
@@ -745,7 +745,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .maxAnisotropy = 1.0f,
         .minLod = 0.0f,
         .maxLod = 1.0f,
-        .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE};
+        .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK};
     VK_CHECK(vkCreateSampler(
         state->device.handle,
         &shadow_map_sampler_info,
@@ -970,7 +970,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
 
-    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+    pipeline_builder_set_cull_mode(&builder, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
     pipeline_builder_set_multisampling_none(&builder);
 
     pipeline_builder_disable_blending(&builder);
