@@ -38,9 +38,6 @@ static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 static b8 scene_renderer_init(scene* scene, scene_config config);
 static void scene_renderer_shutdown(scene* scene, renderer_state* state);
 
-static b8 create_shadow_pass(scene* scene, renderer_state* state);
-static b8 destroy_shadow_pass(scene* scene, renderer_state* state);
-
 // TODO: Remove, textures will be set when loading for now, until any kind of streaming
 // is implemented, if it ever is
 void scene_texture_set(scene* scene, u32 tex_id, u32 img_id, u32 sampler_id);
@@ -56,8 +53,8 @@ b8 scene_init(scene** scn, scene_config config) {
     scene->data.ambient_color = (v4s) { .raw = {1.f, 1.f, 1.f, .1f}};
     scene->data.light.color   = (v4s) { .raw = {1.f, 1.f, 1.f, 5.f}};
     scene->data.sun.color     = (v4s) { .raw = {1.f, 1.f, 1.f, 10.f}};
-    scene->data.sun.direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
-    // scene->data.sun.direction = (v4s) { .raw = {-0.000001f, -1.0, 0.0f, 0.0f}};
+    scene->data.sun.direction = (v4s) { .raw = {-0.000001f, -1.0, 0.0f, 0.0f}};
+    // scene->data.sun.direction = (v4s) { .raw = {-0.707107f, -0.707107f, 0.0f, 0.0f}};
 
     scene->data.debug_view = DEBUG_VIEW_TYPE_OFF;
     

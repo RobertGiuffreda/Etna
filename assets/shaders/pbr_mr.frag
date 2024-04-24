@@ -96,12 +96,22 @@ void main() {
     // TEMP: Create calculate_shadow function
     vec3 shadow_coords = in_sun_position.xyz;
     vec2 shadow_uv = shadow_coords.xy * 0.5f + 0.5f;
-    float closest_depth = texture(textures[frame_data.shadow_map_id], shadow_uv).x;
-    float current_depth = shadow_coords.z;
     float min_bias_factor = 0.002f;
     float max_bias_factor = 0.005f;
     float bias = max(max_bias_factor * (1.0f - NdotLs), min_bias_factor);
-    float shadow = (current_depth + bias < closest_depth) ? 1.0f : 0.0f;
+
+    float shadow = 0.f;
+    vec2 texel_size = 1.f / textureSize(textures[frame_data.shadow_map_id], 0);
+    for (int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float map_depth = texture(textures[frame_data.shadow_map_id], shadow_uv + vec2(x, y) * texel_size).x;
+            shadow += (shadow_coords.z + bias < map_depth) ? (1.f / 9.f) : 0.f;
+        }
+    }
+
+    // float closest_depth = texture(textures[frame_data.shadow_map_id], shadow_uv).x;
+    // float current_depth = shadow_coords.z;
+    // float shadow = (current_depth + bias < closest_depth) ? 1.0f : 0.0f;
 
     // https://www.khronos.org/opengl/wiki/Sampler_(GLSL)#Non-uniform_flow_control
     // Alpha discard after all texture sampling has been done to preserve uniform control flow
@@ -147,13 +157,11 @@ void main() {
     out_frag_color = vec4(color, 1.0f);
     if (frame_data.debug_view == DEBUG_VIEW_TYPE_SHADOW) {
         out_frag_color = vec4(vec3(1.f - shadow), 1.0f);
-    } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_CURRENT_DEPTH) {
-        out_frag_color = vec4(vec3(current_depth), 1.0f);
-    } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_CLOSEST_DEPTH) {
-        out_frag_color = vec4(vec3(closest_depth), 1.0f);
-    } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_METAL_ROUGH) {
+    }
+    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_METAL_ROUGH) {
         out_frag_color = vec4(shadow_coords.xy, 0.0f, 1.0f);
-    } else if (frame_data.debug_view == DEBUG_VIEW_TYPE_NORMAL) {
+    }
+    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_NORMAL) {
         out_frag_color = vec4(N, 1.0);
     }
 }

@@ -70,8 +70,6 @@ typedef struct mesh_buffers {
 typedef enum debug_view_type {
     DEBUG_VIEW_TYPE_OFF = 0,
     DEBUG_VIEW_TYPE_SHADOW,
-    DEBUG_VIEW_TYPE_CURRENT_DEPTH,
-    DEBUG_VIEW_TYPE_CLOSEST_DEPTH,
     DEBUG_VIEW_TYPE_METAL_ROUGH,
     DEBUG_VIEW_TYPE_NORMAL,
     DEBUG_VIEW_TYPE_MAX,

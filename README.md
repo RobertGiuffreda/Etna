@@ -6,21 +6,20 @@ A small `vulkan` renderer written using the `C` programming language. This is wr
 * Window handling done using the [glfw](https://github.com/glfw/glfw) library.
 * Shader Reflection data retrieved using the [SPIRV-Reflect](https://github.com/KhronosGroup/SPIRV-Reflect) library.
 * GLTF & GLB loading with the [cgltf](https://github.com/jkuhlmann/cgltf) GLTF loading library.
+* Loading multiple GLTF or GLB files using paths gotten from command line.
 * Image loading using [stb_image](https://github.com/nothings/stb/blob/master/stb_image.h).
 * Vector & Matrix math done using the [cglm](https://github.com/recp/cglm) math libary.
-* Bare bones file reading using stdio.h
-* Logging to text file
-* Scene rendering using simple Physically Based Rendering, Cook-Torrence BRDF.
+* File reading using stdio.h.
+* Log file & Error file output
+* Physically Based Rendering using Cook-Torrence BRDF.
 * Depth buffering done using reverse-Z.
 * Shader compilation to SPV bytecode at project **compile time** using [glslang](https://github.com/KhronosGroup/glslang).
 * `Vulkan 1.3`'s dynamic rendering feature.
 * vkCmdDrawIndirectCount used alongside descriptor indexing to render the scene with only as many draw calls as pipeline shader objects.
 * Multiple frames in flight.
-* Directional Skylight shadow map 
+* Directional Skylight shadow map.
 ## Planned
-* Custom file formats for scenes, materials, and meshes
-* Serialization support to read in these formats as well as write them out
-* Non Blocking event system
+* File formats for serializing data
 * Editor using C bindings for ImGui [cimgui](https://github.com/cimgui/cimgui/tree/docking_inter)
 
 ## Screenshots

@@ -41,11 +41,9 @@ layout(set = 0, binding = 0) uniform frame_data_block {
 } frame_data;
 
 #define DEBUG_VIEW_TYPE_SHADOW 1
-#define DEBUG_VIEW_TYPE_CURRENT_DEPTH 2
-#define DEBUG_VIEW_TYPE_CLOSEST_DEPTH 3
-#define DEBUG_VIEW_TYPE_METAL_ROUGH 4
-#define DEBUG_VIEW_TYPE_NORMAL 5
-#define DEBUG_VIEW_TYPE_MAX 6
+#define DEBUG_VIEW_TYPE_METAL_ROUGH 2
+#define DEBUG_VIEW_TYPE_NORMAL 3
+#define DEBUG_VIEW_TYPE_MAX 4
 
 layout(set = 0, binding = 1, std430) buffer draw_counts {
 	uint counts[];
