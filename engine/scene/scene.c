@@ -233,8 +233,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     };
 
     // TEMP: SSAA, Super Sample Anti Aliasing
-    // scene->render_extent.width *= 2;
-    // scene->render_extent.height *= 2;
+    scene->render_extent.width *= 2;
+    scene->render_extent.height *= 2;
 
     // Color attachment
     VkImageUsageFlags draw_image_usages = 0;
