@@ -17,10 +17,10 @@ typedef struct mat_pipe {
     buffer draws_buffer;
 
     // Instance data
-    u32 inst_size;      // Size in bytes
-    u32 inst_count;     // Number of instances created
-    void* inst_data;    // Mapped memory
-    buffer inst_buffer; // GPU memory
+    u32 inst_size;          // Size in bytes
+    u32 inst_count;         // Number of instances created
+    void* inst_data;        // Mapped memory
+    buffer inst_buffer;     // Instances in GPU memory
 } mat_pipe;
 
 typedef struct mat_pipe_config {

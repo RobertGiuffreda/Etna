@@ -323,14 +323,14 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->scene_uniforms.handle, "FrameUniformsBuffer");
     buffer_create(
         state,
-        sizeof(u32) * (scene->mat_pipe_count + /* Shadow mapping draw commands */1),
+        sizeof(u32) * (scene->mat_pipe_count + /* Shadow map draw commands */ 1),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->counts_buffer);
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->counts_buffer.handle, "PipelineDrawCountsBuffer");
     buffer_create(
         state,
-        sizeof(VkDeviceAddress) * (scene->mat_pipe_count + /* Shadow mapping draw commands */1),
+        sizeof(VkDeviceAddress) * (scene->mat_pipe_count + /* Shadow map draw commands */ 1),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->draws_buffer);
@@ -1137,10 +1137,10 @@ void draw_command_generation(renderer_state* state, scene* scene, VkCommandBuffe
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_layout, 0, 1, &scene->scene_set, 0, NULL);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->shadow_draw_gen_pipeline);
-    vkCmdDispatch(cmd, ceil(object_count / 32.0f), 1, 1);
+    vkCmdDispatch(cmd, ceil((f32)object_count / 32.0f), 1, 1);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_pipeline);
-    vkCmdDispatch(cmd, ceil(object_count / 32.0f), 1, 1);
+    vkCmdDispatch(cmd, ceil((f32)object_count / 32.0f), 1, 1);
 
     // Wait for shadow draw generation before reading from indirect command buffer
     buffer_barrier(
@@ -1366,7 +1366,7 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
     return true;
 }
 
-// TODO: Have this return the slot in the descriptor array the new combined image sampler is placed
+// TODO: New abstraction than image_manager & this function to handle images and textures
 void scene_texture_set(scene* scene, u32 tex_id, u32 img_id, u32 sampler_id) {
     image* img = image_manager_get(scene->image_bank, img_id);
     VkDescriptorImageInfo image_info = {

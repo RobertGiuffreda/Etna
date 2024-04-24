@@ -8,18 +8,16 @@
 typedef struct image image;
 typedef struct image_manager image_manager;
 
+#define MAX_BUFFER_COUNT 1024
+#define MAX_IMAGE_COUNT 512
+#define MAX_TEXTURE_COUNT 1024
+#define MAX_MATERIAL_COUNT 512
+
 // TODO: Change id to index
 typedef struct mat_id {
     u32 pipe_id;
     u32 inst_id;
 } mat_id;
-
-// NOTE: Each one describes a different pipeline object
-typedef enum mat_pipe_type {
-    MAT_PIPE_METAL_ROUGH,
-    MAT_PIPE_METAL_ROUGH_TRANSPARENT,
-    MAT_PIPE_MAX,
-} mat_pipe_type;
 
 typedef struct geometry {
     u32 start_index;
