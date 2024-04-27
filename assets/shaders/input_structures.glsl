@@ -105,6 +105,19 @@ layout(set = 0, binding = 5, std430) readonly buffer vertex_buffer {
 	vertex vertices[];
 };
 
+// struct anim_vertex {
+//     vec3 position;
+//     float uv_x;
+//     vec3 normal;
+//     float uv_y;
+//     vec4 color;
+//     ivec4 bones;
+//     vec4 weights;
+// };
+// layout(set = _, binding = _, std430) readonly buffer anim_vertex_buffer {
+// 	anim_vertex anim_vertices;
+// };
+
 layout(set = 0, binding = 6, std430) readonly buffer transform_buffer {
 	mat4 transforms[];
 };

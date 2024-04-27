@@ -9,6 +9,12 @@ typedef vec2s v2s;
 typedef vec3s v3s;
 typedef vec4s v4s;
 
+typedef versors quat;   // quaternion
+
+typedef ivec2s iv2s;
+typedef ivec3s iv3s;
+typedef ivec4s iv4s;
+
 typedef mat3s m3s;
 typedef mat4s m4s;
 
@@ -20,8 +26,12 @@ typedef struct vertex {
     v4s color;
 } vertex;
 
-typedef struct vertex2d {
-    v2s position;
-    v2s uv;
+typedef struct anim_vertex {
+    v3s position;
+    f32 uv_x;
+    v3s normal;
+    f32 uv_y;
     v4s color;
-} vertex2d;
+    iv4s bones;
+    v4s weights;
+} anim_vertex;

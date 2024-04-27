@@ -8,6 +8,7 @@
 // TEMP: END
 
 typedef struct scene scene;
+
 typedef struct scene_config {
     const char* name;
     u32 resolution_width;

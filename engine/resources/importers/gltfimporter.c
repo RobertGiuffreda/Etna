@@ -237,10 +237,16 @@ b8 import_gltf(import_payload* payload, const char* path) {
                             geo->vertices[l].color = colors[l];
                         }
                         break;
+                    case cgltf_attribute_type_joints:
+                        // TODO: Implement
+                        iv4s* joints = (iv4s*)accessor_data;
+                        break;
+                    case cgltf_attribute_type_weights:
+                        // TODO: Implement
+                        v4s* weights = (v4s*)accessor_data;
+                        break;
                     // TODO: Implement
                     case cgltf_attribute_type_tangent: break;
-                    case cgltf_attribute_type_joints: break;
-                    case cgltf_attribute_type_weights: break;
                     case cgltf_attribute_type_custom: break;
                     // TODO: END
                     default: {
@@ -272,7 +278,6 @@ b8 import_gltf(import_payload* payload, const char* path) {
     }
     // TODO: END
 
-    // TODO: Create transform buffer from node transforms, just mesh nodes for now.
     u32 node_start = dynarray_grow((void**)&payload->nodes, data->nodes_count);
     for (u32 i = 0; i < data->nodes_count; ++i) {
         import_node node = {0};
@@ -296,7 +301,6 @@ b8 import_gltf(import_payload* payload, const char* path) {
 
         payload->nodes[node_start + i] = node;
     }
-    // TODO: END
 
     // TODO: Import Animation data & such
 

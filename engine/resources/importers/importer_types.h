@@ -154,6 +154,12 @@ typedef struct import_payload {
     import_mesh* meshes;                // Dynarray
 
     import_node* nodes;                 // Dynarray
+    // GLTF:
+    // Animations
+    // Channels
+    // Samplers
+    // Skins
+    // Joints
 } import_payload;
 
 // TODO: Serializing Beginning

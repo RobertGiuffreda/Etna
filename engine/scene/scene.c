@@ -47,7 +47,7 @@ b8 scene_init(scene** scn, scene_config config) {
     scene->name = config.name;
 
     camera_create(&scene->cam);
-    scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 5.0f}};
+    scene->cam.position = (v3s){.raw = {0.0f, 0.0f, 1.0f}};
 
     // NOTE: This will be passed a config when serialization is implemented
     scene->data.ambient_color = (v4s) { .raw = {1.f, 1.f, 1.f, .1f}};
@@ -233,8 +233,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     };
 
     // TEMP: SSAA, Super Sample Anti Aliasing
-    scene->render_extent.width *= 2;
-    scene->render_extent.height *= 2;
+    // scene->render_extent.width *= 2;
+    // scene->render_extent.height *= 2;
 
     // Color attachment
     VkImageUsageFlags draw_image_usages = 0;
@@ -255,7 +255,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     VkImageUsageFlags depth_image_usages = {0};
     depth_image_usages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
-    image2D_create(state, 
+    image2D_create(state,
         scene->render_extent,
         VK_FORMAT_D32_SFLOAT,
         depth_image_usages,
@@ -447,7 +447,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         },
         [SCENE_SET_TEXTURES_BINDING] = {
             .binding = SCENE_SET_TEXTURES_BINDING,
-            .descriptorCount = state->device.properties_12.maxDescriptorSetUpdateAfterBindSampledImages,
+            .descriptorCount = MAX_TEXTURE_COUNT,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             .pImmutableSamplers = NULL,

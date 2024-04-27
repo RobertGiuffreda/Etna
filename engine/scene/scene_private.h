@@ -15,6 +15,20 @@
  * (Double Ended Queue / Ring queue) for traversing the scene graph
  */
 
+// TODO: Read from shader reflection data.
+// NOTE: Spirv-reflect is dereferencing a null pointer on me at the moment
+typedef enum scene_set_bindings {
+    SCENE_SET_FRAME_UNIFORMS_BINDING = 0,
+    SCENE_SET_DRAW_COUNTS_BINDING,
+    SCENE_SET_DRAW_BUFFERS_BINDING,
+    SCENE_SET_OBJECTS_BINDING,
+    SCENE_SET_GEOMETRIES_BINDING,
+    SCENE_SET_VERTICES_BINDING,
+    SCENE_SET_TRANSFORMS_BINDING,
+    SCENE_SET_TEXTURES_BINDING,
+    SCENE_SET_BINDING_MAX,
+} scene_set_bindings;
+
 typedef struct scene {
     const char* name;
 
@@ -72,12 +86,9 @@ typedef struct scene {
     VkPipelineLayout mat_pipeline_layout;
 
     // TODO: Clean up implementation
-    mat_pipe_config* mat_pipe_configs;
-    // TODO: image2D_config* image_configs;
-
     u32 mat_pipe_count;
     mat_pipe* mat_pipes;
-    // TODO: END
+    mat_pipe_config* mat_pipe_configs;
 
     image_manager* image_bank;
 
