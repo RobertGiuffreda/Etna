@@ -1,6 +1,7 @@
 #pragma once
 #include "defines.h"
 #include "scene/scene_types.h"
+#include "scene/transforms.h"
 
 #include "core/camera.h"
 #include "core/clock.h"
@@ -36,11 +37,13 @@ typedef struct scene {
     camera cam;
     scene_data data;
 
-    vertex* vertices;       // dynarray
-    u32* indices;           // dynarray
-    m4s* transforms;        // dynarray
-    geometry* geometries;   // dynarray
-    object* objects;        // dynarray
+    vertex* vertices;           // dynarray
+    u32* indices;               // dynarray
+    m4s* transforms_global;     // dynarray
+    geometry* geometries;       // dynarray
+    object* objects;            // dynarray
+
+    transforms transforms;
     // NOTE: END
 
     // NOTE: GPU Memory Buffers

@@ -15,6 +15,7 @@ typedef enum memory_tag {
     MEMORY_TAG_SHADER,
     MEMORY_TAG_IMPORTER,
     MEMORY_TAG_RESOURCE,
+    MEMORY_TAG_TRANSFORM,
     MEMORY_TAG_FILE,
     MEMORY_TAG_DYNARRAY,
     MEMORY_TAG_STRING,
@@ -31,6 +32,8 @@ void* etallocate(u64 size, memory_tag tag);
 
 void etfree(void* block, u64 size, memory_tag tag);
 
+void* etset_memory(void* block, u8 value, u64 size);
+void* etone_memory(void* block, u64 size);
 void* etzero_memory(void* block, u64 size);
 
 void* etcopy_memory(void* dest, const void* source, u64 size);

@@ -7,9 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/sandbox.exe",
             "args": [
-                "../../loading/AnimatedCube/AnimatedCube.gltf",
-                // "../../loading/galaxy/miss_galaxy.glb",
-                "../assets/gltf/structure.glb",
+                "../../loading/galaxy/miss_galaxy.glb",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/",

@@ -42,6 +42,8 @@ static void scene_renderer_shutdown(scene* scene, renderer_state* state);
 // is implemented, if it ever is
 void scene_texture_set(scene* scene, u32 tex_id, u32 img_id, u32 sampler_id);
 
+void add_node_to_transforms(u32 node_index, u32* nodes_to_transforms, import_node* nodes, transforms transforms);
+
 b8 scene_init(scene** scn, scene_config config) {
     scene* scene = etallocate(sizeof(struct scene), MEMORY_TAG_SCENE);
     scene->name = config.name;
@@ -103,14 +105,55 @@ b8 scene_init(scene** scn, scene_config config) {
     }
 
     // Change nodes into objects and transforms for the meshes
-    m4s* transforms = dynarray_create(1, sizeof(m4s));
-    object* objects = dynarray_create(1, sizeof(object));
     u32 node_count = dynarray_length(payload->nodes);
+    u32* nodes_to_transforms = etallocate(sizeof(u32) * node_count, MEMORY_TAG_SCENE);
+
+    transforms transforms = transforms_init(node_count);
+
+    u32 root_node_count = dynarray_length(payload->root_nodes);
+    for (u32 i = 0; i < root_node_count; ++i) {
+        u32 root_index = payload->root_nodes[i];
+        import_node root = payload->nodes[root_index];
+        transform root_transform = matrix_to_transform(root.local_transform);
+        nodes_to_transforms[root_index] = transforms_add_root(transforms, root_transform);
+        
+        u32 children_count = dynarray_length(root.children_indices);
+        for (u32 j = 0; j < children_count; ++j) {
+            add_node_to_transforms(root.children_indices[j], nodes_to_transforms, payload->nodes, transforms);
+        }
+    }
+
+    m4s* transforms_global = dynarray_create(node_count, sizeof(m4s));
+    dynarray_resize((void**)&transforms_global, node_count);
+    transforms_compute_global(transforms, transforms_global);
+
+    u32 skin_count = dynarray_length(payload->skins);
+    for (u32 i = 0; i < skin_count; ++i) {
+        u32 joint_count = dynarray_length(payload->skins[i].joint_indices);
+        for (u32 j = 0; j < joint_count; ++j) {
+            payload->skins[i].joint_indices[j] = nodes_to_transforms[payload->skins[i].joint_indices[j]];
+        }
+    }
+
+    u32 animation_count = dynarray_length(payload->animations);
+    for (u32 i = 0; i < animation_count; ++i) {
+        u32 channel_count = dynarray_length(payload->animations[i].channels);
+        for (u32 j = 0; j < channel_count; ++j) {
+            u32 target_index = payload->animations[i].channels[j].target_index;
+            payload->animations[i].channels[j].target_index = nodes_to_transforms[target_index];
+        }
+    }
+
+    // TODO: Create scene objects
+    m4s* transforms_glob = dynarray_create(1, sizeof(m4s));
+    object* objects = dynarray_create(1, sizeof(object));
     for (u32 i = 0; i < node_count; ++i) {
         if (payload->nodes[i].has_mesh) {
-            u32 transform_index = dynarray_length(transforms);
-            dynarray_push((void**)&transforms, &payload->nodes[i].world_transform);
+            u32 transform_index;
+            // transform_index = dynarray_length(transforms_glob);
+            // dynarray_push((void**)&transforms_glob, &payload->nodes[i].world_transform);
 
+            transform_index = nodes_to_transforms[i];
             import_mesh mesh = payload->meshes[payload->nodes[i].mesh_index];
             u64 object_start = dynarray_grow((void**)&objects, mesh.count);
             for (u32 j = 0; j < mesh.count; ++j) {
@@ -125,11 +168,16 @@ b8 scene_init(scene** scn, scene_config config) {
         }
     }
 
+    etfree(nodes_to_transforms, sizeof(u32) * node_count, MEMORY_TAG_SCENE);
+
+    // transforms_global = transforms_glob;
+
     scene->vertices = vertices;
     scene->indices = indices;
     scene->objects = objects;
-    scene->transforms = transforms;
+    scene->transforms_global = transforms_global;
     scene->geometries = geometries;
+    scene->transforms = transforms;
 
     u32 mat_pipe_count = dynarray_length(mat_pipe_configs);
     scene->mat_pipe_count = mat_pipe_count;
@@ -159,7 +207,7 @@ void scene_shutdown(scene* scene) {
     dynarray_destroy(scene->indices);
     dynarray_destroy(scene->vertices);
     dynarray_destroy(scene->geometries);
-    dynarray_destroy(scene->transforms);
+    dynarray_destroy(scene->transforms_global);
     dynarray_destroy(scene->objects);
 
     import_payload_destroy(&scene->payload);
@@ -357,13 +405,13 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     buffer_create_data(
         state,
-        scene->transforms,
-        sizeof(m4s) * dynarray_length(scene->transforms),
+        scene->transforms_global,
+        sizeof(m4s) * dynarray_length(scene->transforms_global),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->transform_buffer);
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->transform_buffer.handle, "TransformBuffer");
-    
+
     buffer_create_data(
         state,
         scene->geometries,
@@ -915,7 +963,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     }
 
     // TEMP: Quick and dirty placement of this data
-    scene->data.max_draw_count = MAX_DRAW_COMMANDS * scene->mat_pipe_count;
+    scene->data.max_draw_count = dynarray_length(scene->objects);
+    // scene->data.max_draw_count = 1; // TODO: What the fuck is going in
     scene->data.alpha_cutoff = 0.5f;
     scene->data.shadow_draw_id = scene->mat_pipe_count;
     scene->data.shadow_map_id = RESERVED_TEXTURE_SHADOW_MAP_INDEX;
@@ -1133,11 +1182,12 @@ void draw_command_generation(renderer_state* state, scene* scene, VkCommandBuffe
     u32 object_count = dynarray_length(scene->objects);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_layout, 0, 1, &scene->scene_set, 0, NULL);
 
+    u32 group_count_x = (u32)ceil((f32)object_count / 32.0f);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->shadow_draw_gen_pipeline);
-    vkCmdDispatch(cmd, ceil((f32)object_count / 32.0f), 1, 1);
+    vkCmdDispatch(cmd, group_count_x, 1, 1);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_pipeline);
-    vkCmdDispatch(cmd, ceil((f32)object_count / 32.0f), 1, 1);
+    vkCmdDispatch(cmd, group_count_x, 1, 1);
 
     // Wait for shadow draw generation before reading from indirect command buffer
     buffer_barrier(
@@ -1425,4 +1475,17 @@ static b8 scene_on_key_event(u16 code, void* scne, event_data data) {
         }
     }
     return false;
+}
+
+// TEMP: Recursive helper
+void add_node_to_transforms(u32 node_index, u32* nodes_to_transforms, import_node* nodes, transforms transforms) {
+    import_node node = nodes[node_index];
+    transform node_transform = matrix_to_transform(node.local_transform);
+    u32 parent_transform_index = nodes_to_transforms[node.parent_index];
+    nodes_to_transforms[node_index] = transforms_add_child(transforms, parent_transform_index, node_transform);
+
+    u32 children_count = dynarray_length(node.children_indices);
+    for (u32 i = 0; i < children_count; ++i) {
+        add_node_to_transforms(node.children_indices[i], nodes_to_transforms, nodes, transforms);
+    }
 }

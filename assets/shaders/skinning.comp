@@ -1,0 +1,18 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+#include "input_structures.glsl"
+
+#define SUBGROUP_SIZE 32
+layout(local_size_x = SUBGROUP_SIZE) in;
+layout(local_size_y = 1) in;
+layout(local_size_z = 1) in;
+
+// NOTE: This is compute shader skinning so I do not have to write skinning
+// vertex shaders for each material
+
+void main() {
+    // TODO: Skin each vertex and place into a vertex buffer for rendering
+
+    // TODO: END
+}

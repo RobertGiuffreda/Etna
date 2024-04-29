@@ -81,8 +81,6 @@ typedef enum import_pipeline_flag_bits {
 } import_pipeline_flag_bits;
 typedef u32 import_pipeline_flags;
 
-#define import_pipeline_type_to_flag(type) (1 << type)
-
 // NOTE: Default shaders for importing,
 // as file formats do not include shaders,
 typedef struct import_pipeline {
@@ -103,6 +101,7 @@ const static import_pipeline default_import_pipelines[IMPORT_PIPELINE_TYPE_MAX] 
         .instances = NULL,
         .transparent = false,
     },
+    // TODO: Rework this shader
     [IMPORT_PIPELINE_TYPE_PMX_DEFAULT] = {
         .vert_path = "assets/shaders/cel.vert.spv.opt",
         .frag_path = "assets/shaders/cel.frag.spv.opt",
@@ -129,15 +128,54 @@ typedef struct import_mesh {
     u32 count;
 } import_mesh;
 
+typedef struct import_skin {
+    u32* joint_indices;         // dynarray
+    m4s* inverse_binds;         // dynarray
+} import_skin;
+
 typedef struct import_node {
-    b8 has_mesh;
     b8 has_parent;
-    u32 mesh_index;
+    b8 has_mesh;
+    b8 has_skin;
     u32 parent_index;
+    u32 mesh_index;
+    u32 skin_index;
     u32* children_indices;      // dynarray
     m4s local_transform;
     m4s world_transform;
 } import_node;
+
+// NOTE: Temporarily make this a GLTF viewer to get a handle on the
+// GPU and requirements to support skinning and morph targets
+
+typedef enum transform_type {
+    TRANSFORM_TYPE_TRANSLATION = 1, // Starts at one to match with cgltf atm
+    TRANSFORM_TYPE_ROTATION,
+    TRANSFORM_TYPE_SCALE,
+} transform_type;
+
+typedef enum interpolation_type {
+    INTERPOLATION_TYPE_LINEAR = 0,
+    INTERPOLATION_TYPE_STEP,
+    INTERPOLATION_TYPE_CUBIC_SPLINE,
+} interpolation_type;
+
+typedef struct import_anim_channel {
+    u32 sampler_index;
+    u32 target_index;
+    transform_type trans_type;
+} import_anim_channel;
+
+typedef struct import_anim_sampler {
+    f32* timestamps;
+    v4s* data;
+    interpolation_type interp_type;
+} import_anim_sampler;
+
+typedef struct import_animation {
+    import_anim_channel* channels;
+    import_anim_sampler* samplers;
+} import_animation;
 
 // NOTE: All dynarrays
 typedef struct import_payload {
@@ -154,12 +192,12 @@ typedef struct import_payload {
     import_mesh* meshes;                // Dynarray
 
     import_node* nodes;                 // Dynarray
-    // GLTF:
-    // Animations
-    // Channels
-    // Samplers
-    // Skins
-    // Joints
+    import_skin* skins;                 // Dynarray
+    import_animation* animations;       // Dynarray
+
+    // TODO: Skins & joints
+
+    u32* root_nodes;
 } import_payload;
 
 // TODO: Serializing Beginning

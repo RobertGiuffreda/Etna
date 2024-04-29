@@ -37,6 +37,7 @@ layout(set = 0, binding = 0) uniform frame_data_block {
 	uint shadow_draws_id;
 	uint shadow_map_id;
 	// TEMP: END
+	
 	uint debug_view;
 } frame_data;
 

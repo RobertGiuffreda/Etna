@@ -32,6 +32,7 @@ static const char* memory_strings[MEMORY_TAG_MAX] = {
     "Shader:        ",
     "Importer:      ",
     "Resource:      ",
+    "Transform:     ",
     "File:          ",
     "Dynarray:      ",
     "String:        "
@@ -61,6 +62,14 @@ void etfree(void* block, u64 size, memory_tag tag) {
     metrics.tag_metrics[tag].allocated -= size;
     metrics.tag_metrics[tag].allocations--;
     free(block);
+}
+
+void* etset_memory(void* block, u8 value, u64 size) {
+    return memset(block, value, size);
+}
+
+void* etone_memory(void* block, u64 size) {
+    return memset(block, (int)-1, size);
 }
 
 void* etzero_memory(void* block, u64 size) {

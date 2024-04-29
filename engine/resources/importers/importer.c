@@ -25,7 +25,11 @@ import_payload import_files(u32 file_count, const char* const* paths) {
         .index_count = 0,
         .geometries = dynarray_create(1, sizeof(import_geometry)),
         .meshes = dynarray_create(1, sizeof(import_mesh)),
+        .skins = dynarray_create(1, sizeof(import_skin)),
+
         .nodes = dynarray_create(1, sizeof(import_node)),
+        .animations = dynarray_create(1, sizeof(import_animation)),
+        .root_nodes = dynarray_create(1, sizeof(u32)),
     };
 
     // HACK: Place default dummy positions in the texture array for importing
@@ -51,6 +55,18 @@ import_payload import_files(u32 file_count, const char* const* paths) {
             ETWARN("Attempting to load file %s with unsupported extension %s.", path, ext);
         }
     }
+    ETASSERT(failure_count == 0);
+
+    u32 node_count = dynarray_length(payload.nodes);
+    for (u32 i = 0; i < node_count; ++i) {
+        if (!payload.nodes[i].has_parent) {
+            dynarray_push((void**)&payload.root_nodes, &i);
+        }
+    }
+
+    // TODO: Vertex and index buffer placement here
+    // TODO: Unused pipeline removal here
+
     return payload;
 }
 // TODO: END

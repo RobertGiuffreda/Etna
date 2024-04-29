@@ -24,6 +24,6 @@
     #endif
 #else
     #define ETASSERT(expr)
-    #define ETASSERT_MSG(expr, message)
+    #define ETASSERT_MESSAGE(expr, message)
     #define ETASSERT_DEBUG(expr)
 #endif

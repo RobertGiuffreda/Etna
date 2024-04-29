@@ -34,6 +34,8 @@ static void combine_paths(char* path, const char* base, const char* uri);
 static VkFilter gltf_filter_to_vk_filter(cgltf_int filter);
 static VkSamplerMipmapMode gltf_filter_to_vk_mipmap_mode(cgltf_int filter);
 
+static m4s mat4s_add4(m4s m0, m4s m1, m4s m2, m4s m3);
+
 /** TODO: Next:
  * Put vertex data into single vertex buffer on import
  * Put index data into single index buffer on import
@@ -166,8 +168,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
         payload->mat_index_to_mat_id[mat_index_id_offset + i] = id;
     }
 
-    // TODO: Put vertex data into single vertex buffer & index data 
-    // into single index buffer in this function.
+    // TODO: Detect joint indices and joint weights in mesh here?
     u32 mesh_start = dynarray_grow((void**)&payload->meshes, data->meshes_count);    
     for (u32 i = 0; i < data->meshes_count; ++i) {
         import_mesh* mesh = &payload->meshes[mesh_start + i];
@@ -272,22 +273,27 @@ b8 import_gltf(import_payload* payload, const char* path) {
 
             mesh->geometry_indices[j] = geo_start + j;
             // TODO: When pipelines are placed before this function, we can store the pipeline_id, instance_id combo here
-            mesh->material_indices[j] = (prim.material) ? mat_index_id_offset + cgltf_material_index(data, prim.material) : mat_index_id_offset;
+            mesh->material_indices[j] = mat_index_id_offset + (prim.material ? cgltf_material_index(data, prim.material) : 0);
             // TODO: END
         }
     }
-    // TODO: END
 
     u32 node_start = dynarray_grow((void**)&payload->nodes, data->nodes_count);
+    u32 skin_start = dynarray_grow((void**)&payload->skins, data->skins_count);
+
     for (u32 i = 0; i < data->nodes_count; ++i) {
         import_node node = {0};
+        if (data->nodes[i].parent != NULL) {
+            node.has_parent = true;
+            node.parent_index = node_start + cgltf_node_index(data, data->nodes[i].parent);
+        }
         if (data->nodes[i].mesh != NULL) {
             node.has_mesh = true;
             node.mesh_index = mesh_start + cgltf_mesh_index(data, data->nodes[i].mesh);
         }
-        if (data->nodes[i].parent != NULL) {
-            node.has_parent = true;
-            node.parent_index = node_start + cgltf_node_index(data, data->nodes[i].parent);
+        if (data->nodes[i].skin != NULL) {
+            node.has_skin = true;
+            node.skin_index = skin_start + cgltf_skin_index(data, data->nodes[i].skin);
         }
 
         node.children_indices = dynarray_create(data->nodes[i].children_count, sizeof(u32));
@@ -302,9 +308,133 @@ b8 import_gltf(import_payload* payload, const char* path) {
         payload->nodes[node_start + i] = node;
     }
 
-    // TODO: Import Animation data & such
+    for (u32 i = 0; i < data->skins_count; ++i) {
+        u32 joint_count = data->skins[i].joints_count;
+        payload->skins[skin_start + i] = (import_skin) {
+            .inverse_binds = dynarray_create(joint_count, sizeof(m4s)),
+            .joint_indices = dynarray_create(joint_count, sizeof(u32)),
+        };
+        dynarray_resize((void**)&payload->skins[skin_start + i].inverse_binds, joint_count);
+        dynarray_resize((void**)&payload->skins[skin_start + i].joint_indices, joint_count);
+
+        u32 float_count = joint_count * 16;
+        cgltf_accessor_unpack_floats(
+            data->skins[i].inverse_bind_matrices,
+            (f32*)payload->skins[skin_start + i].inverse_binds,
+            float_count);
+        for (u32 j = 0; j < joint_count; ++j) {
+            payload->skins[skin_start + i].joint_indices[j] = node_start + cgltf_node_index(data, data->skins[i].joints[j]);
+        }
+    }
+
+    // TEMP:HACK: Temporary cpu skinning of meshes in order to get a handle on things
+    // for (u32 i = 0; i < data->skins_count; ++i) {
+    //     // Fill joint mats with inverse bind matrices
+    //     u32 float_count = cgltf_accessor_unpack_floats(data->skins[i].inverse_bind_matrices, NULL, 0);
+    //     m4s* joint_mats = etallocate(sizeof(f32) * float_count, MEMORY_TAG_IMPORTER);
+    //     cgltf_accessor_unpack_floats(data->skins[i].inverse_bind_matrices, (f32*)joint_mats, float_count);
+
+    //     for (u32 j = 0; j < data->skins[i].joints_count; ++j) {
+    //         u32 joint_node_index = node_start + cgltf_node_index(data, data->skins[i].joints[j]);
+    //         import_node* joint_node = &payload->nodes[joint_node_index];
+    //         joint_mats[j] = glms_mat4_mul(joint_node->world_transform, joint_mats[j]);
+    //     }
+
+    //     u32 mesh_index;
+    //     for (u32 j = 0; j < data->nodes_count; ++j) {
+    //         if (data->nodes[j].skin) {
+    //             u32 skin_index = cgltf_skin_index(data, data->nodes[j].skin);
+    //             if (skin_index == i) mesh_index = cgltf_mesh_index(data, data->nodes[j].mesh);
+    //         }
+    //     }
+    //     import_mesh* mesh = &payload->meshes[mesh_start + mesh_index];
+    //     cgltf_mesh* gltf_mesh = &data->meshes[mesh_index];
+    //     for (u32 j = 0; j < gltf_mesh->primitives_count; j++) {
+    //         cgltf_primitive* primitive = &gltf_mesh->primitives[j];
+    //         cgltf_accessor* joints = get_accessor_from_attributes(primitive->attributes, primitive->attributes_count, "JOINTS_0");
+    //         cgltf_accessor* weights = get_accessor_from_attributes(primitive->attributes, primitive->attributes_count, "WEIGHTS_0");
+            
+    //         u32 vertex_count = dynarray_length(payload->geometries[mesh->geometry_indices[j]].vertices);
+
+    //         iv4s* v_joints = etallocate(sizeof(iv4s) * vertex_count, MEMORY_TAG_IMPORTER);
+    //         for (u32 k = 0; k < vertex_count; ++k) {
+    //             cgltf_accessor_read_uint(joints, k, (u32*)&v_joints[k], sizeof(u32));
+    //         }
+
+    //         u32 weight_float_count = cgltf_accessor_unpack_floats(weights, NULL, 0);
+    //         v4s* v_weights = etallocate(sizeof(f32) * weight_float_count, MEMORY_TAG_IMPORTER);
+    //         cgltf_accessor_unpack_floats(weights, (f32*)v_weights, weight_float_count);
+
+    //         for (u32 k = 0; k < vertex_count; ++k) {
+    //             m4s m0 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[0]], v_weights[k].raw[0]);
+    //             m4s m1 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[1]], v_weights[k].raw[1]);
+    //             m4s m2 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[2]], v_weights[k].raw[2]);
+    //             m4s m3 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[3]], v_weights[k].raw[3]);
+
+    //             m4s m = mat4s_add4(m0, m1, m2, m3);
+
+    //             v3s new_pos = glms_mat4_mulv3(m, payload->geometries[mesh->geometry_indices[j]].vertices[k].position, 1.0f);
+    //             payload->geometries[mesh->geometry_indices[j]].vertices[k].position = new_pos;
+    //         }
+
+    //         etfree(v_joints, sizeof(iv4s) * vertex_count, MEMORY_TAG_IMPORTER);
+    //         etfree(v_weights, sizeof(f32) * weight_float_count, MEMORY_TAG_IMPORTER);
+    //     }
+
+    //     etfree(joint_mats, sizeof(f32) * float_count, MEMORY_TAG_IMPORTER);
+    // }
+    // TEMP:HACK: Temporary cpu skinning of meshes in order to get a handle on things
+
+    u32 animation_start = dynarray_grow((void**)&payload->animations, data->animations_count);
+    for (u32 i = 0; i < data->animations_count; ++i) {
+        payload->animations[animation_start + i] = (import_animation) {
+            .channels = dynarray_create(data->animations[i].channels_count, sizeof(import_anim_channel)),
+            .samplers = dynarray_create(data->animations[i].samplers_count, sizeof(import_anim_sampler)),
+        };
+        dynarray_resize((void**)&payload->animations[animation_start + i].channels, data->animations[i].channels_count);
+        dynarray_resize((void**)&payload->animations[animation_start + i].samplers, data->animations[i].samplers_count);
+
+        for (u32 j = 0; j < data->animations[i].channels_count; ++j) {
+            payload->animations[animation_start + i].channels[j] = (import_anim_channel) {
+                .sampler_index = cgltf_animation_sampler_index(data->animations, data->animations[i].channels[j].sampler),
+                .target_index = node_start + cgltf_node_index(data, data->animations[i].channels[j].target_node),
+                .trans_type = (transform_type)data->animations[i].channels[j].target_path,
+            };
+        }
+
+        for (u32 j = 0; j < data->animations[i].samplers_count; ++j) {
+            payload->animations[animation_start + i].samplers[j] = (import_anim_sampler) {
+                .timestamps = dynarray_create(data->animations[i].samplers[j].input->count, sizeof(f32)),
+                .data = dynarray_create(data->animations[i].samplers[j].output->count, sizeof(v4s)),
+                .interp_type = data->animations[i].samplers[j].interpolation,
+            };
+            dynarray_resize((void**)&payload->animations[animation_start + i].samplers[j].timestamps, data->animations[i].samplers[j].input->count);
+            dynarray_resize((void**)&payload->animations[animation_start + i].samplers[j].data, data->animations[i].samplers[j].output->count);
+        }
+    }
 
     return true;
+}
+
+m4s mat4s_add4(m4s m0, m4s m1, m4s m2, m4s m3) {
+    m4s return_mat;
+    return_mat.m00 = m0.m00 + m1.m00 + m2.m00 + m3.m00;
+    return_mat.m01 = m0.m01 + m1.m01 + m2.m01 + m3.m01;
+    return_mat.m02 = m0.m02 + m1.m02 + m2.m02 + m3.m02;
+    return_mat.m03 = m0.m03 + m1.m03 + m2.m03 + m3.m03;
+    return_mat.m10 = m0.m10 + m1.m10 + m2.m10 + m3.m10;
+    return_mat.m11 = m0.m11 + m1.m11 + m2.m11 + m3.m11;
+    return_mat.m12 = m0.m12 + m1.m12 + m2.m12 + m3.m12;
+    return_mat.m13 = m0.m13 + m1.m13 + m2.m13 + m3.m13;
+    return_mat.m20 = m0.m20 + m1.m20 + m2.m20 + m3.m20;
+    return_mat.m21 = m0.m21 + m1.m21 + m2.m21 + m3.m21;
+    return_mat.m22 = m0.m22 + m1.m22 + m2.m22 + m3.m22;
+    return_mat.m23 = m0.m23 + m1.m23 + m2.m23 + m3.m23;
+    return_mat.m30 = m0.m30 + m1.m30 + m2.m30 + m3.m30;
+    return_mat.m31 = m0.m31 + m1.m31 + m2.m31 + m3.m31;
+    return_mat.m32 = m0.m32 + m1.m32 + m2.m32 + m3.m32;
+    return_mat.m33 = m0.m33 + m1.m33 + m2.m33 + m3.m33;
+    return return_mat;
 }
 
 b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
