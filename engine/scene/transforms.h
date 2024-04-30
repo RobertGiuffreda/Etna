@@ -11,9 +11,22 @@ typedef struct transform {
 #define TRANSFORM_INIT_DEFAULT (transform) { .translation = GLMS_VEC3_ZERO, .rotation = GLMS_QUAT_IDENTITY, .scale = GLMS_VEC3_ONE,}
 #define TRANSFORM_INIT(t, r, s) (transform) { .translation = t, .rotation = r, .scale = s, }
 
+// TODO: Implement
+typedef struct transform_animation {
+    v4s* translations;
+    f32* trans_times;
+    quat* rotations;
+    f32* rot_times;
+    v4s* scales;
+    f32* scale_times;
+    u32 target_index;
+    u32 trans_count;
+    u32 rot_count;
+    u32 scale_count;
+} transform_animation;
+
 // NOTE: Dynarrays
 typedef struct transforms {
-    u32 count;
     u32 capacity;
     u32* parents;
     transform* tforms;
@@ -26,7 +39,7 @@ void transforms_deinit(transforms transforms);
 u32 transforms_add_root(transforms transforms, transform transform);
 u32 transforms_add_child(transforms transforms, u32 parent_index, transform transform);
 
-void transforms_compute_global(transforms transforms, m4s* global);
+void transforms_recompute_global(transforms transforms, m4s* global);
 
 static inline void transforms_set_transform(transforms transforms, u32 index, transform transform) {
     transforms.tforms[index] = transform;

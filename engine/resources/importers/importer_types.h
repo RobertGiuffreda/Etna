@@ -131,6 +131,7 @@ typedef struct import_mesh {
 typedef struct import_skin {
     u32* joint_indices;         // dynarray
     m4s* inverse_binds;         // dynarray
+    u32 skeleton;
 } import_skin;
 
 typedef struct import_node {
@@ -173,6 +174,7 @@ typedef struct import_anim_sampler {
 } import_anim_sampler;
 
 typedef struct import_animation {
+    f32 duration;
     import_anim_channel* channels;
     import_anim_sampler* samplers;
 } import_animation;
@@ -194,8 +196,6 @@ typedef struct import_payload {
     import_node* nodes;                 // Dynarray
     import_skin* skins;                 // Dynarray
     import_animation* animations;       // Dynarray
-
-    // TODO: Skins & joints
 
     u32* root_nodes;
 } import_payload;

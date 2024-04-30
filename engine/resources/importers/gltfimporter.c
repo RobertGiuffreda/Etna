@@ -39,12 +39,13 @@ static m4s mat4s_add4(m4s m0, m4s m1, m4s m2, m4s m3);
 /** TODO: Next:
  * Put vertex data into single vertex buffer on import
  * Put index data into single index buffer on import
- * Assign material data pipeline ids and instance ids on import
- * Create transform buffer from nodes on import
+ * Create transforms from nodes on import
  * 
- * After creating scene from payload
- * Import animations and joints and skins and stuff
- * 
+ * Things to fix/improve:
+ * Skins: Logic to handle Inverse Bind Matrices accessor property's absence
+ * Skins: Logic to handle Skeleton node property's absence 
+ * Mesh: Logic to handle the case where primitives use the same 
+ *       attribute accessors but differ in material. Same geometry
  */
 b8 import_gltf(import_payload* payload, const char* path) {
     // Attempt to load gltf file data with cgltf library
@@ -309,15 +310,19 @@ b8 import_gltf(import_payload* payload, const char* path) {
     }
 
     for (u32 i = 0; i < data->skins_count; ++i) {
+        ETASSERT_MESSAGE(data->skins[i].skeleton, "Skeleton Node Assumption Failure");
+        ETASSERT_MESSAGE(data->skins[i].inverse_bind_matrices, "Inverse Bind Matrices Assumption Failure");
+
         u32 joint_count = data->skins[i].joints_count;
         payload->skins[skin_start + i] = (import_skin) {
             .inverse_binds = dynarray_create(joint_count, sizeof(m4s)),
             .joint_indices = dynarray_create(joint_count, sizeof(u32)),
+            .skeleton = node_start + cgltf_node_index(data, data->skins[i].skeleton),
         };
         dynarray_resize((void**)&payload->skins[skin_start + i].inverse_binds, joint_count);
         dynarray_resize((void**)&payload->skins[skin_start + i].joint_indices, joint_count);
 
-        u32 float_count = joint_count * 16;
+        u32 float_count = joint_count * sizeof(m4s) / sizeof(f32);
         cgltf_accessor_unpack_floats(
             data->skins[i].inverse_bind_matrices,
             (f32*)payload->skins[skin_start + i].inverse_binds,
@@ -388,6 +393,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
     u32 animation_start = dynarray_grow((void**)&payload->animations, data->animations_count);
     for (u32 i = 0; i < data->animations_count; ++i) {
         payload->animations[animation_start + i] = (import_animation) {
+            .duration = 0.0f,
             .channels = dynarray_create(data->animations[i].channels_count, sizeof(import_anim_channel)),
             .samplers = dynarray_create(data->animations[i].samplers_count, sizeof(import_anim_sampler)),
         };
@@ -402,15 +408,49 @@ b8 import_gltf(import_payload* payload, const char* path) {
             };
         }
 
+        f32 duration = 0.f;
         for (u32 j = 0; j < data->animations[i].samplers_count; ++j) {
             payload->animations[animation_start + i].samplers[j] = (import_anim_sampler) {
                 .timestamps = dynarray_create(data->animations[i].samplers[j].input->count, sizeof(f32)),
                 .data = dynarray_create(data->animations[i].samplers[j].output->count, sizeof(v4s)),
                 .interp_type = data->animations[i].samplers[j].interpolation,
             };
-            dynarray_resize((void**)&payload->animations[animation_start + i].samplers[j].timestamps, data->animations[i].samplers[j].input->count);
-            dynarray_resize((void**)&payload->animations[animation_start + i].samplers[j].data, data->animations[i].samplers[j].output->count);
+            u32 times_count = data->animations[i].samplers[j].input->count;
+            u32 data_count = data->animations[i].samplers[j].output->count;
+            dynarray_resize((void**)&payload->animations[animation_start + i].samplers[j].timestamps, times_count);
+            dynarray_resize((void**)&payload->animations[animation_start + i].samplers[j].data, data_count);
+
+            cgltf_accessor_unpack_floats(
+                data->animations[i].samplers[j].input,
+                payload->animations[animation_start + i].samplers[j].timestamps,
+                times_count);
+
+            switch (data->animations[i].samplers[j].output->type) {
+                case cgltf_type_vec3:
+                    for (u32 k = 0; k < data_count; ++k) {
+                        cgltf_accessor_read_float(
+                            data->animations[i].samplers[j].output,
+                            k,
+                            (f32*)&payload->animations[animation_start + i].samplers[j].data[k],
+                            cgltf_num_components(cgltf_type_vec3));
+                        payload->animations[animation_start + i].samplers[j].data[k].w = 1.f;
+                    }
+                    break;
+                case cgltf_type_vec4:
+                    cgltf_accessor_unpack_floats(
+                        data->animations[i].samplers[j].output,
+                        (f32*)payload->animations[animation_start + i].samplers[j].data,
+                        data_count * 4);
+                    break;
+                default: {
+                    ETERROR("Unknown Animation Sampler Component Type.");
+                    break;
+                }
+            }
+
+            duration = glm_max(duration, data->animations[i].samplers[j].input->max[0]);
         }
+        payload->animations[animation_start + i].duration = duration;
     }
 
     return true;

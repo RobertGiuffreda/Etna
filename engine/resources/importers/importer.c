@@ -25,10 +25,11 @@ import_payload import_files(u32 file_count, const char* const* paths) {
         .index_count = 0,
         .geometries = dynarray_create(1, sizeof(import_geometry)),
         .meshes = dynarray_create(1, sizeof(import_mesh)),
-        .skins = dynarray_create(1, sizeof(import_skin)),
-
         .nodes = dynarray_create(1, sizeof(import_node)),
+
+        .skins = dynarray_create(1, sizeof(import_skin)),
         .animations = dynarray_create(1, sizeof(import_animation)),
+
         .root_nodes = dynarray_create(1, sizeof(u32)),
     };
 
@@ -66,6 +67,7 @@ import_payload import_files(u32 file_count, const char* const* paths) {
 
     // TODO: Vertex and index buffer placement here
     // TODO: Unused pipeline removal here
+    // TODO: Flatten nodes to transforms here
 
     return payload;
 }
@@ -109,4 +111,25 @@ void import_payload_destroy(import_payload* payload) {
         dynarray_destroy(payload->nodes[i].children_indices);
     }
     dynarray_destroy(payload->nodes);
+
+    u32 skin_count = dynarray_length(payload->skins);
+    for (u32 i = 0; i < skin_count; ++i) {
+        dynarray_destroy(payload->skins[i].inverse_binds);
+        dynarray_destroy(payload->skins[i].joint_indices);
+    }
+    dynarray_destroy(payload->skins);
+
+    u32 animation_count = dynarray_length(payload->animations);
+    for (u32 i = 0; i < animation_count; ++i) {
+        dynarray_destroy(payload->animations[i].channels);
+        u32 anim_sampler_count = dynarray_length(payload->animations[i].samplers);
+        for (u32 j = 0; j < anim_sampler_count; ++j) {
+            dynarray_destroy(payload->animations[i].samplers[j].timestamps);
+            dynarray_destroy(payload->animations[i].samplers[j].data);
+        }
+        dynarray_destroy(payload->animations[i].samplers);
+    }
+    dynarray_destroy(payload->animations);
+
+    dynarray_destroy(payload->root_nodes);
 }

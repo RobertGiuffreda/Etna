@@ -123,10 +123,11 @@ b8 scene_init(scene** scn, scene_config config) {
         }
     }
 
-    m4s* transforms_global = dynarray_create(node_count, sizeof(m4s));
-    dynarray_resize((void**)&transforms_global, node_count);
-    transforms_compute_global(transforms, transforms_global);
+    m4s* transforms_global = dynarray_create(transforms.capacity, sizeof(m4s));
+    dynarray_resize((void**)&transforms_global, transforms.capacity);
+    transforms_recompute_global(transforms, transforms_global);
 
+    // Change each joint index to be a transform index instead of a node index
     u32 skin_count = dynarray_length(payload->skins);
     for (u32 i = 0; i < skin_count; ++i) {
         u32 joint_count = dynarray_length(payload->skins[i].joint_indices);
@@ -144,16 +145,20 @@ b8 scene_init(scene** scn, scene_config config) {
         }
     }
 
+    // TEMP: Testing animations updating transforms on the gpu
+    scene->current_animation = 0;
+    scene->timestamp = 0.f;
+    // TEMP: END
+
     // TODO: Create scene objects
-    m4s* transforms_glob = dynarray_create(1, sizeof(m4s));
     object* objects = dynarray_create(1, sizeof(object));
     for (u32 i = 0; i < node_count; ++i) {
         if (payload->nodes[i].has_mesh) {
-            u32 transform_index;
-            // transform_index = dynarray_length(transforms_glob);
-            // dynarray_push((void**)&transforms_glob, &payload->nodes[i].world_transform);
-
-            transform_index = nodes_to_transforms[i];
+            u32 node_index = i;
+            if (payload->nodes[i].has_skin) {
+                node_index = payload->skins[payload->nodes[i].skin_index].skeleton;
+            }
+            u32 transform_index = nodes_to_transforms[node_index];
             import_mesh mesh = payload->meshes[payload->nodes[i].mesh_index];
             u64 object_start = dynarray_grow((void**)&objects, mesh.count);
             for (u32 j = 0; j < mesh.count; ++j) {
@@ -169,8 +174,6 @@ b8 scene_init(scene** scn, scene_config config) {
     }
 
     etfree(nodes_to_transforms, sizeof(u32) * node_count, MEMORY_TAG_SCENE);
-
-    // transforms_global = transforms_glob;
 
     scene->vertices = vertices;
     scene->indices = indices;
@@ -210,10 +213,92 @@ void scene_shutdown(scene* scene) {
     dynarray_destroy(scene->transforms_global);
     dynarray_destroy(scene->objects);
 
+    transforms_deinit(scene->transforms);
+
     import_payload_destroy(&scene->payload);
     
     etfree(scene, sizeof(struct scene), MEMORY_TAG_SCENE);
 }
+
+// TEMP: update gltf animations
+void apply_animation(transforms tforms, import_animation animation, f32 timestamp) {
+    u32 channel_count = dynarray_length(animation.channels);
+    for (u32 i = 0; i < channel_count; ++i) {
+        u32 smpl_index = animation.channels[i].sampler_index;
+        u32 tform_index = animation.channels[i].target_index;
+        
+
+        u32 key0 = -1;
+        u32 key1 = -1;
+        f32* timestamps = animation.samplers[smpl_index].timestamps;
+        v4s* data = animation.samplers[smpl_index].data;
+        u32 key_count = dynarray_length(timestamps);
+
+        if (timestamp > timestamps[key_count - 1]) {
+            // Reached the end of this channel
+            continue;
+        }
+        for (u32 j = 0; j < key_count - 1; ++j) {
+            if (timestamp > timestamps[j] && timestamp < timestamps[j + 1]) {
+                key0 = j;
+                key1 = j + 1;
+                break;
+            }
+        }
+        if (key0 == (u32)-1 && key1 == (u32)-1 && timestamp < timestamps[0]) {
+            switch (animation.channels[i].trans_type) {
+                case TRANSFORM_TYPE_TRANSLATION:
+                    transforms_set_translation(tforms, tform_index, glms_vec3(data[0]));
+                    break;
+                case TRANSFORM_TYPE_ROTATION:
+                    quat rot = {
+                        .x = data[0].x,
+                        .y = data[0].y,
+                        .z = data[0].z,
+                        .w = data[0].w,
+                    };
+                    transforms_set_rotation(tforms, tform_index, rot);
+                    break;
+                case TRANSFORM_TYPE_SCALE:
+                    transforms_set_scale(tforms, tform_index, glms_vec3(data[0]));
+                    break;
+                default: {
+                    break;
+                }
+            }
+        }
+
+        f32 t0 = timestamps[key0];
+        f32 t1 = timestamps[key1];
+        v4s data0 = data[key0];
+        v4s data1 = data[key1];
+
+        // Only support linear for testing
+        ETASSERT(animation.samplers[smpl_index].interp_type == INTERPOLATION_TYPE_LINEAR);
+
+        f32 a = (timestamp - t0) / (t1 - t0);
+        switch (animation.channels[i].trans_type) {
+            case TRANSFORM_TYPE_TRANSLATION:
+                v4s t = glms_vec4_lerp(data0, data1, a);
+                transforms_set_translation(tforms, tform_index, glms_vec3(t));
+                break;
+            case TRANSFORM_TYPE_ROTATION:
+                quat r;
+                glm_quat_slerp(data0.raw, data1.raw, a, r.raw);
+                transforms_set_rotation(tforms, tform_index, r);
+                break;
+            case TRANSFORM_TYPE_SCALE:
+                v4s s = glms_vec4_lerp(data0, data1, a);
+                transforms_set_scale(tforms, tform_index, glms_vec3(s));
+                break;
+            default: {
+                ETERROR("Animation of unknown transform type");
+                break;
+            }
+        }
+    }
+}
+// TEMP: END
 
 // TEMP: For testing and debugging
 static f32 light_offset = 0.0f;
@@ -267,6 +352,15 @@ void scene_update(scene* scene, f64 dt) {
         scene->data.light.position = l_pos;
         scene->data.light.position.y += light_offset;
     }
+
+    // TEMP: Apply temporary representation of animation to check if gpu systems are working
+    import_animation curr_ani = scene->payload.animations[scene->current_animation];
+    scene->timestamp = scene->timestamp + dt;
+    while (scene->timestamp > curr_ani.duration)
+        scene->timestamp -= curr_ani.duration;
+    apply_animation(scene->transforms, curr_ani, scene->timestamp);
+    transforms_recompute_global(scene->transforms, scene->transforms_global);
+    // TEMP: END
 }
 
 b8 scene_renderer_init(scene* scene, scene_config config) {
@@ -368,14 +462,14 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->scene_uniforms.handle, "FrameUniformsBuffer");
     buffer_create(
         state,
-        sizeof(u32) * (scene->mat_pipe_count + /* Shadow map draw commands */ 1),
+        sizeof(u32) * (scene->mat_pipe_count + /* TEMP: Shadow map draw commands */ 1),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->counts_buffer);
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->counts_buffer.handle, "PipelineDrawCountsBuffer");
     buffer_create(
         state,
-        sizeof(VkDeviceAddress) * (scene->mat_pipe_count + /* Shadow map draw commands */ 1),
+        sizeof(VkDeviceAddress) * (scene->mat_pipe_count + /* TEMP: Shadow map draw commands */ 1),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->draws_buffer);
@@ -403,10 +497,11 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         &scene->object_buffer);
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->object_buffer.handle, "ObjectBuffer");
 
+    u64 transform_buffer_bytes = sizeof(m4s) * dynarray_length(scene->transforms_global);
     buffer_create_data(
         state,
         scene->transforms_global,
-        sizeof(m4s) * dynarray_length(scene->transforms_global),
+        transform_buffer_bytes,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->transform_buffer);
@@ -420,6 +515,29 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         &scene->geometry_buffer);
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->geometry_buffer.handle, "GeometryBuffer");
+
+    // TEMP: Create some sort of staging system to request memory to send data to GPU instead of this
+    u64 staging_size = transform_buffer_bytes + sizeof(scene_data);
+    scene->staging_buffers = etallocate(sizeof(buffer) * state->swapchain.image_count, MEMORY_TAG_SCENE);
+    scene->staging_mapped = etallocate(sizeof(u8*) * state->swapchain.image_count, MEMORY_TAG_SCENE);
+    for (u32 i = 0; i < state->swapchain.image_count; ++i) {
+        buffer_create(
+            state,
+            staging_size,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+            &scene->staging_buffers[i]);
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->staging_buffers[i].handle, "SceneStagingBuffer");
+        vkMapMemory(
+            state->device.handle,
+            scene->staging_buffers[i].memory,
+            /* Offset */ 0,
+            VK_WHOLE_SIZE,
+            /* flags */ 0,
+            &scene->staging_mapped[i]
+        );
+    }
+    // TEMP: END
 
     // NOTE: Descriptors init function placed here for testing payload with x amount of mat_pipe_configs
     // Set 0: Scene set layout (engine specific). The set itself will be allocated on the fly
@@ -767,7 +885,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         ));
     }
 
-    // HACK:TEMP: More robust shadow mapping code
+    // TEMP: More robust shadow mapping code
     VkExtent3D shadow_map_resolution = {
         .width = 2048,
         .height = 2048,
@@ -800,7 +918,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         state->allocator,
         &scene->shadow_map_sampler));
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_SAMPLER, scene->shadow_map_sampler, "ShadowMapSampler");
-    // HACK:TEMP: END
+    // TEMP: END
 
     // Texture defaults using default samplers and images from renderer_state
     VkDescriptorImageInfo white_texture_info = {
@@ -964,13 +1082,12 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     // TEMP: Quick and dirty placement of this data
     scene->data.max_draw_count = dynarray_length(scene->objects);
-    // scene->data.max_draw_count = 1; // TODO: What the fuck is going in
     scene->data.alpha_cutoff = 0.5f;
     scene->data.shadow_draw_id = scene->mat_pipe_count;
     scene->data.shadow_map_id = RESERVED_TEXTURE_SHADOW_MAP_INDEX;
     // TEMP: END
 
-    // NOTE: Shadow mapping start
+    // TEMP: Shadow mapping placement
     buffer_create(
         state,
         sizeof(draw_command) * MAX_DRAW_COMMANDS,
@@ -1007,11 +1124,12 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE, scene->shadow_draw_gen_pipeline, "ShadowDrawGenerationPipeline");
     unload_shader(state, &shadow_draw_gen);
 
-    // TODO: Alpha passthrough for alpha-mask
+    // TODO: Light passing through alpha-mask texture
     shader shadow_map_vert;
     if (!load_shader(state, "assets/shaders/shadow.vert.spv.opt", &shadow_map_vert)) {
         return false;
     };
+    // TODO: END
 
     pipeline_builder builder = pipeline_builder_create();
     builder.layout = scene->draw_gen_layout;
@@ -1031,7 +1149,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     pipeline_builder_destroy(&builder);
 
     unload_shader(state, &shadow_map_vert);
-    // NOTE: Shadow Mapping end
+    // TEMP: Shadow Mapping end
     return true;
 }
 
@@ -1089,36 +1207,96 @@ void scene_renderer_shutdown(scene* scene, renderer_state* state) {
     for (u32 i = 0; i < frame_overlap; ++i) {
         vkDestroyCommandPool(state->device.handle, scene->graphics_pools[i], state->allocator);
         vkDestroyFence(state->device.handle, scene->render_fences[i], state->allocator);
+        vkUnmapMemory(state->device.handle, scene->staging_buffers[i].memory);
+        buffer_destroy(state, &scene->staging_buffers[i]);
     }
     etfree(scene->graphics_command_buffers, sizeof(VkCommandBuffer) * frame_overlap, MEMORY_TAG_SCENE);
     etfree(scene->graphics_pools, sizeof(VkCommandPool) * frame_overlap, MEMORY_TAG_SCENE);
     etfree(scene->render_fences, sizeof(VkFence) * frame_overlap, MEMORY_TAG_SCENE);
+    etfree(scene->staging_buffers, sizeof(buffer) * frame_overlap, MEMORY_TAG_SCENE);
+    etfree(scene->staging_mapped, sizeof(u8*) * frame_overlap, MEMORY_TAG_SCENE);
 
     image_destroy(state, &scene->depth_image);
     image_destroy(state, &scene->render_image);
 }
 
-// TODO: Data transfer commands to load information
+// TODO: Data transfer commands to load information into per frame staging
+// NOTE: Once there is a staging & memory management system we can just create 
+// buffers as necessary without waiting on per-frame staging to be available
 b8 scene_render(scene* scene, renderer_state* state) {
-    // TEMP:TODO: Create staging buffer to move this instead of vkCmdUpdateBuffer
-    VkCommandBuffer cmd = scene->graphics_command_buffers[state->swapchain.frame_index];
-    vkCmdUpdateBuffer(cmd,
-        scene->scene_uniforms.handle,
-        /* Offset: */ 0,
-        sizeof(scene_data),
-        &scene->data);
+    // TEMP: Until some kind of staging buffer system is is place
+    u32 frame_index = state->swapchain.frame_index;
+    VkCommandBuffer cmd = scene->graphics_command_buffers[frame_index];
+    scene->staging_mapped[frame_index];
+    
+    // vkCmdUpdateBuffer(cmd,
+    //     scene->scene_uniforms.handle,
+    //     /* Offset: */ 0,
+    //     sizeof(scene_data),
+    //     &scene->data
+    // );
+
+    u32 transforms_bytes = sizeof(m4s) * dynarray_length(scene->transforms_global);
+    etcopy_memory(
+        scene->staging_mapped[frame_index],
+        scene->transforms_global,
+        transforms_bytes
+    );
+    etcopy_memory(
+        (u8*)scene->staging_mapped[frame_index] + transforms_bytes,
+        &scene->data,
+        sizeof(scene_data)
+    );
+    
+    VkBufferCopy2 transform_copy = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
+        .srcOffset = 0,
+        .dstOffset = 0,
+        .size = transforms_bytes,
+    };
+    VkCopyBufferInfo2 transform_copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
+        .srcBuffer = scene->staging_buffers[frame_index].handle,
+        .dstBuffer = scene->transform_buffer.handle,
+        .regionCount = 1,
+        .pRegions = &transform_copy,
+    };
+    VkBufferCopy2 scene_uniforms_copy = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2,
+        .srcOffset = transforms_bytes,
+        .dstOffset = 0,
+        .size = sizeof(scene_data),
+    };
+    VkCopyBufferInfo2 scene_uniforms_copy_info = {
+        .sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2,
+        .srcBuffer = scene->staging_buffers[frame_index].handle,
+        .dstBuffer = scene->scene_uniforms.handle,
+        .regionCount = 1,
+        .pRegions = &scene_uniforms_copy,
+    };
+
+    vkCmdCopyBuffer2(cmd, &transform_copy_info);
+    vkCmdCopyBuffer2(cmd, &scene_uniforms_copy_info);
+
+    buffer_barrier(cmd, scene->scene_uniforms.handle, /* Offset: */ 0, VK_WHOLE_SIZE,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
+    );
+    buffer_barrier(cmd, scene->transform_buffer.handle, /* Offset: */ 0, VK_WHOLE_SIZE,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT
+    );
+
     vkCmdFillBuffer(cmd,
         scene->counts_buffer.handle,
         /* Offset: */ 0,
-        sizeof(u32) * (scene->mat_pipe_count + /* shadow map draws buffer */ 1),
+        sizeof(u32) * (scene->mat_pipe_count + /* TEMP: shadow map draws buffer */ 1),
         (u32)0);
-    buffer_barrier(cmd, scene->scene_uniforms.handle, /* Offset: */ 0, VK_WHOLE_SIZE,
-        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
-        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
     buffer_barrier(cmd, scene->counts_buffer.handle, /* Offset: */ 0, VK_WHOLE_SIZE,
         VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
-    // TEMP:TODO: END
+        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT
+    );
+    // TEMP: END
     return true;
 }
 

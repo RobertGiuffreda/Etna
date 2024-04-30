@@ -43,6 +43,11 @@ typedef struct scene {
     geometry* geometries;       // dynarray
     object* objects;            // dynarray
 
+    // TEMP: Testing playing animations
+    u32 current_animation;
+    f32 timestamp;
+    // TEMP: END
+
     transforms transforms;
     // NOTE: END
 
@@ -55,8 +60,13 @@ typedef struct scene {
     buffer object_buffer;       // Contains Object information used to generate draws
     buffer geometry_buffer;
 
-    buffer counts_buffer;        // Holds the counts for each pipeline draw indirect
-    buffer draws_buffer;         // Holds pointers to each material pipelines draw buffers
+    buffer counts_buffer;       // Holds the counts for each pipeline draw indirect
+    buffer draws_buffer;        // Holds pointers to each material pipelines draw buffers
+
+    // TEMP: Staging buffers
+    buffer* staging_buffers;            // Per frame staging buffers
+    void** staging_mapped;              // Per frame staging buffer mapped memory
+    // TEMP: END
 
     // NOTE: Render image, depth image
     VkExtent3D render_extent;
