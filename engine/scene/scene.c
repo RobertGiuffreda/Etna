@@ -145,12 +145,7 @@ b8 scene_init(scene** scn, scene_config config) {
         }
     }
 
-    // TEMP: Testing animations updating transforms on the gpu
-    scene->current_animation = 0;
-    scene->timestamp = 0.f;
-    // TEMP: END
-
-    // TODO: Create scene objects
+    // TODO: Skinned mesh instance
     object* objects = dynarray_create(1, sizeof(object));
     for (u32 i = 0; i < node_count; ++i) {
         if (payload->nodes[i].has_mesh) {
@@ -174,6 +169,11 @@ b8 scene_init(scene** scn, scene_config config) {
     }
 
     etfree(nodes_to_transforms, sizeof(u32) * node_count, MEMORY_TAG_SCENE);
+
+    // TEMP: Testing animations updating transforms on the gpu
+    scene->current_animation = 0;
+    scene->timestamp = 0.f;
+    // TEMP: END
 
     scene->vertices = vertices;
     scene->indices = indices;
@@ -1220,7 +1220,6 @@ void scene_renderer_shutdown(scene* scene, renderer_state* state) {
     image_destroy(state, &scene->render_image);
 }
 
-// TODO: Data transfer commands to load information into per frame staging
 // NOTE: Once there is a staging & memory management system we can just create 
 // buffers as necessary without waiting on per-frame staging to be available
 b8 scene_render(scene* scene, renderer_state* state) {
@@ -1228,13 +1227,6 @@ b8 scene_render(scene* scene, renderer_state* state) {
     u32 frame_index = state->swapchain.frame_index;
     VkCommandBuffer cmd = scene->graphics_command_buffers[frame_index];
     scene->staging_mapped[frame_index];
-    
-    // vkCmdUpdateBuffer(cmd,
-    //     scene->scene_uniforms.handle,
-    //     /* Offset: */ 0,
-    //     sizeof(scene_data),
-    //     &scene->data
-    // );
 
     u32 transforms_bytes = sizeof(m4s) * dynarray_length(scene->transforms_global);
     etcopy_memory(

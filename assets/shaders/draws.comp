@@ -49,7 +49,7 @@ bool is_visible(mat4 transform, geometry geo) {
 void main() {
 	uint gID = gl_GlobalInvocationID.x;
 
-	// TODO: Use this to cut off the 32 on the end of the workgroup size
+	// Use this to cut off the 32 on the end of the workgroup size
 	if (gID >= frame_data.max_draw_count) {
 		return;
 	}

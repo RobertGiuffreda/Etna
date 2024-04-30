@@ -7,8 +7,7 @@
 // This means the array can be traversed linearly using the already calculated
 // global transform of the parent transform
 
-// TODO: Remove dummy root node logic
-
+// TODO: Remove dummy root node logic; capacity + 1 in init
 /** TODO: Once multithreading is used in the engine
  * Keep track of children for each entry in the transform array
  * Use the children to multithread the global transform calculation
@@ -57,7 +56,7 @@ u32 transforms_add_child(transforms transforms, u32 parent_index, transform tran
     return (u32)-1;
 }
 
-// NOTE: Function assumes global is allocated and has count 
+// NOTE: Function assumes global is allocated and has count
 void transforms_recompute_global(transforms transforms, m4s* global) {
     global[0] = transform_to_matrix(transforms.tforms[0]);
     for (u32 i = 1; i < transforms.capacity; ++i) {

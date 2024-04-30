@@ -27,11 +27,7 @@ typedef struct vertex {
 } vertex;
 
 typedef struct anim_vertex {
-    v3s position;
-    f32 uv_x;
-    v3s normal;
-    f32 uv_y;
-    v4s color;
+    vertex static_vertex;
     iv4s bones;
     v4s weights;
 } anim_vertex;

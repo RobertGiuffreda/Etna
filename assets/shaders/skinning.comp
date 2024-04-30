@@ -8,11 +8,47 @@ layout(local_size_x = SUBGROUP_SIZE) in;
 layout(local_size_y = 1) in;
 layout(local_size_z = 1) in;
 
-// NOTE: This is compute shader skinning so I do not have to write skinning
-// vertex shaders for each material
+// NOTE: Push constant elements used:
+// buffer0: Joint Matrix buffer (joint transform * inverse bind matrix)
+// buffer1: Vertex buffer for input
+// buffer2: Vertex buffer for output
+// uint0: Number of vertices in vertex buffer we are skinning
+
+layout(buffer_reference, std430) buffer joint_mats {
+    mat4 matrices[];
+};
+
+layout(buffer_reference, std430) buffer in_vertices {
+    anim_vertex in_verts[];
+};
+
+layout(buffer_reference, std430) buffer out_vertices {
+    vertex out_verts[];
+};
 
 void main() {
-    // TODO: Skin each vertex and place into a vertex buffer for rendering
+    uint max_vertex_count = push.uint0;
+	uint gID = gl_GlobalInvocationID.x;
+    if (gID <= max_vertex_count) {
+        return;
+    }
 
-    // TODO: END
+    joint_mats joints = joint_mats(push.buffer0);
+    in_vertices in_vs = in_vertices(push.buffer1);
+    out_vertices out_vs = out_vertices(push.buffer2);
+
+    ivec4 joint_indices = in_vs.in_verts[gID].joints;
+    vec4 joint_weights = in_vs.in_verts[gID].weights;
+    vertex skinned_vertex = in_vs.in_verts[gID].static_vertex;
+
+    mat4 skin_mat = 
+        joint_weights.x * joints.matrices[joint_indices.x] + 
+        joint_weights.y * joints.matrices[joint_indices.y] + 
+        joint_weights.z * joints.matrices[joint_indices.z] + 
+        joint_weights.w * joints.matrices[joint_indices.w];
+
+    skinned_vertex.position = (skin_mat * vec4(skinned_vertex.position, 1.0f)).xyz;
+    skinned_vertex.normal   = transpose(inverse(mat3(skin_mat))) * skinned_vertex.normal;
+
+    out_vs.out_verts[gID] = skinned_vertex;
 }

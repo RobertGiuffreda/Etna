@@ -106,17 +106,13 @@ layout(set = 0, binding = 5, std430) readonly buffer vertex_buffer {
 	vertex vertices[];
 };
 
-// struct anim_vertex {
-//     vec3 position;
-//     float uv_x;
-//     vec3 normal;
-//     float uv_y;
-//     vec4 color;
-//     ivec4 bones;
-//     vec4 weights;
-// };
+struct anim_vertex {
+	vertex static_vertex;
+    ivec4 joints;
+    vec4 weights;
+};
 // layout(set = _, binding = _, std430) readonly buffer anim_vertex_buffer {
-// 	anim_vertex anim_vertices;
+// 	anim_vertex anim_vertices[];
 // };
 
 layout(set = 0, binding = 6, std430) readonly buffer transform_buffer {
@@ -124,3 +120,16 @@ layout(set = 0, binding = 6, std430) readonly buffer transform_buffer {
 };
 
 layout(set = 0, binding = 7) uniform sampler2D textures[];
+
+// TODO: Push constant range in scene struct 
+// when creating scene descriptor set layout
+layout(push_constant) uniform block {
+	uint64_t buffer0;
+	uint64_t buffer1;
+	uint64_t buffer2;
+	uint64_t buffer3;
+	uint uint0;
+	uint uint1;
+	uint uint2;
+	uint uint3;
+} push;

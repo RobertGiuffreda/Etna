@@ -9,15 +9,7 @@
 #include "resources/resource_private.h"
 #include "resources/material.h"
 
-/** TODO:
- * Clean up loading from the import payload
- * 
- * Parent child relationship between objects/transforms to make scene graph.
- * (Double Ended Queue / Ring queue) for traversing the scene graph
- */
-
 // TODO: Read from shader reflection data.
-// NOTE: Spirv-reflect is dereferencing a null pointer on me at the moment
 typedef enum scene_set_bindings {
     SCENE_SET_FRAME_UNIFORMS_BINDING = 0,
     SCENE_SET_DRAW_COUNTS_BINDING,
@@ -29,6 +21,17 @@ typedef enum scene_set_bindings {
     SCENE_SET_TEXTURES_BINDING,
     SCENE_SET_BINDING_MAX,
 } scene_set_bindings;
+
+typedef struct scene_push {
+    u64 buffer0;
+    u64 buffer1;
+    u64 buffer2;
+    u64 buffer3;
+    u32 uint0;
+    u32 uint1;
+    u32 uint2;
+    u32 uint3;
+} scene_push;
 
 typedef struct scene {
     const char* name;
@@ -89,12 +92,16 @@ typedef struct scene {
     VkPipeline draw_gen_pipeline;
     VkPipelineLayout draw_gen_layout;
     
-    // NOTE: PSOs must implement SET 0 to match this layout & retrieve the information
+    // NOTE: Currently only used to pass params 
+    // to skinning compute shader
+    VkPushConstantRange push_range;
+
+    // NOTE: Corresponds with "include_structures.glsl" set 0
     VkDescriptorSetLayout scene_set_layout;
     VkDescriptorSet scene_set;
 
     // NOTE: Currenly material pipelines are all hardcoded to
-    // To have the same descriptor set layout and pipeline layouts
+    // have the same descriptor set layout, SET 1, and pipeline layout
     VkDescriptorSetLayout mat_set_layout;
     VkPipelineLayout mat_pipeline_layout;
 
