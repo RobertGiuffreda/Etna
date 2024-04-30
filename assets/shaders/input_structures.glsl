@@ -3,6 +3,15 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
+// Per instance differences:
+// Geometry: 	Transform, Material Pipeline, Material Instance
+// Skin:		Joint Matrices
+// Instantiated Geometry elements:
+// Pipeline used to render the geometry
+// Material used to render the geometry
+// Transform used to render the geometry
+// Joint matrices to skin the vertices (if skinned)
+
 struct point_light {
 	vec4 color;
 	vec4 position;
@@ -28,8 +37,10 @@ layout(set = 0, binding = 0) uniform frame_data_block {
 	mat4 sun_viewproj;		// For ShadowMapping
 	direction_light sun;
 
-	// Alpha masking info
+	// Alpha masking info:
+	// NOTE: Should be per material instance
 	float alpha_cutoff;
+
 	// Indirect Draw information
 	uint max_draw_count;
 
@@ -106,30 +117,31 @@ layout(set = 0, binding = 5, std430) readonly buffer vertex_buffer {
 	vertex vertices[];
 };
 
-struct anim_vertex {
+struct skin_vertex {
 	vertex static_vertex;
     ivec4 joints;
     vec4 weights;
 };
-// layout(set = _, binding = _, std430) readonly buffer anim_vertex_buffer {
-// 	anim_vertex anim_vertices[];
-// };
+layout(set = 0, binding = 6, std430) readonly buffer skin_vertex_buffer {
+	skin_vertex skin_vertices[];
+};
 
-layout(set = 0, binding = 6, std430) readonly buffer transform_buffer {
+layout(set = 0, binding = 7, std430) readonly buffer transform_buffer {
 	mat4 transforms[];
 };
 
-layout(set = 0, binding = 7) uniform sampler2D textures[];
+layout(set = 0, binding = 8) uniform sampler2D textures[];
 
-// TODO: Push constant range in scene struct 
-// when creating scene descriptor set layout
-layout(push_constant) uniform block {
-	uint64_t buffer0;
-	uint64_t buffer1;
-	uint64_t buffer2;
-	uint64_t buffer3;
-	uint uint0;
-	uint uint1;
-	uint uint2;
-	uint uint3;
-} push;
+// How I would do things if I were not compute skinning
+// struct skinned_object {
+// 	uint geometry_index;
+// 	uint pipeline_index;
+// 	uint material_index;
+// 	uint transform_index;
+// 	uint joint_offset;
+// };
+
+// Would have all joint matrices for each instance of each skinned mesh
+// layout(set = 0, binding = _, std430) readonly buffer joint_matrices_buffer {
+// 	mat4 joints[];
+// };

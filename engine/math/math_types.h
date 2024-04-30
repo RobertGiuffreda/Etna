@@ -26,8 +26,8 @@ typedef struct vertex {
     v4s color;
 } vertex;
 
-typedef struct anim_vertex {
+typedef struct skin_vertex {
     vertex static_vertex;
     iv4s bones;
     v4s weights;
-} anim_vertex;
+} skin_vertex;

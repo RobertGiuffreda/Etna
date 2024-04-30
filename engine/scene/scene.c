@@ -488,6 +488,16 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->vertex_buffer.handle, "VertexBuffer");
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->index_buffer.handle, "IndexBuffer");
 
+    // TEMP: Until skinned vertex information is gotten 
+    buffer_create(
+        state,
+        sizeof(skin_vertex) * 32,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &scene->skin_vertex_buffer
+    );
+    // TEMP: END
+
     buffer_create_data(
         state,
         scene->objects,
@@ -552,6 +562,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         [SCENE_SET_OBJECTS_BINDING] = ssbf,
         [SCENE_SET_GEOMETRIES_BINDING] = ssbf,
         [SCENE_SET_VERTICES_BINDING] = ssbf,
+        [SCENE_SET_SKIN_VERTICES_BINDING] = ssbf,
         [SCENE_SET_TRANSFORMS_BINDING] = ssbf,
         [SCENE_SET_TEXTURES_BINDING] = ssbf | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT,
     };
@@ -602,6 +613,13 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
             .descriptorCount = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = NULL,
+        },
+        [SCENE_SET_SKIN_VERTICES_BINDING] = {
+            .binding = SCENE_SET_SKIN_VERTICES_BINDING,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
             .pImmutableSamplers = NULL,
         },
         [SCENE_SET_TRANSFORMS_BINDING] = {
@@ -658,7 +676,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
         .pNext = 0,
         .bindingCount = MAT_BINDING_MAX,
-        .pBindingFlags = mat_binding_flags
+        .pBindingFlags = mat_binding_flags,
     };
     VkDescriptorSetLayoutCreateInfo mat_layout_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -702,7 +720,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         &pool_info,
         state->allocator,
         &scene->descriptor_pool));
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_DESCRIPTOR_POOL, scene->descriptor_pool, "Scene Descriptor Pool");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_DESCRIPTOR_POOL, scene->descriptor_pool, "SceneDescriptorPool");
 
     u32 scene_texture_count = MAX_TEXTURE_COUNT;
     VkDescriptorSetVariableDescriptorCountAllocateInfo scene_descriptor_count_info = {
@@ -721,7 +739,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         state->device.handle,
         &scene_set_alloc_info,
         &scene->scene_set));
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_DESCRIPTOR_SET, scene->scene_set, "Scene Descriptor Set");
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_DESCRIPTOR_SET, scene->scene_set, "SceneDescriptorSet");
 
     // Write buffers to DescriptorSet
     VkDescriptorBufferInfo uniform_buffer_info = {
@@ -814,6 +832,21 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .dstBinding = SCENE_SET_VERTICES_BINDING,
         .pBufferInfo = &vertex_buffer_info,
     };
+    VkDescriptorBufferInfo skin_vertex_buffer_info = {
+        .buffer = scene->skin_vertex_buffer.handle,
+        .offset = 0,
+        .range = VK_WHOLE_SIZE,
+    };
+    VkWriteDescriptorSet skin_vertex_buffer_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = 0,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .dstSet = scene->scene_set,
+        .dstBinding = SCENE_SET_SKIN_VERTICES_BINDING,
+        .pBufferInfo = &skin_vertex_buffer_info,
+    };
     VkDescriptorBufferInfo transform_buffer_info = {
         .buffer = scene->transform_buffer.handle,
         .offset = 0,
@@ -836,11 +869,12 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         draws_buffer_write,
         geometry_buffer_write,
         vertex_buffer_write,
+        skin_vertex_buffer_write,
         transform_buffer_write,
     };
     vkUpdateDescriptorSets(
         state->device.handle,
-        /* writeCount: */ 7,
+        /* writeCount: */ 8,
         buffer_writes,
         /* copyCount: */ 0,
         /* copies: */ 0
@@ -1313,7 +1347,6 @@ b8 scene_frame_begin(scene* scene, renderer_state* state) {
         &state->swapchain.image_index);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         VK_CHECK(vkDeviceWaitIdle(state->device.handle));
-        
         // NOTE: VK_SUBOPTIMAL_KHR means an image will be successfully
         // acquired. Signalling the semaphore current semaphore when it is. 
         // This unsignals the semaphore by recreating it.
@@ -1497,13 +1530,13 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
         VK_ACCESS_2_NONE, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
         VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
     shadow_pass(state, scene, frame_cmd);
-    // Do not sample from shadow map until the shadow pass has reached
+    // Do not sample from shadow map until the shadow pass has reached end of depth writing
     image_barrier(frame_cmd, scene->shadow_map.handle, scene->shadow_map.aspects,
         VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
         VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
 
-    // Get color attachment and depth attachment ready to render to
+    // Get color attachment and depth attachment ready to be rendered to
     image_barrier(frame_cmd, scene->render_image.handle, scene->render_image.aspects,
         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         VK_ACCESS_2_NONE, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,

@@ -17,21 +17,11 @@ typedef enum scene_set_bindings {
     SCENE_SET_OBJECTS_BINDING,
     SCENE_SET_GEOMETRIES_BINDING,
     SCENE_SET_VERTICES_BINDING,
+    SCENE_SET_SKIN_VERTICES_BINDING,
     SCENE_SET_TRANSFORMS_BINDING,
     SCENE_SET_TEXTURES_BINDING,
     SCENE_SET_BINDING_MAX,
 } scene_set_bindings;
-
-typedef struct scene_push {
-    u64 buffer0;
-    u64 buffer1;
-    u64 buffer2;
-    u64 buffer3;
-    u32 uint0;
-    u32 uint1;
-    u32 uint2;
-    u32 uint3;
-} scene_push;
 
 typedef struct scene {
     const char* name;
@@ -55,6 +45,7 @@ typedef struct scene {
     // NOTE: END
 
     // NOTE: GPU Memory Buffers
+    buffer skin_vertex_buffer;
     buffer vertex_buffer;
     buffer index_buffer;
     buffer transform_buffer;

@@ -18,28 +18,25 @@ layout(buffer_reference, std430) buffer joint_mats {
     mat4 matrices[];
 };
 
-layout(buffer_reference, std430) buffer in_vertices {
-    anim_vertex in_verts[];
-};
-
-layout(buffer_reference, std430) buffer out_vertices {
-    vertex out_verts[];
-};
+layout(push_constant) uniform block {
+    uint vertex_count;
+    uint vertex_input_offset;
+    uint vertex_output_offset; 
+    joint_mats joints;
+} skinning_push;
 
 void main() {
-    uint max_vertex_count = push.uint0;
 	uint gID = gl_GlobalInvocationID.x;
-    if (gID <= max_vertex_count) {
+    if (gID <= skinning_push.vertex_count) {
         return;
     }
 
-    joint_mats joints = joint_mats(push.buffer0);
-    in_vertices in_vs = in_vertices(push.buffer1);
-    out_vertices out_vs = out_vertices(push.buffer2);
+    joint_mats joints = skinning_push.joints;
+    skin_vertex in_vertex = skin_vertices[gID + skinning_push.vertex_input_offset];
 
-    ivec4 joint_indices = in_vs.in_verts[gID].joints;
-    vec4 joint_weights = in_vs.in_verts[gID].weights;
-    vertex skinned_vertex = in_vs.in_verts[gID].static_vertex;
+    ivec4 joint_indices = in_vertex.joints;
+    vec4 joint_weights = in_vertex.weights;
+    vertex out_vertex = in_vertex.static_vertex;
 
     mat4 skin_mat = 
         joint_weights.x * joints.matrices[joint_indices.x] + 
@@ -47,8 +44,8 @@ void main() {
         joint_weights.z * joints.matrices[joint_indices.z] + 
         joint_weights.w * joints.matrices[joint_indices.w];
 
-    skinned_vertex.position = (skin_mat * vec4(skinned_vertex.position, 1.0f)).xyz;
-    skinned_vertex.normal   = transpose(inverse(mat3(skin_mat))) * skinned_vertex.normal;
+    out_vertex.position = (skin_mat * vec4(out_vertex.position, 1.0f)).xyz;
+    out_vertex.normal   = transpose(inverse(mat3(skin_mat))) * out_vertex.normal;
 
-    out_vs.out_verts[gID] = skinned_vertex;
+    vertices[gID + skinning_push.vertex_output_offset] = out_vertex;
 }
