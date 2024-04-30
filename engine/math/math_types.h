@@ -1,5 +1,4 @@
 #pragma once
-
 #include "defines.h"
 
 #define CGLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -27,7 +26,7 @@ typedef struct vertex {
 } vertex;
 
 typedef struct skin_vertex {
-    vertex static_vertex;
-    iv4s bones;
+    vertex vertex;
+    iv4s joints;
     v4s weights;
 } skin_vertex;

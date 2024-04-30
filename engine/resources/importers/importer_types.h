@@ -208,7 +208,7 @@ typedef enum index_type {
 
 typedef enum vertex_type {
     VERTEX_TYPE_STATIC = 0,
-    VERTEX_TYPE_ANIMATED,
+    VERTEX_TYPE_SKIN,
 } vertex_type;
 
 typedef struct blob_view {

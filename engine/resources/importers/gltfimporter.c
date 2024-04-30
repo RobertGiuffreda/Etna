@@ -41,11 +41,14 @@ static m4s mat4s_add4(m4s m0, m4s m1, m4s m2, m4s m3);
  * Put index data into single index buffer on import
  * Create transforms from nodes on import
  * 
- * Things to fix/improve:
- * Skins: Logic to handle Inverse Bind Matrices accessor property's absence
- * Skins: Logic to handle Skeleton node property's absence 
- * Mesh: Logic to handle the case where primitives use the same 
- *       attribute accessors but differ in material. Same geometry
+ * Assumptions:
+ * Textures: Sampler index is present
+ * Textures: Image index is present
+ * Skins:    Inverse Bind Matrices accessor is present
+ * Skins:    Skeleton node property is present 
+ * Meshes:   Logic to handle the case where primitives use the same 
+ *           attribute accessors(same vertices and indices) but differ
+ *           in material.
  */
 b8 import_gltf(import_payload* payload, const char* path) {
     // Attempt to load gltf file data with cgltf library
@@ -69,7 +72,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
     for (u32 i = 0; i < data->images_count; ++i) {
         import_image* image = &payload->images[img_start + i];
         image->data = load_image_data(&data->images[i], path, &image->width, &image->height, &image->channels);
-        image->name = (data->images[i].name) ? str_duplicate_allocate(data->images[i].name) : str_duplicate_allocate("Default Name");
+        image->name = (data->images[i].name) ? str_duplicate_allocate(data->images[i].name) : str_duplicate_allocate("NamelessImage");
     }
 
     u32 sampler_start = dynarray_grow((void**)&payload->samplers, data->samplers_count);
@@ -89,7 +92,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
 
     // TODO: Deserialize all files set to be imported, check the material 
     // specs for each one and place all the deafult pipelines needed into 
-    // the payload before calling this function.  
+    // the payload before calling this function.
     i32 opaque_index = -1;
     i32 transparent_index = -1;
     u32 pipeline_count = dynarray_length(payload->pipelines);
@@ -169,7 +172,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
         payload->mat_index_to_mat_id[mat_index_id_offset + i] = id;
     }
 
-    // TODO: Detect joint indices and joint weights in mesh here?
+    // TODO: If mesh is paired with a skin in a node then it must have JOINTS & WEIGHTS attributes
     u32 mesh_start = dynarray_grow((void**)&payload->meshes, data->meshes_count);    
     for (u32 i = 0; i < data->meshes_count; ++i) {
         import_mesh* mesh = &payload->meshes[mesh_start + i];
@@ -259,7 +262,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
             }
             dynarray_destroy(accessor_data);
 
-            // TODO: Frustum culling is causing pop-in
+            // TODO: Better method of frustum culling
             v4s min_pos = glms_vec4(geo->vertices[0].position, 0.0f);
             v4s max_pos = glms_vec4(geo->vertices[0].position, 0.0f);
             for (u32 k = 0; k < vertex_count; ++k) {
@@ -331,64 +334,6 @@ b8 import_gltf(import_payload* payload, const char* path) {
             payload->skins[skin_start + i].joint_indices[j] = node_start + cgltf_node_index(data, data->skins[i].joints[j]);
         }
     }
-
-    // TEMP:HACK: Temporary cpu skinning of meshes in order to get a handle on things
-    // for (u32 i = 0; i < data->skins_count; ++i) {
-    //     // Fill joint mats with inverse bind matrices
-    //     u32 float_count = cgltf_accessor_unpack_floats(data->skins[i].inverse_bind_matrices, NULL, 0);
-    //     m4s* joint_mats = etallocate(sizeof(f32) * float_count, MEMORY_TAG_IMPORTER);
-    //     cgltf_accessor_unpack_floats(data->skins[i].inverse_bind_matrices, (f32*)joint_mats, float_count);
-
-    //     for (u32 j = 0; j < data->skins[i].joints_count; ++j) {
-    //         u32 joint_node_index = node_start + cgltf_node_index(data, data->skins[i].joints[j]);
-    //         import_node* joint_node = &payload->nodes[joint_node_index];
-    //         joint_mats[j] = glms_mat4_mul(joint_node->world_transform, joint_mats[j]);
-    //     }
-
-    //     u32 mesh_index;
-    //     for (u32 j = 0; j < data->nodes_count; ++j) {
-    //         if (data->nodes[j].skin) {
-    //             u32 skin_index = cgltf_skin_index(data, data->nodes[j].skin);
-    //             if (skin_index == i) mesh_index = cgltf_mesh_index(data, data->nodes[j].mesh);
-    //         }
-    //     }
-    //     import_mesh* mesh = &payload->meshes[mesh_start + mesh_index];
-    //     cgltf_mesh* gltf_mesh = &data->meshes[mesh_index];
-    //     for (u32 j = 0; j < gltf_mesh->primitives_count; j++) {
-    //         cgltf_primitive* primitive = &gltf_mesh->primitives[j];
-    //         cgltf_accessor* joints = get_accessor_from_attributes(primitive->attributes, primitive->attributes_count, "JOINTS_0");
-    //         cgltf_accessor* weights = get_accessor_from_attributes(primitive->attributes, primitive->attributes_count, "WEIGHTS_0");
-            
-    //         u32 vertex_count = dynarray_length(payload->geometries[mesh->geometry_indices[j]].vertices);
-
-    //         iv4s* v_joints = etallocate(sizeof(iv4s) * vertex_count, MEMORY_TAG_IMPORTER);
-    //         for (u32 k = 0; k < vertex_count; ++k) {
-    //             cgltf_accessor_read_uint(joints, k, (u32*)&v_joints[k], sizeof(u32));
-    //         }
-
-    //         u32 weight_float_count = cgltf_accessor_unpack_floats(weights, NULL, 0);
-    //         v4s* v_weights = etallocate(sizeof(f32) * weight_float_count, MEMORY_TAG_IMPORTER);
-    //         cgltf_accessor_unpack_floats(weights, (f32*)v_weights, weight_float_count);
-
-    //         for (u32 k = 0; k < vertex_count; ++k) {
-    //             m4s m0 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[0]], v_weights[k].raw[0]);
-    //             m4s m1 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[1]], v_weights[k].raw[1]);
-    //             m4s m2 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[2]], v_weights[k].raw[2]);
-    //             m4s m3 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[3]], v_weights[k].raw[3]);
-
-    //             m4s m = mat4s_add4(m0, m1, m2, m3);
-
-    //             v3s new_pos = glms_mat4_mulv3(m, payload->geometries[mesh->geometry_indices[j]].vertices[k].position, 1.0f);
-    //             payload->geometries[mesh->geometry_indices[j]].vertices[k].position = new_pos;
-    //         }
-
-    //         etfree(v_joints, sizeof(iv4s) * vertex_count, MEMORY_TAG_IMPORTER);
-    //         etfree(v_weights, sizeof(f32) * weight_float_count, MEMORY_TAG_IMPORTER);
-    //     }
-
-    //     etfree(joint_mats, sizeof(f32) * float_count, MEMORY_TAG_IMPORTER);
-    // }
-    // TEMP:HACK: Temporary cpu skinning of meshes in order to get a handle on things
 
     u32 animation_start = dynarray_grow((void**)&payload->animations, data->animations_count);
     for (u32 i = 0; i < data->animations_count; ++i) {
@@ -663,3 +608,61 @@ static cgltf_accessor* get_accessor_from_attributes(cgltf_attribute* attributes,
     }
     return (void*)0;
 }
+
+    // TEMP:HACK: Temporary cpu skinning of meshes in order to get a handle on things
+    // for (u32 i = 0; i < data->skins_count; ++i) {
+    //     // Fill joint mats with inverse bind matrices
+    //     u32 float_count = cgltf_accessor_unpack_floats(data->skins[i].inverse_bind_matrices, NULL, 0);
+    //     m4s* joint_mats = etallocate(sizeof(f32) * float_count, MEMORY_TAG_IMPORTER);
+    //     cgltf_accessor_unpack_floats(data->skins[i].inverse_bind_matrices, (f32*)joint_mats, float_count);
+
+    //     for (u32 j = 0; j < data->skins[i].joints_count; ++j) {
+    //         u32 joint_node_index = node_start + cgltf_node_index(data, data->skins[i].joints[j]);
+    //         import_node* joint_node = &payload->nodes[joint_node_index];
+    //         joint_mats[j] = glms_mat4_mul(joint_node->world_transform, joint_mats[j]);
+    //     }
+
+    //     u32 mesh_index;
+    //     for (u32 j = 0; j < data->nodes_count; ++j) {
+    //         if (data->nodes[j].skin) {
+    //             u32 skin_index = cgltf_skin_index(data, data->nodes[j].skin);
+    //             if (skin_index == i) mesh_index = cgltf_mesh_index(data, data->nodes[j].mesh);
+    //         }
+    //     }
+    //     import_mesh* mesh = &payload->meshes[mesh_start + mesh_index];
+    //     cgltf_mesh* gltf_mesh = &data->meshes[mesh_index];
+    //     for (u32 j = 0; j < gltf_mesh->primitives_count; j++) {
+    //         cgltf_primitive* primitive = &gltf_mesh->primitives[j];
+    //         cgltf_accessor* joints = get_accessor_from_attributes(primitive->attributes, primitive->attributes_count, "JOINTS_0");
+    //         cgltf_accessor* weights = get_accessor_from_attributes(primitive->attributes, primitive->attributes_count, "WEIGHTS_0");
+            
+    //         u32 vertex_count = dynarray_length(payload->geometries[mesh->geometry_indices[j]].vertices);
+
+    //         iv4s* v_joints = etallocate(sizeof(iv4s) * vertex_count, MEMORY_TAG_IMPORTER);
+    //         for (u32 k = 0; k < vertex_count; ++k) {
+    //             cgltf_accessor_read_uint(joints, k, (u32*)&v_joints[k], sizeof(u32));
+    //         }
+
+    //         u32 weight_float_count = cgltf_accessor_unpack_floats(weights, NULL, 0);
+    //         v4s* v_weights = etallocate(sizeof(f32) * weight_float_count, MEMORY_TAG_IMPORTER);
+    //         cgltf_accessor_unpack_floats(weights, (f32*)v_weights, weight_float_count);
+
+    //         for (u32 k = 0; k < vertex_count; ++k) {
+    //             m4s m0 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[0]], v_weights[k].raw[0]);
+    //             m4s m1 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[1]], v_weights[k].raw[1]);
+    //             m4s m2 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[2]], v_weights[k].raw[2]);
+    //             m4s m3 = glms_mat4_scale(joint_mats[(u32)v_joints[k].raw[3]], v_weights[k].raw[3]);
+
+    //             m4s m = mat4s_add4(m0, m1, m2, m3);
+
+    //             v3s new_pos = glms_mat4_mulv3(m, payload->geometries[mesh->geometry_indices[j]].vertices[k].position, 1.0f);
+    //             payload->geometries[mesh->geometry_indices[j]].vertices[k].position = new_pos;
+    //         }
+
+    //         etfree(v_joints, sizeof(iv4s) * vertex_count, MEMORY_TAG_IMPORTER);
+    //         etfree(v_weights, sizeof(f32) * weight_float_count, MEMORY_TAG_IMPORTER);
+    //     }
+
+    //     etfree(joint_mats, sizeof(f32) * float_count, MEMORY_TAG_IMPORTER);
+    // }
+    // TEMP:HACK: Temporary cpu skinning of meshes in order to get a handle on things

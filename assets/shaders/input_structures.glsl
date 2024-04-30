@@ -118,7 +118,7 @@ layout(set = 0, binding = 5, std430) readonly buffer vertex_buffer {
 };
 
 struct skin_vertex {
-	vertex static_vertex;
+	vertex vertex;
     ivec4 joints;
     vec4 weights;
 };

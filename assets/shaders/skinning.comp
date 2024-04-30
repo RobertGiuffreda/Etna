@@ -36,7 +36,7 @@ void main() {
 
     ivec4 joint_indices = in_vertex.joints;
     vec4 joint_weights = in_vertex.weights;
-    vertex out_vertex = in_vertex.static_vertex;
+    vertex out_vertex = in_vertex.vertex;
 
     mat4 skin_mat = 
         joint_weights.x * joints.matrices[joint_indices.x] + 
