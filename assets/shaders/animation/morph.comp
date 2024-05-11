@@ -1,0 +1,44 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+#define SUBGROUP_SIZE 32
+layout(local_size_x = SUBGROUP_SIZE) in;
+layout(local_size_y = 1) in;
+layout(local_size_z = 1) in;
+
+#include "animation_common.glsl"
+
+void main() {
+	uint gID = gl_GlobalInvocationID.x;
+    if (gID <= animation_push.vertex_count) {
+        return;
+    }
+
+    vertex in_v = vertices[animation_push.in_vertex_start + gID];
+    vertex out_v = in_v;
+
+    float_buffer weights = float_buffer(animation_push.weights);
+    float_buffer targets = float_buffer((animation_push.targets + (gID * animation_push.morph_stride)));
+
+    // Position is first
+    uint pos_offset = 0;
+    for (uint i = 0; i < animation_push.morph_count; ++i) {
+        out_v.position += weights.floats[i] * vec3(
+            targets.floats[pos_offset + (i * 3) + 0],
+            targets.floats[pos_offset + (i * 3) + 1],
+            targets.floats[pos_offset + (i * 3) + 2]
+        );
+    }
+
+    // Normal is right after position
+    uint normal_offset = animation_push.morph_count * 3;
+    for (uint i = 0; i < animation_push.morph_count; ++i) {
+        out_v.normal += weights.floats[i] * vec3(
+            targets.floats[normal_offset + (i * 3) + 0],
+            targets.floats[normal_offset + (i * 3) + 1],
+            targets.floats[normal_offset + (i * 3) + 2]
+        );
+    }
+
+    vertices[animation_push.out_vertex_start + gID] = out_v;
+}

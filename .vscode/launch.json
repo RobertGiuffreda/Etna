@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/sandbox.exe",
             "args": [
-                "../../loading/AnimatedCube/AnimatedCube.gltf",
+                "../assets/gltf/structure.glb",
                 "../assets/gltf/Khronos-Sponza/glTF/Sponza.gltf",
             ],
             "stopAtEntry": false,

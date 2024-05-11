@@ -1,0 +1,33 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+#define SUBGROUP_SIZE 32
+layout(local_size_x = SUBGROUP_SIZE) in;
+layout(local_size_y = 1) in;
+layout(local_size_z = 1) in;
+
+#include "animation_common.glsl"
+
+void main() {
+	uint gID = gl_GlobalInvocationID.x;
+    if (gID >= animation_push.vertex_count) {
+        return;
+    }
+
+    joints joints_b = joints(animation_push.joints);
+    skin_vertex in_vertex = skin_vertices[animation_push.in_vertex_start + gID];
+    ivec4 joint_indices = in_vertex.joints;
+    vec4 joint_weights = in_vertex.weights;
+    vertex out_vertex = in_vertex.vertex;
+
+    mat4 skin_mat = 
+        joint_weights.x * transforms[joints_b.indices[joint_indices.x]] + 
+        joint_weights.y * transforms[joints_b.indices[joint_indices.y]] + 
+        joint_weights.z * transforms[joints_b.indices[joint_indices.z]] + 
+        joint_weights.w * transforms[joints_b.indices[joint_indices.w]];
+
+    out_vertex.position = (skin_mat * vec4(out_vertex.position, 1.0f)).xyz;
+    out_vertex.normal   = transpose(inverse(mat3(skin_mat))) * out_vertex.normal;
+
+    vertices[animation_push.out_vertex_start + gID] = out_vertex;
+}

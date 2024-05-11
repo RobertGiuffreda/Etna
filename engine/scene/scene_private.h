@@ -30,19 +30,21 @@ typedef struct scene {
     camera cam;
     scene_data data;
 
+    skin_vertex* skin_vertices; // dynarray
     vertex* vertices;           // dynarray
     u32* indices;               // dynarray
-    m4s* transforms_global;     // dynarray
     geometry* geometries;       // dynarray
+    
+    transforms transforms;
     object* objects;            // dynarray
+    skin_instance* skins;       // dynarray
+    u32 extra_vertex_count;
+    // NOTE: END
 
     // TEMP: Testing playing animations
     u32 current_animation;
     f32 timestamp;
     // TEMP: END
-
-    transforms transforms;
-    // NOTE: END
 
     // NOTE: GPU Memory Buffers
     buffer skin_vertex_buffer;
@@ -67,25 +69,25 @@ typedef struct scene {
     image render_image;
     image depth_image;
 
-    // NOTE: Index into draws_buffer for shadow_draws is a scene_data struct member
-    buffer shadow_draws;                    // Draw command buffer for indirect drawing
-    image shadow_map;                       // Depth map on shadow pass, sampler2D on lighting pass
-    VkSampler shadow_map_sampler;
-    VkPipeline shadow_draw_gen_pipeline;    // Uses draw_gen_layout as VkPipelineLayout
-    VkPipeline shadow_pipeline;             // Pipeline to render to the shadow map
-
     VkFence* render_fences;
     VkCommandPool* graphics_pools;
     VkCommandBuffer* graphics_command_buffers;
 
     VkDescriptorPool descriptor_pool;
 
-    VkPipeline draw_gen_pipeline;
-    VkPipelineLayout draw_gen_layout;
-    
+    // NOTE: Index into draws_buffer for shadow_draws is a scene_data struct member
+    image shadow_map;                       // Depth map on shadow pass, sampler2D on lighting pass
+    VkSampler shadow_map_sampler;
+    buffer shadow_draws;                    // Draw command buffer for indirect drawing
+    VkPipeline shadow_draw_gen_pipeline;    // Uses set0_layout as VkPipelineLayout
+    VkPipeline shadow_pipeline;             // Pipeline to render to the shadow map
+
     // NOTE: Currently only used to pass params 
     // to skinning compute shader
     VkPushConstantRange push_range;
+    VkPipelineLayout set0_layout;
+
+    VkPipeline draw_gen_pipeline;    
 
     // NOTE: Corresponds with "include_structures.glsl" set 0
     VkDescriptorSetLayout scene_set_layout;
@@ -108,6 +110,10 @@ typedef struct scene {
 
     import_payload payload;
     // TODO: END
+
+    // TEMP: Skin stuff
+    VkPipeline skinning_pipeline;
+    // TEMP: END
 
     renderer_state* state;
 } scene;

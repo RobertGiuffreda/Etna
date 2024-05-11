@@ -43,7 +43,11 @@ do {                                            \
     _immediate_end(state);                      \
 } while(0);                                     \
 
-mesh_buffers upload_mesh_immediate(
+vertex_index_buffers vertex_index_buffers_create(
     renderer_state* state,
-    u32 index_count, u32* indices, 
-    u32 vertex_count, vertex* vertices);
+    u32 index_count,
+    u32* indices, 
+    u32 vertex_count,
+    vertex* vertices,
+    u32 extra_vertex_count
+);

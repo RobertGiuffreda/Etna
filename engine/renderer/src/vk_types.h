@@ -62,11 +62,17 @@ typedef struct buffer {
 } buffer;
 
 // TODO: Refactor this
-typedef struct mesh_buffers {
+typedef struct vertex_index_buffers {
     buffer index_buffer;
     buffer vertex_buffer;
-} mesh_buffers;
+} vertex_index_buffers;
 // TODO: END
+
+typedef union push_constant {
+    f32 f32s[16];
+    u32 u32s[16];
+    u64 u64s[8];
+} push_constant;
 
 typedef struct draw_command {
     VkDrawIndexedIndirectCommand draw;

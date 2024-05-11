@@ -8,20 +8,6 @@
 
 typedef struct scene scene;
 
-// typedef struct sampler_config sampler_config;
-// typedef struct texture_config texture_config;
-// typedef struct mesh_config mesh_config;
-
-// typedef struct scene_payload {
-//     mat_pipe_config* pipeline_configs;
-//     image2D_config* image_configs;
-//     sampler_config* sampler_configs;
-//     texture_config* texture_configs;
-//     mesh_config* mesh_configs;
-//     transforms transforms;
-//     // animations animations;
-// } scene_payload;
-
 typedef struct scene_config {
     const char* name;
     u32 resolution_width;

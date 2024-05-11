@@ -7,7 +7,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "data_structures/dynarray.h"
+#include "utils/dynarray.h"
 
 #include "core/logger.h"
 #include "core/asserts.h"
@@ -17,7 +17,7 @@
 #include "memory/etmemory.h"
 #include "renderer/src/vk_types.h"
 
-// NOTE: Currenly leaks memory on failure to load gltf file
+// NOTE: Currently leaks memory on failure to load gltf file
 // TODO: Create a function to call when importing a file fails
 // that checks for memory allocations and frees them before returning
 
@@ -45,11 +45,11 @@ static m4s mat4s_add4(m4s m0, m4s m1, m4s m2, m4s m3);
  * Textures: Sampler index is present
  * Textures: Image index is present
  * Skins:    Inverse Bind Matrices accessor is present
- * Skins:    Skeleton node property is present 
  * Meshes:   Logic to handle the case where primitives use the same 
  *           attribute accessors(same vertices and indices) but differ
  *           in material.
  */
+
 b8 import_gltf(import_payload* payload, const char* path) {
     // Attempt to load gltf file data with cgltf library
     cgltf_options options = {0};
@@ -90,38 +90,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
         payload->textures[tex_start + i].sampler_id = sampler_start + cgltf_sampler_index(data, data->textures[i].sampler);
     }
 
-    // TODO: Deserialize all files set to be imported, check the material 
-    // specs for each one and place all the deafult pipelines needed into 
-    // the payload before calling this function.
-    i32 opaque_index = -1;
-    i32 transparent_index = -1;
-    u32 pipeline_count = dynarray_length(payload->pipelines);
-    for (u32 i = 0; i < pipeline_count; ++i) {
-        switch (payload->pipelines[i].type) {
-            case IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT:
-                transparent_index = (i32)i;
-                break;
-            case IMPORT_PIPELINE_TYPE_GLTF_DEFAULT: {
-                opaque_index = (i32)i;
-                break;
-            }
-        }
-    }
-    if (opaque_index == -1) {
-        import_pipeline gltf_default = default_import_pipelines[IMPORT_PIPELINE_TYPE_GLTF_DEFAULT];
-        gltf_default.instances = dynarray_create(0, gltf_default.inst_size);
-        dynarray_push((void**)&payload->pipelines, &gltf_default);
-        opaque_index = (i32)pipeline_count++;
-    }
-    if (transparent_index == -1) {
-        import_pipeline gltf_transparent = default_import_pipelines[IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT];
-        gltf_transparent.instances = dynarray_create(0, gltf_transparent.inst_size);
-        dynarray_push((void**)&payload->pipelines, &gltf_transparent);
-        transparent_index = (i32)pipeline_count++;
-    }
-    // TODO: END
-
-    u32 mat_index_id_offset = dynarray_grow((void**)&payload->mat_index_to_mat_id, data->materials_count);
+    mat_id* mat_index_to_mat_id = etallocate(sizeof(mat_id) * data->materials_count, MEMORY_TAG_IMPORTER);
     for (u32 i = 0; i < data->materials_count; ++i) {
         cgltf_material mat = data->materials[i];
         cgltf_pbr_metallic_roughness mr = mat.pbr_metallic_roughness;
@@ -154,156 +123,66 @@ b8 import_gltf(import_payload* payload, const char* path) {
         mat_id id;
         switch (data->materials[i].alpha_mode) {
             case cgltf_alpha_mode_blend:
-                id.pipe_id = transparent_index;
-                id.inst_id = dynarray_length(payload->pipelines[transparent_index].instances);
-                dynarray_push((void**)&payload->pipelines[transparent_index].instances, &instance);
+                id.pipe_id = IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT;
+                id.inst_id = dynarray_length(payload->pipelines[IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT].instances);
+                dynarray_push((void**)&payload->pipelines[IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT].instances, &instance);
                 break;
             default:
                 ETWARN("Unknown alpha mode for material %lu in gltf file %s. Setting opaque.", i, path);
             case cgltf_alpha_mode_mask:
             case cgltf_alpha_mode_opaque: {
-                id.pipe_id = opaque_index;
-                id.inst_id = dynarray_length(payload->pipelines[opaque_index].instances);
-                dynarray_push((void**)&payload->pipelines[opaque_index].instances, &instance);
+                id.pipe_id = IMPORT_PIPELINE_TYPE_GLTF_DEFAULT;
+                id.inst_id = dynarray_length(payload->pipelines[IMPORT_PIPELINE_TYPE_GLTF_DEFAULT].instances);
+                dynarray_push((void**)&payload->pipelines[IMPORT_PIPELINE_TYPE_GLTF_DEFAULT].instances, &instance);
                 break;
             }
         }
         
-        payload->mat_index_to_mat_id[mat_index_id_offset + i] = id;
+        mat_index_to_mat_id[i] = id;
     }
 
-    // TODO: If mesh is paired with a skin in a node then it must have JOINTS & WEIGHTS attributes
-    u32 mesh_start = dynarray_grow((void**)&payload->meshes, data->meshes_count);    
-    for (u32 i = 0; i < data->meshes_count; ++i) {
-        import_mesh* mesh = &payload->meshes[mesh_start + i];
-        mesh->count = data->meshes[i].primitives_count;
-        
-        mesh->geometry_indices = dynarray_create(mesh->count, sizeof(u32));
-        dynarray_resize((void**)&mesh->geometry_indices, mesh->count);
-
-        mesh->material_indices = dynarray_create(mesh->count, sizeof(u32));
-        dynarray_resize((void**)&mesh->material_indices, mesh->count);
-        
-        u32 geo_start = dynarray_grow((void**)&payload->geometries, mesh->count);
-
-        for (u32 j = 0; j < data->meshes[i].primitives_count; ++j) {
-            cgltf_primitive prim = data->meshes[i].primitives[j];
-            import_geometry* geo = &payload->geometries[geo_start + j];
-
-            // NOTE: Converts u16 indices to u32 indices
-            geo->indices = dynarray_create(prim.indices->count, sizeof(u32));
-            dynarray_resize((void**)&geo->indices, prim.indices->count);
-            payload->index_count += prim.indices->count;
-            cgltf_accessor_unpack_indices(prim.indices, geo->indices, sizeof(u32), prim.indices->count);
-            
-            // Make sure attribute 0 always has the max number of vertices
-            u32 vertex_count = prim.attributes[0].data->count;
-            geo->vertices = dynarray_create(vertex_count, sizeof(vertex));
-            dynarray_resize((void**)&geo->vertices, vertex_count);
-            payload->vertex_count += vertex_count;
-            for (u32 i = 0; i < vertex_count; ++i) {
-                geo->vertices[i] = (vertex) {
-                    .position = (v3s) {0, 0, 0},
-                    .normal = (v3s) {1.0f, 0, 0},
-                    .uv_x = 0.f,
-                    .uv_y = 0.f,
-                    .color = (v4s) { 1.f, 1.f, 1.f, 1.f},
-                };
-            }
-            
-            f32* accessor_data = dynarray_create(1, sizeof(f32));
-            for (u32 k = 0; k < prim.attributes_count; ++k) {
-                u64 float_count = cgltf_accessor_unpack_floats(prim.attributes[k].data, NULL, 0);
-                dynarray_resize((void**)&accessor_data, float_count);
-                cgltf_accessor_unpack_floats(prim.attributes[k].data, accessor_data, float_count);
-                switch (prim.attributes[k].type) {
-                    case cgltf_attribute_type_position:
-                        v3s* positions = (v3s*)accessor_data;
-                        for (u32 l = 0; l < prim.attributes[k].data->count; l++) {
-                            geo->vertices[l].position = positions[l];
-                        }
-                        break;
-                    case cgltf_attribute_type_normal:
-                        v3s* normals = (v3s*)accessor_data;
-                        for (u32 l = 0; l < prim.attributes[k].data->count; l++) {
-                            geo->vertices[l].normal = normals[l];
-                        }
-                        break;
-                    case cgltf_attribute_type_texcoord:
-                        v2s* uvs = (v2s*)accessor_data;
-                        for (u32 l = 0; l < prim.attributes[k].data->count; l++) {
-                            geo->vertices[l].uv_x = uvs[l].x;
-                            geo->vertices[l].uv_y = uvs[l].y;
-                        }
-                        break;
-                    case cgltf_attribute_type_color:
-                        v4s* colors = (v4s*)accessor_data;
-                        for (u32 l = 0; l < prim.attributes[k].data->count; l++) {
-                            geo->vertices[l].color = colors[l];
-                        }
-                        break;
-                    case cgltf_attribute_type_joints:
-                        // TODO: Implement
-                        iv4s* joints = (iv4s*)accessor_data;
-                        break;
-                    case cgltf_attribute_type_weights:
-                        // TODO: Implement
-                        v4s* weights = (v4s*)accessor_data;
-                        break;
-                    // TODO: Implement
-                    case cgltf_attribute_type_tangent: break;
-                    case cgltf_attribute_type_custom: break;
-                    // TODO: END
-                    default: {
-                        ETWARN("Unknown gltf vertex attribute type.");
-                        break;
-                    }
-                }
-            }
-            dynarray_destroy(accessor_data);
-
-            // TODO: Better method of frustum culling
-            v4s min_pos = glms_vec4(geo->vertices[0].position, 0.0f);
-            v4s max_pos = glms_vec4(geo->vertices[0].position, 0.0f);
-            for (u32 k = 0; k < vertex_count; ++k) {
-                min_pos = glms_vec4_minv(min_pos, glms_vec4(geo->vertices[k].position, 0.0f));
-                max_pos = glms_vec4_maxv(max_pos, glms_vec4(geo->vertices[k].position, 0.0f));
-            }
-
-            geo->origin = glms_vec4_scale(glms_vec4_add(max_pos, min_pos), 0.5f);
-            geo->extent = glms_vec4_scale(glms_vec4_sub(max_pos, min_pos), 0.5f);
-            geo->radius = glms_vec3_norm(glms_vec3(geo->extent));
-            // TODO: END
-
-            mesh->geometry_indices[j] = geo_start + j;
-            // TODO: When pipelines are placed before this function, we can store the pipeline_id, instance_id combo here
-            mesh->material_indices[j] = mat_index_id_offset + (prim.material ? cgltf_material_index(data, prim.material) : 0);
-            // TODO: END
-        }
+    // NOTE: For import_skin_instance
+    import_skin_instance* skin_insts_map = etallocate(
+        sizeof(skin_insts_map[0]) * data->skins_count,
+        MEMORY_TAG_IMPORTER);
+    for (u32 i = 0; i < data->skins_count; ++i) {
+        skin_insts_map[i].skin = (u32)-1;
     }
 
-    u32 node_start = dynarray_grow((void**)&payload->nodes, data->nodes_count);
+    u32 skin_inst_count = 0;
+    u32 mesh_start = dynarray_grow((void**)&payload->meshes, data->meshes_count);
     u32 skin_start = dynarray_grow((void**)&payload->skins, data->skins_count);
-
+    u32 node_start = dynarray_grow((void**)&payload->nodes, data->nodes_count);
     for (u32 i = 0; i < data->nodes_count; ++i) {
         import_node node = {0};
         if (data->nodes[i].parent != NULL) {
             node.has_parent = true;
-            node.parent_index = node_start + cgltf_node_index(data, data->nodes[i].parent);
+            u32 local_parent_index = cgltf_node_index(data, data->nodes[i].parent);
+            node.parent_index = node_start + local_parent_index;
         }
         if (data->nodes[i].mesh != NULL) {
             node.has_mesh = true;
-            node.mesh_index = mesh_start + cgltf_mesh_index(data, data->nodes[i].mesh);
-        }
-        if (data->nodes[i].skin != NULL) {
-            node.has_skin = true;
-            node.skin_index = skin_start + cgltf_skin_index(data, data->nodes[i].skin);
+            u32 local_mesh_index = cgltf_mesh_index(data, data->nodes[i].mesh);
+            node.mesh_index = mesh_start + local_mesh_index;
+            if (data->nodes[i].skin != NULL) {
+                node.has_skin = true;
+                u32 local_skin_index = cgltf_skin_index(data, data->nodes[i].skin);
+                node.skin_index = skin_start + local_skin_index;
+
+                if (skin_insts_map[local_skin_index].skin == (u32)-1) {
+                    skin_inst_count++;
+                    skin_insts_map[local_skin_index].skin = node.skin_index;
+                    skin_insts_map[local_skin_index].meshes = dynarray_create(1, sizeof(u32));
+                }
+                dynarray_push((void**)&skin_insts_map[local_skin_index].meshes, &node.mesh_index);
+            }
         }
 
         node.children_indices = dynarray_create(data->nodes[i].children_count, sizeof(u32));
         dynarray_resize((void**)&node.children_indices, data->nodes[i].children_count);
         for (u32 j = 0; j < data->nodes[i].children_count; ++j) {
-            node.children_indices[j] = node_start + cgltf_node_index(data, data->nodes[i].children[j]);
+            u32 local_node_index = cgltf_node_index(data, data->nodes[i].children[j]);
+            node.children_indices[j] = node_start + local_node_index;
         }
 
         cgltf_node_transform_local(&data->nodes[i], (cgltf_float*)node.local_transform.raw);
@@ -312,15 +191,287 @@ b8 import_gltf(import_payload* payload, const char* path) {
         payload->nodes[node_start + i] = node;
     }
 
+    struct {
+        b8 skinned;
+        u32 vertex_start;
+        u32 vertex_count;
+        u32 index_start;
+        u32 index_count;
+        u32 geometry_start;
+        u32 geometry_count;
+    }* mesh_info = etallocate(
+        sizeof(mesh_info[0]) * data->meshes_count,
+        MEMORY_TAG_IMPORTER);
+    etzero_memory(mesh_info, sizeof(mesh_info[0]) * data->meshes_count);
+
+    u32 static_vertex_start = dynarray_length(payload->vertices.statics);
+    u32 skinned_vertex_start = dynarray_length(payload->vertices.skinned);
+    u32 index_start = dynarray_length(payload->indices);
+    u32 geometry_start = dynarray_length(payload->geometries);
+
+    // TODO: Replace this passthrough to get grow counts by using custom
+    // memory allocators to avoid the expensive allocations instead.
+    u32 static_vertex_count = 0;
+    u32 skinned_vertex_count = 0;
+    u32 total_index_count = 0;
+    u32 total_geometry_count = 0;
+    for (u32 i = 0; i < data->meshes_count; ++i) {
+        for (u32 j = 0; j < data->meshes[i].primitives[0].attributes_count; ++j) {
+            switch (data->meshes[i].primitives[0].attributes[j].type) {
+                case cgltf_attribute_type_joints:
+                case cgltf_attribute_type_weights:
+                    mesh_info[i].skinned = true;
+                    break;
+                default: {
+                    break;
+                }
+            }
+        }
+        mesh_info[i].vertex_start = (mesh_info[i].skinned ?
+            (skinned_vertex_start + skinned_vertex_count) :
+            (static_vertex_start + static_vertex_count));
+        mesh_info[i].index_start = index_start + total_index_count;
+        mesh_info[i].geometry_start = geometry_start + total_geometry_count;
+        mesh_info[i].geometry_count = data->meshes[i].primitives_count;
+        total_geometry_count += data->meshes[i].primitives_count;
+
+        for (u32 j = 0; j < data->meshes[i].primitives_count; ++j) {
+            mesh_info[i].index_count += data->meshes[i].primitives[j].indices->count;
+            mesh_info[i].vertex_count += data->meshes[i].primitives[j].attributes[0].data->count;
+        }
+
+        total_index_count += mesh_info[i].index_count;
+        if (mesh_info[i].skinned) {
+            skinned_vertex_count += mesh_info[i].vertex_count;
+        } else {
+            static_vertex_count += mesh_info[i].vertex_count;
+        }
+    }
+
+    dynarray_grow((void**)&payload->vertices.statics, static_vertex_count);
+    dynarray_grow((void**)&payload->vertices.skinned, skinned_vertex_count);
+    dynarray_grow((void**)&payload->indices, total_index_count);
+    dynarray_grow((void**)&payload->geometries, total_geometry_count);
+    // TODO: END
+
+    for (u32 i = 0; i < static_vertex_count; ++i) {
+        payload->vertices.statics[i] = (vertex) {
+            .position = (v3s){0, 0, 0},
+            .normal = (v3s){1, 0, 0},
+            .uv_x = 0.0f,
+            .uv_y = 0.0f,
+            .color = (v4s){1, 1, 1, 1},
+        };
+    }
+
+    for (u32 i = 0; i < skinned_vertex_count; ++i) {
+        payload->vertices.skinned[i] = (skin_vertex) {
+            .vertex = {
+                .position = (v3s){0, 0, 0},
+                .normal = (v3s){1, 0, 0},
+                .uv_x = 0.0f,
+                .uv_y = 0.0f,
+                .color = (v4s){1, 1, 1, 1},
+            },
+            .joints = (iv4s){0, 0, 0, 0},
+            .weights = (v4s){0, 0, 0, 0},
+        };
+    }
+
+    for (u32 i = 0; i < data->meshes_count; ++i) {
+        import_mesh* mesh = &payload->meshes[mesh_start + i];
+        
+        // Get morph information
+        mesh->morph_count = data->meshes[i].primitives[0].targets_count;
+        mesh->morph_weights = etallocate(sizeof(f32) * mesh->morph_count, MEMORY_TAG_IMPORTER);
+        if (data->meshes[i].weights) {
+            etcopy_memory(
+                mesh->morph_weights,
+                data->meshes[i].weights,
+                mesh->morph_count * sizeof(f32)
+            );
+        } else {
+            etzero_memory(
+                mesh->morph_weights,
+                mesh->morph_count * sizeof(f32)
+            );
+        }
+
+        u32 morph_stride = 0;
+        if (mesh->morph_count) {
+            for (u32 j = 0; j < data->meshes[i].primitives[0].targets[0].attributes_count; ++j) {
+                switch (data->meshes[i].primitives[0].targets[0].attributes[j].type) {
+                    case cgltf_attribute_type_position:
+                    case cgltf_attribute_type_normal:
+                        morph_stride += sizeof(v3s);
+                        break;
+                    default: {
+                        break;
+                    }
+                }
+            }
+        }
+        mesh->morph_targets = dynarray_create(mesh->morph_count * mesh_info[i].vertex_count, morph_stride);
+        dynarray_resize((void**)&mesh->morph_targets, mesh->morph_count * mesh_info[i].vertex_count);
+
+        // Get geometry information
+        u32 geometry_count = data->meshes[i].primitives_count;
+        mesh->geo_count = geometry_count;
+        mesh->geometries = etallocate(sizeof(u32) * geometry_count, MEMORY_TAG_IMPORTER);
+        mesh->materials = etallocate(sizeof(mat_id) * geometry_count, MEMORY_TAG_IMPORTER);
+
+        u32 vertex_stride = mesh_info[i].skinned ? sizeof(skin_vertex) : sizeof(vertex);
+        mesh->vertex_type = (mesh_info[i].skinned ?
+            (mesh->morph_count ? VERTEX_SKIN_MORPH : VERTEX_SKINNED) :
+            (mesh->morph_count ? VERTEX_MORPHING   : VERTEX_STATIC)
+        );
+
+        mesh->vertex_offset = mesh_info[i].vertex_start;
+        mesh->vertex_count = mesh_info[i].vertex_count;
+
+        u32 vertex_start = mesh_info[i].vertex_start;
+        u32 index_start = mesh_info[i].index_start;
+        for (u32 j = 0; j < geometry_count; ++j) {
+            u32 vertex_count = data->meshes[i].primitives[j].attributes[0].data->count;
+
+            v4s min_pos = GLMS_VEC4_ONE;
+            v4s max_pos = GLMS_VEC4_ONE;
+            void* accessor_data = dynarray_create(1, sizeof(u32));
+            for (u32 k = 0; k < data->meshes[i].primitives[j].attributes_count; ++k) {
+                cgltf_attribute* attribute = &data->meshes[i].primitives[j].attributes[k];
+
+                if (attribute->type == cgltf_attribute_type_joints) {
+                    dynarray_resize((void**)&accessor_data, 4 * vertex_count);
+                    iv4s* acc_data = accessor_data;
+                    for (u32 l = 0; l < vertex_count; ++l) {
+                        cgltf_accessor_read_uint(
+                            attribute->data,
+                            l,
+                            (u32*)&acc_data[l],
+                            4
+                        );
+                    }
+                } else {
+                    if (attribute->type == cgltf_attribute_type_position) {
+                        ETASSERT(attribute->data->has_min && attribute->data->has_max);
+                        etcopy_memory(&min_pos, attribute->data->min, sizeof(v3s));
+                        etcopy_memory(&max_pos, attribute->data->max, sizeof(v3s));
+                    }
+                    u64 float_count = cgltf_accessor_unpack_floats(attribute->data, NULL, 0);
+                    dynarray_resize((void**)&accessor_data, float_count);
+                    cgltf_accessor_unpack_floats(attribute->data, accessor_data, float_count);
+                }
+
+                void* vertices = (mesh->vertex_type >= VERTEX_SKINNED ? 
+                    ((void*)&payload->vertices.skinned[vertex_start]) :
+                    ((void*)&payload->vertices.statics[vertex_start])
+                );
+                for (u32 l = 0; l < vertex_count; ++l) {
+                    void* vert = (u8*)vertices + (l * vertex_stride);
+                    switch (attribute->type) {
+                        case cgltf_attribute_type_position:
+                            ((vertex*)vert)->position = ((v3s*)accessor_data)[l];
+                            break;
+                        case cgltf_attribute_type_normal:
+                            ((vertex*)vert)->normal = ((v3s*)accessor_data)[l];
+                            break;
+                        case cgltf_attribute_type_texcoord:
+                            ((vertex*)vert)->uv_x = ((v2s*)accessor_data)[l].x;
+                            ((vertex*)vert)->uv_y = ((v2s*)accessor_data)[l].y;
+                            break;
+                        case cgltf_attribute_type_color:
+                            ((vertex*)vert)->color = ((v4s*)accessor_data)[l];
+                            break;
+                        case cgltf_attribute_type_joints:
+                            ((skin_vertex*)vert)->joints = ((iv4s*)accessor_data)[l];
+                            break;
+                        case cgltf_attribute_type_weights:
+                            ((skin_vertex*)vert)->weights = ((v4s*)accessor_data)[l];
+                            break;
+                        default: {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Morph target information
+            for (u32 k = 0; k < mesh->morph_count; ++k) {
+                cgltf_morph_target* cgltf_target = &data->meshes[i].primitives[j].targets[k];
+                for (u32 l = 0; l < cgltf_target->attributes_count; ++l) {
+                    u64 float_count = cgltf_accessor_unpack_floats(cgltf_target->attributes[l].data, NULL, 0);
+                    dynarray_resize((void**)&accessor_data, float_count);
+                    cgltf_accessor_unpack_floats(
+                        cgltf_target->attributes[l].data,
+                        accessor_data,
+                        float_count
+                    );
+
+                    for (u32 m = 0; m < vertex_count; ++m) {
+                        u64 morph_offset = (morph_stride * m);
+                        switch (cgltf_target->attributes[l].type) {
+                            case cgltf_attribute_type_position:
+                                morph_offset += k * sizeof(v3s);
+                                *((v3s*)((u8*)mesh->morph_targets + morph_offset)) = ((v3s*)accessor_data)[m];
+                                break;
+                            case cgltf_attribute_type_normal:
+                                morph_offset += (mesh->morph_count + k) * sizeof(v3s);
+                                *((v3s*)((u8*)mesh->morph_targets + morph_offset)) = ((v3s*)accessor_data)[m];
+                                break;
+                            // TODO: Implement
+                            case cgltf_attribute_type_tangent:
+                                break;
+                            case cgltf_attribute_type_texcoord:
+                                break;
+                            // TODO: END
+                            default: {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            u32 index_count = data->meshes[i].primitives[j].indices->count;
+            u32 geo_index = mesh_info[i].geometry_start + j;
+            payload->geometries[geo_index] = (import_geometry) {
+                .index_start = index_start,
+                .index_count = index_count,
+                .origin = glms_vec4_scale(glms_vec4_add(max_pos, min_pos), 0.5f),
+                .extent = glms_vec4_scale(glms_vec4_sub(max_pos, min_pos), 0.5f)};
+            payload->geometries[geo_index].radius = glms_vec3_norm(glms_vec3(payload->geometries[geo_index].extent));
+
+            mesh->geometries[j] = geo_index;
+
+            u32 local_vertex_start = vertex_start - mesh_info[i].vertex_start;
+            for (u32 k = 0; k < index_count; ++k) {
+                payload->indices[index_start + k] = local_vertex_start + cgltf_accessor_read_index(
+                    data->meshes[i].primitives[j].indices,
+                    k
+                );
+            }
+
+            mesh->materials[j] = mat_index_to_mat_id[
+                (data->meshes[i].primitives[j].material ? 
+                    cgltf_material_index(
+                        data,
+                        data->meshes[i].primitives[j].material
+                    ) : 0
+                )
+            ];
+
+            vertex_start += vertex_count;
+            index_start += index_count;
+        }
+    }
+
     for (u32 i = 0; i < data->skins_count; ++i) {
-        ETASSERT_MESSAGE(data->skins[i].skeleton, "Skeleton Node Assumption Failure");
         ETASSERT_MESSAGE(data->skins[i].inverse_bind_matrices, "Inverse Bind Matrices Assumption Failure");
 
         u32 joint_count = data->skins[i].joints_count;
         payload->skins[skin_start + i] = (import_skin) {
             .inverse_binds = dynarray_create(joint_count, sizeof(m4s)),
             .joint_indices = dynarray_create(joint_count, sizeof(u32)),
-            .skeleton = node_start + cgltf_node_index(data, data->skins[i].skeleton),
         };
         dynarray_resize((void**)&payload->skins[skin_start + i].inverse_binds, joint_count);
         dynarray_resize((void**)&payload->skins[skin_start + i].joint_indices, joint_count);
@@ -333,7 +484,13 @@ b8 import_gltf(import_payload* payload, const char* path) {
         for (u32 j = 0; j < joint_count; ++j) {
             payload->skins[skin_start + i].joint_indices[j] = node_start + cgltf_node_index(data, data->skins[i].joints[j]);
         }
+
+        if (skin_insts_map[i].skin != (u32)-1) {
+            dynarray_push((void**)&payload->skin_instances, &skin_insts_map[i]);
+        }
     }
+
+    etfree(skin_insts_map, sizeof(import_skin_instance), MEMORY_TAG_IMPORTER);
 
     u32 animation_start = dynarray_grow((void**)&payload->animations, data->animations_count);
     for (u32 i = 0; i < data->animations_count; ++i) {
@@ -347,7 +504,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
 
         for (u32 j = 0; j < data->animations[i].channels_count; ++j) {
             payload->animations[animation_start + i].channels[j] = (import_anim_channel) {
-                .sampler_index = cgltf_animation_sampler_index(data->animations, data->animations[i].channels[j].sampler),
+                .sampler_index = cgltf_animation_sampler_index(&data->animations[i], data->animations[i].channels[j].sampler),
                 .target_index = node_start + cgltf_node_index(data, data->animations[i].channels[j].target_node),
                 .trans_type = (transform_type)data->animations[i].channels[j].target_path,
             };
@@ -386,6 +543,9 @@ b8 import_gltf(import_payload* payload, const char* path) {
                         data->animations[i].samplers[j].output,
                         (f32*)payload->animations[animation_start + i].samplers[j].data,
                         data_count * 4);
+                    break;
+                case cgltf_type_scalar:
+                    // TODO: Implement morph weight animation
                     break;
                 default: {
                     ETERROR("Unknown Animation Sampler Component Type.");
@@ -450,8 +610,6 @@ b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
     return true;
 }
 
-// TODO: Have this return data to be processed by stbi_load_from_memory
-// Image manager should handle loading in image memory
 void* load_image_data(
     cgltf_image* in_image,
     const char* gltf_path,

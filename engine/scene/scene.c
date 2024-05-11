@@ -1,7 +1,7 @@
 #include "scene.h"
 #include "scene/scene_private.h"
 
-#include "data_structures/dynarray.h"
+#include "utils/dynarray.h"
 
 #include "core/etstring.h"
 #include "core/logger.h"
@@ -38,9 +38,10 @@ static b8 scene_on_key_event(u16 code, void* scne, event_data data);
 static b8 scene_renderer_init(scene* scene, scene_config config);
 static void scene_renderer_shutdown(scene* scene, renderer_state* state);
 
-// TODO: Remove, textures will be set when loading for now, until any kind of streaming
-// is implemented, if it ever is
+// TODO: Remove, textures will be set when loading for now, 
+// until any kind of streaming is implemented, if it ever is.
 void scene_texture_set(scene* scene, u32 tex_id, u32 img_id, u32 sampler_id);
+// TODO: END
 
 void add_node_to_transforms(u32 node_index, u32* nodes_to_transforms, import_node* nodes, transforms transforms);
 
@@ -63,28 +64,24 @@ b8 scene_init(scene** scn, scene_config config) {
     import_payload* payload = config.import_payload;
 
     // Create singular vertex buffer, index buffer
+    vertex* vertices = payload->vertices.statics;
+    skin_vertex* skin_vertices = payload->vertices.skinned;
+    u32* indices = payload->indices;
+    
     u32 geo_count = dynarray_length(payload->geometries);
     geometry* geometries = dynarray_create(geo_count, sizeof(geometry));
     dynarray_resize((void**)&geometries, geo_count);
-
-    vertex* vertices = dynarray_create(payload->vertex_count, sizeof(vertex));
-    u32* indices = dynarray_create(payload->index_count, sizeof(u32));
-
     for (u32 i = 0; i < geo_count; ++i) {
         geometries[i] = (geometry) {
-            .start_index = dynarray_length(indices),
-            .index_count = dynarray_length(payload->geometries[i].indices),
-            .vertex_offset = dynarray_length(vertices),
+            .start_index = payload->geometries[i].index_start,
+            .index_count = payload->geometries[i].index_count,
             .radius = payload->geometries[i].radius,
             .origin = payload->geometries[i].origin,
             .extent = payload->geometries[i].extent,
         };
-
-        dynarray_append_vertex(&vertices, payload->geometries[i].vertices);
-        dynarray_append_u32(&indices, payload->geometries[i].indices);
     }
 
-    // Remove default pipelines without empty instance arrays
+    // NOTE: Remove default pipelines with empty instance arrays
     mat_pipe_config* mat_pipe_configs = dynarray_create(0, sizeof(mat_pipe_config));
     u32 pipeline_count = dynarray_length(payload->pipelines);
     u32* pipe_index_to_id = etallocate(sizeof(u32) * pipeline_count, MEMORY_TAG_SCENE);
@@ -104,7 +101,7 @@ b8 scene_init(scene** scn, scene_config config) {
         }
     }
 
-    // Change nodes into objects and transforms for the meshes
+    // NOTE: Reorders node hierarchy into flat transform array 
     u32 node_count = dynarray_length(payload->nodes);
     u32* nodes_to_transforms = etallocate(sizeof(u32) * node_count, MEMORY_TAG_SCENE);
 
@@ -123,16 +120,16 @@ b8 scene_init(scene** scn, scene_config config) {
         }
     }
 
-    m4s* transforms_global = dynarray_create(transforms.capacity, sizeof(m4s));
-    dynarray_resize((void**)&transforms_global, transforms.capacity);
-    transforms_recompute_global(transforms, transforms_global);
+    transforms_recompute_global(transforms);
 
-    // Change each joint index to be a transform index instead of a node index
+    // NOTE: Change index into old node array into index into
+    // the new transform array
     u32 skin_count = dynarray_length(payload->skins);
     for (u32 i = 0; i < skin_count; ++i) {
         u32 joint_count = dynarray_length(payload->skins[i].joint_indices);
         for (u32 j = 0; j < joint_count; ++j) {
-            payload->skins[i].joint_indices[j] = nodes_to_transforms[payload->skins[i].joint_indices[j]];
+            u32 joint_index = payload->skins[i].joint_indices[j];
+            payload->skins[i].joint_indices[j] = nodes_to_transforms[joint_index];
         }
     }
 
@@ -141,30 +138,73 @@ b8 scene_init(scene** scn, scene_config config) {
         u32 channel_count = dynarray_length(payload->animations[i].channels);
         for (u32 j = 0; j < channel_count; ++j) {
             u32 target_index = payload->animations[i].channels[j].target_index;
-            payload->animations[i].channels[j].target_index = nodes_to_transforms[target_index];
+            if (payload->animations[i].channels[j].trans_type == TRANSFORM_TYPE_WEIGHTS) {
+                // TODO: Have this be the mesh instance index
+                payload->animations[i].channels[j].target_index = payload->nodes[target_index].mesh_index;
+                // TODO: END
+            } else {
+                payload->animations[i].channels[j].target_index = nodes_to_transforms[target_index];
+            }
         }
     }
 
-    // TODO: Skinned mesh instance
+    // TODO: Skinned mesh animations
     object* objects = dynarray_create(1, sizeof(object));
     for (u32 i = 0; i < node_count; ++i) {
         if (payload->nodes[i].has_mesh) {
-            u32 node_index = i;
+            u32 transform_index = nodes_to_transforms[i];
             if (payload->nodes[i].has_skin) {
-                node_index = payload->skins[payload->nodes[i].skin_index].skeleton;
+                continue;
             }
-            u32 transform_index = nodes_to_transforms[node_index];
             import_mesh mesh = payload->meshes[payload->nodes[i].mesh_index];
-            u64 object_start = dynarray_grow((void**)&objects, mesh.count);
-            for (u32 j = 0; j < mesh.count; ++j) {
-                u32 material_index = mesh.material_indices[j];
+            u64 object_start = dynarray_grow((void**)&objects, mesh.geo_count);
+            for (u32 j = 0; j < mesh.geo_count; ++j) {
+                mat_id material_index = mesh.materials[j];
                 objects[object_start + j] = (object) {
-                    .pipe_id = pipe_index_to_id[payload->mat_index_to_mat_id[material_index].pipe_id],
-                    .mat_id = payload->mat_index_to_mat_id[material_index].inst_id,
-                    .geo_id = mesh.geometry_indices[j],
+                    .pipe_id = pipe_index_to_id[material_index.pipe_id],
+                    .mat_id = material_index.inst_id,
+                    .geo_id = mesh.geometries[j],
+                    .vertex_offset = mesh.vertex_offset,
                     .transform_id = transform_index,
                 };
             }
+        }
+    }
+
+    u32 extra_vertex_offset = dynarray_length(vertices);
+    u32 extra_vertex_count = 0;
+
+    u32 skin_instance_count = dynarray_length(payload->skin_instances);
+    skin_instance* skin_instances = dynarray_create(skin_instance_count, sizeof(skin_instance));
+    dynarray_resize((void**)&skin_instances, skin_instance_count);
+    for (u32 i = 0; i < skin_instance_count; ++i) {
+        skin_instances[i].skin = payload->skin_instances[i].skin;
+        u32 mesh_inst_count = dynarray_length(payload->skin_instances[i].meshes);
+        skin_instances[i].meshes = dynarray_create(mesh_inst_count, sizeof(skin_mesh_inst));
+        dynarray_resize((void**)&skin_instances[i].meshes, mesh_inst_count);
+        for (u32 j = 0; j < mesh_inst_count; ++j) {
+            u32 mesh_index = payload->skin_instances[i].meshes[j];
+            skin_instances[i].meshes[j].mesh = mesh_index;
+            skin_instances[i].meshes[j].vertex_offset = extra_vertex_offset;
+
+            import_mesh mesh = payload->meshes[mesh_index];
+            u64 object_start = dynarray_grow((void**)&objects, mesh.geo_count);
+            for (u32 k = 0; k < mesh.geo_count; ++k) {
+                mat_id material_index = mesh.materials[k];
+                objects[object_start + k] = (object) {
+                    .pipe_id = pipe_index_to_id[material_index.pipe_id],
+                    .mat_id = material_index.inst_id,
+                    .geo_id = mesh.geometries[k],
+                    .vertex_offset = extra_vertex_offset,
+                    // TEMP:HACK: 0 index: Dummy transform identity mat in transform struct
+                    // to keep the gltf skins using node hierarchy logic intact
+                    .transform_id = 0,
+                    // TEMP:HACK: END
+                };
+            }
+
+            extra_vertex_offset += mesh.vertex_count;
+            extra_vertex_count += mesh.vertex_count;
         }
     }
 
@@ -176,11 +216,13 @@ b8 scene_init(scene** scn, scene_config config) {
     // TEMP: END
 
     scene->vertices = vertices;
+    scene->skin_vertices = skin_vertices;
     scene->indices = indices;
     scene->objects = objects;
-    scene->transforms_global = transforms_global;
     scene->geometries = geometries;
     scene->transforms = transforms;
+    scene->skins = skin_instances;
+    scene->extra_vertex_count = extra_vertex_count;
 
     u32 mat_pipe_count = dynarray_length(mat_pipe_configs);
     scene->mat_pipe_count = mat_pipe_count;
@@ -210,7 +252,6 @@ void scene_shutdown(scene* scene) {
     dynarray_destroy(scene->indices);
     dynarray_destroy(scene->vertices);
     dynarray_destroy(scene->geometries);
-    dynarray_destroy(scene->transforms_global);
     dynarray_destroy(scene->objects);
 
     transforms_deinit(scene->transforms);
@@ -220,13 +261,13 @@ void scene_shutdown(scene* scene) {
     etfree(scene, sizeof(struct scene), MEMORY_TAG_SCENE);
 }
 
-// TEMP: update gltf animations
+// TEMP: Until my own concept of animations and keyframes is
+// ironed out and imported from GLTF files I'm using theirs.
 void apply_animation(transforms tforms, import_animation animation, f32 timestamp) {
     u32 channel_count = dynarray_length(animation.channels);
     for (u32 i = 0; i < channel_count; ++i) {
         u32 smpl_index = animation.channels[i].sampler_index;
-        u32 tform_index = animation.channels[i].target_index;
-        
+        u32 target_index = animation.channels[i].target_index;
 
         u32 key0 = -1;
         u32 key1 = -1;
@@ -235,20 +276,20 @@ void apply_animation(transforms tforms, import_animation animation, f32 timestam
         u32 key_count = dynarray_length(timestamps);
 
         if (timestamp > timestamps[key_count - 1]) {
-            // Reached the end of this channel
             continue;
         }
         for (u32 j = 0; j < key_count - 1; ++j) {
-            if (timestamp > timestamps[j] && timestamp < timestamps[j + 1]) {
+            if (timestamp >= timestamps[j] && timestamp < timestamps[j + 1]) {
                 key0 = j;
                 key1 = j + 1;
                 break;
             }
         }
+
         if (key0 == (u32)-1 && key1 == (u32)-1 && timestamp < timestamps[0]) {
             switch (animation.channels[i].trans_type) {
                 case TRANSFORM_TYPE_TRANSLATION:
-                    transforms_set_translation(tforms, tform_index, glms_vec3(data[0]));
+                    transforms_set_translation(tforms, target_index, glms_vec3(data[0]));
                     break;
                 case TRANSFORM_TYPE_ROTATION:
                     quat rot = {
@@ -257,15 +298,16 @@ void apply_animation(transforms tforms, import_animation animation, f32 timestam
                         .z = data[0].z,
                         .w = data[0].w,
                     };
-                    transforms_set_rotation(tforms, tform_index, rot);
+                    transforms_set_rotation(tforms, target_index, rot);
                     break;
                 case TRANSFORM_TYPE_SCALE:
-                    transforms_set_scale(tforms, tform_index, glms_vec3(data[0]));
+                    transforms_set_scale(tforms, target_index, glms_vec3(data[0]));
                     break;
                 default: {
                     break;
                 }
             }
+            continue;
         }
 
         f32 t0 = timestamps[key0];
@@ -280,16 +322,19 @@ void apply_animation(transforms tforms, import_animation animation, f32 timestam
         switch (animation.channels[i].trans_type) {
             case TRANSFORM_TYPE_TRANSLATION:
                 v4s t = glms_vec4_lerp(data0, data1, a);
-                transforms_set_translation(tforms, tform_index, glms_vec3(t));
+                transforms_set_translation(tforms, target_index, glms_vec3(t));
                 break;
             case TRANSFORM_TYPE_ROTATION:
                 quat r;
                 glm_quat_slerp(data0.raw, data1.raw, a, r.raw);
-                transforms_set_rotation(tforms, tform_index, r);
+                transforms_set_rotation(tforms, target_index, r);
                 break;
             case TRANSFORM_TYPE_SCALE:
                 v4s s = glms_vec4_lerp(data0, data1, a);
-                transforms_set_scale(tforms, tform_index, glms_vec3(s));
+                transforms_set_scale(tforms, target_index, glms_vec3(s));
+                break;
+            case TRANSFORM_TYPE_WEIGHTS:
+                
                 break;
             default: {
                 ETERROR("Animation of unknown transform type");
@@ -311,15 +356,16 @@ void scene_update(scene* scene, f64 dt) {
     renderer_state* state = scene->state;
     camera_update(&scene->cam, dt);
 
-    // TODO: Camera should store near and far values & calculate perspective matrix itself
-    // Camera should also have the aspect ratio and update on resize
-    // TODO: Scene should register for event system and update camera stuff itself
+    // TODO: Camera should store near and far values & calculate perspective matrix
+    // TODO: Camera should have the aspect ratio and have resize function
+    // TODO: Scene should register for event system and call camera update functions
     m4s view = camera_get_view_matrix(&scene->cam);
     // NOTE: invert the Y direction on projection matrix so that we match gltf axis
     float aspect_ratio = ((f32)state->swapchain.image_extent.width/(f32)state->swapchain.image_extent.height);
     m4s project = glms_perspective(glm_rad(70.f), aspect_ratio, 1000.f, 0.1f);
     project.raw[1][1] *= -1;
     // NOTE: END
+    // TODO: END
     // TODO: END
     // TODO: END
 
@@ -354,12 +400,28 @@ void scene_update(scene* scene, f64 dt) {
     }
 
     // TEMP: Apply temporary representation of animation to check if gpu systems are working
-    import_animation curr_ani = scene->payload.animations[scene->current_animation];
-    scene->timestamp = scene->timestamp + dt;
-    while (scene->timestamp > curr_ani.duration)
-        scene->timestamp -= curr_ani.duration;
-    apply_animation(scene->transforms, curr_ani, scene->timestamp);
-    transforms_recompute_global(scene->transforms, scene->transforms_global);
+    if (dynarray_length(scene->payload.animations)) {
+        import_animation curr_ani = scene->payload.animations[scene->current_animation];
+        scene->timestamp = fmod(scene->timestamp + dt, curr_ani.duration);
+        apply_animation(scene->transforms, curr_ani, scene->timestamp);
+        // transforms_recompute_global(scene->transforms);
+    }
+
+    // TEMP: Apply inverse binds, until we do not use transforms like gltf does nodes
+    transforms_recompute_global(scene->transforms);
+    u32 skin_inst_count = dynarray_length(scene->skins);
+    for (u32 i = 0; i < skin_inst_count; ++i) {
+        import_skin skin = scene->payload.skins[scene->skins[i].skin];
+        u32 joint_count = dynarray_length(skin.joint_indices);
+        for (u32 j = 0; j < joint_count; j++) {
+            u32 transform_index = skin.joint_indices[j];
+            scene->transforms.global[transform_index] = glms_mat4_mul(
+                scene->transforms.global[transform_index],
+                skin.inverse_binds[j]
+            );
+        }
+    }
+
     // TEMP: END
 }
 
@@ -477,26 +539,27 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     u64 vertex_count = dynarray_length(scene->vertices);
     u64 index_count = dynarray_length(scene->indices);
-    mesh_buffers vertex_index = upload_mesh_immediate(
+    vertex_index_buffers vertex_index = vertex_index_buffers_create(
         state,
         index_count,
         scene->indices,
         vertex_count,
-        scene->vertices);
+        scene->vertices,
+        scene->extra_vertex_count
+    );
     scene->vertex_buffer = vertex_index.vertex_buffer;
     scene->index_buffer = vertex_index.index_buffer;
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->vertex_buffer.handle, "VertexBuffer");
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->index_buffer.handle, "IndexBuffer");
 
-    // TEMP: Until skinned vertex information is gotten 
-    buffer_create(
+    buffer_create_data(
         state,
-        sizeof(skin_vertex) * 32,
+        scene->skin_vertices,
+        sizeof(skin_vertex) * dynarray_length(scene->skin_vertices),
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &scene->skin_vertex_buffer
-    );
-    // TEMP: END
+        &scene->skin_vertex_buffer);
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->skin_vertex_buffer.handle, "SkinVertexBuffer");
 
     buffer_create_data(
         state,
@@ -507,10 +570,10 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         &scene->object_buffer);
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->object_buffer.handle, "ObjectBuffer");
 
-    u64 transform_buffer_bytes = sizeof(m4s) * dynarray_length(scene->transforms_global);
+    u64 transform_buffer_bytes = sizeof(m4s) * scene->transforms.capacity;
     buffer_create_data(
         state,
-        scene->transforms_global,
+        scene->transforms.global,
         transform_buffer_bytes,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -1035,23 +1098,33 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         scene_texture_set(scene, i, scene->payload.textures[i].image_id, scene->payload.textures[i].sampler_id);
     }
 
+    // Pipeline Creation 
+    scene->push_range = (VkPushConstantRange) {
+        .offset = 0,
+        .size = sizeof(push_constant),
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+    };
+
+    VkPipelineLayoutCreateInfo set0_layout_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = 0,
+        .setLayoutCount = 1,
+        .pSetLayouts = &scene->scene_set_layout,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &scene->push_range};
+    VK_CHECK(vkCreatePipelineLayout(
+        state->device.handle,
+        &set0_layout_info,
+        state->allocator,
+        &scene->set0_layout));
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE_LAYOUT, scene->set0_layout, "DescriptorSet0PipelineLayout");
+
     const char* draw_gen_path = "assets/shaders/draws.comp.spv.opt";
     shader draw_gen;
     if (!load_shader(state, draw_gen_path, &draw_gen)) {
         ETFATAL("Unable to load draw generation shader.");
         return false;
     }
-    VkPipelineLayoutCreateInfo draw_gen_layout_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .pNext = 0,
-        .setLayoutCount = 1,
-        .pSetLayouts = &scene->scene_set_layout};
-    VK_CHECK(vkCreatePipelineLayout(
-        state->device.handle,
-        &draw_gen_layout_info,
-        state->allocator,
-        &scene->draw_gen_layout));
-    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE_LAYOUT, scene->draw_gen_layout, "DrawGenerationPipelineLayout");
     VkPipelineShaderStageCreateInfo draw_stage_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .pNext = 0,
@@ -1061,7 +1134,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     VkComputePipelineCreateInfo draw_pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
         .pNext = 0,
-        .layout = scene->draw_gen_layout,
+        .layout = scene->set0_layout,
         .stage = draw_stage_info};
     VK_CHECK(vkCreateComputePipelines(
         state->device.handle,
@@ -1083,6 +1156,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .pNext = 0,
         .setLayoutCount = 2,
         .pSetLayouts = pipeline_ds_layouts,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &scene->push_range,
     };
     VK_CHECK(vkCreatePipelineLayout(
         state->device.handle,
@@ -1135,6 +1210,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     shader shadow_draw_gen;
     if (!load_shader(state, "assets/shaders/shadow_draws.comp.spv.opt", &shadow_draw_gen)) {
+        ETFATAL("Unable to load the shadow map draw command gerneration shader.");
         return false;
     }
     VkPipelineShaderStageCreateInfo shadow_draw_stage_info = {
@@ -1146,7 +1222,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     VkComputePipelineCreateInfo shadow_draw_pipeline_info = {
         .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
         .pNext = 0,
-        .layout = scene->draw_gen_layout,
+        .layout = scene->set0_layout,
         .stage = shadow_draw_stage_info};
     VK_CHECK(vkCreateComputePipelines(
         state->device.handle,
@@ -1161,12 +1237,13 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     // TODO: Light passing through alpha-mask texture
     shader shadow_map_vert;
     if (!load_shader(state, "assets/shaders/shadow.vert.spv.opt", &shadow_map_vert)) {
+        ETFATAL("Unable to load the shadow map vertex shader.");
         return false;
     };
     // TODO: END
 
     pipeline_builder builder = pipeline_builder_create();
-    builder.layout = scene->draw_gen_layout;
+    builder.layout = scene->set0_layout;
     pipeline_builder_set_vertex_only(&builder, shadow_map_vert);
     pipeline_builder_set_input_topology(&builder, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     pipeline_builder_set_polygon_mode(&builder, VK_POLYGON_MODE_FILL);
@@ -1184,6 +1261,47 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     unload_shader(state, &shadow_map_vert);
     // TEMP: Shadow Mapping end
+
+    // TEMP: Skin stuff placement
+    shader skinning_comp;
+    if (!load_shader(state, "assets/shaders/skinning.comp.spv.opt", &skinning_comp)) {
+        ETFATAL("Unable to load the skinning compute shader.");
+        return false;
+    }
+
+    VkPipelineShaderStageCreateInfo skinning_comp_stage_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .pName = skinning_comp.entry_point,
+        .stage = skinning_comp.stage,
+        .module = skinning_comp.module};
+    VkComputePipelineCreateInfo skinning_comp_pipeline_info = {
+        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+        .layout = scene->set0_layout,
+        .stage = skinning_comp_stage_info};
+    VK_CHECK(vkCreateComputePipelines(
+        state->device.handle,
+        VK_NULL_HANDLE,
+        /* CreateInfoCount */ 1,
+        &skinning_comp_pipeline_info,
+        state->allocator,
+        &scene->skinning_pipeline));
+    SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE, scene->skinning_pipeline, "ComputeSkinningPipeline");
+    unload_shader(state, &skinning_comp);
+
+    u32 skin_inst_count = dynarray_length(scene->skins);
+    for (u32 i = 0; i < skin_inst_count; ++i) {
+        u32 joint_count = dynarray_length(scene->payload.skins[scene->skins[i].skin].joint_indices);
+        buffer_create_data(
+            state,
+            scene->payload.skins[scene->skins[i].skin].joint_indices,
+            sizeof(u32) * joint_count,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &scene->skins[i].joints_buffer);
+        SET_DEBUG_NAME(state, VK_OBJECT_TYPE_BUFFER, scene->skins[i].joints_buffer.handle, "JointIndexBuffer");
+        scene->skins[i].joints_addr = buffer_get_address(state, &scene->skins[i].joints_buffer);
+    }
+    // TEMP: END
     return true;
 }
 
@@ -1198,10 +1316,11 @@ void scene_renderer_shutdown(scene* scene, renderer_state* state) {
     buffer_destroy(state, &scene->object_buffer);
     buffer_destroy(state, &scene->geometry_buffer);
     buffer_destroy(state, &scene->vertex_buffer);
+    buffer_destroy(state, &scene->skin_vertex_buffer);
     buffer_destroy(state, &scene->transform_buffer);
 
     vkDestroyPipeline(state->device.handle, scene->draw_gen_pipeline, state->allocator);
-    vkDestroyPipelineLayout(state->device.handle, scene->draw_gen_layout, state->allocator);
+    vkDestroyPipelineLayout(state->device.handle, scene->set0_layout, state->allocator);
     vkDestroyPipelineLayout(state->device.handle, scene->mat_pipeline_layout, state->allocator);
 
     vkDestroyDescriptorPool(
@@ -1262,10 +1381,10 @@ b8 scene_render(scene* scene, renderer_state* state) {
     VkCommandBuffer cmd = scene->graphics_command_buffers[frame_index];
     scene->staging_mapped[frame_index];
 
-    u32 transforms_bytes = sizeof(m4s) * dynarray_length(scene->transforms_global);
+    u32 transforms_bytes = sizeof(m4s) * scene->transforms.capacity;
     etcopy_memory(
         scene->staging_mapped[frame_index],
-        scene->transforms_global,
+        scene->transforms.global,
         transforms_bytes
     );
     etcopy_memory(
@@ -1305,7 +1424,7 @@ b8 scene_render(scene* scene, renderer_state* state) {
     vkCmdCopyBuffer2(cmd, &scene_uniforms_copy_info);
 
     buffer_barrier(cmd, scene->scene_uniforms.handle, /* Offset: */ 0, VK_WHOLE_SIZE,
-        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
+        VK_ACCESS_2_TRANSFER_WRITE_BIT, VK_ACCESS_2_UNIFORM_READ_BIT,
         VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT
     );
     buffer_barrier(cmd, scene->transform_buffer.handle, /* Offset: */ 0, VK_WHOLE_SIZE,
@@ -1383,7 +1502,7 @@ b8 scene_frame_begin(scene* scene, renderer_state* state) {
 void draw_command_generation(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
     // Shadow draw command generation compute
     u32 object_count = dynarray_length(scene->objects);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->draw_gen_layout, 0, 1, &scene->scene_set, 0, NULL);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->set0_layout, 0, 1, &scene->scene_set, 0, NULL);
 
     u32 group_count_x = (u32)ceil((f32)object_count / 32.0f);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->shadow_draw_gen_pipeline);
@@ -1419,6 +1538,40 @@ void draw_command_generation(renderer_state* state, scene* scene, VkCommandBuffe
     // NOTE: END
 }
 
+void compute_skinning(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
+    push_constant push = {0};
+    u32 skin_inst_count = dynarray_length(scene->skins);
+    for (u32 i = 0; i < skin_inst_count; ++i) {
+        u32 mesh_inst_count = dynarray_length(scene->skins[i].meshes);
+        for (u32 j = 0; j < mesh_inst_count; j++) {
+            skin_mesh_inst mesh_inst = scene->skins[i].meshes[j];
+            import_mesh mesh = scene->payload.meshes[mesh_inst.mesh];
+            push.u64s[0] = scene->skins[i].joints_addr;
+            push.u32s[6] = mesh.vertex_offset;
+            push.u32s[7] = mesh_inst.vertex_offset;
+            push.u32s[8] = mesh.vertex_count;
+
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->skinning_pipeline);
+            vkCmdPushConstants(
+                cmd,
+                scene->set0_layout,
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                0,
+                sizeof(push_constant),
+                &push);
+            u32 group_count_x = (u32)ceil((f32)mesh.vertex_count / 32.0f);
+            vkCmdDispatch(cmd, group_count_x, 1, 1);
+        }
+    }
+
+    u32 barrier_offset = sizeof(vertex) * dynarray_length(scene->vertices);
+    u32 barrier_size = sizeof(vertex) * scene->extra_vertex_count;
+    buffer_barrier(cmd, scene->vertex_buffer.handle, barrier_offset, barrier_size,
+        VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT,
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT
+    );
+}
+
 void shadow_pass(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
     VkRenderingAttachmentInfo depth_attachment = init_depth_attachment_info(
         scene->shadow_map.view, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
@@ -1450,7 +1603,7 @@ void shadow_pass(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     vkCmdBindIndexBuffer(cmd, scene->index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->draw_gen_layout, 0, 1, &scene->scene_set, 0, NULL);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->set0_layout, 0, 1, &scene->scene_set, 0, NULL);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, scene->shadow_pipeline);
 
     vkCmdDrawIndexedIndirectCount(cmd,
@@ -1523,6 +1676,8 @@ b8 scene_frame_end(scene* scene, renderer_state* state) {
 
     // Generate draw commands
     draw_command_generation(state, scene, frame_cmd);
+
+    compute_skinning(state, scene, frame_cmd);
     
     // Get shadow map ready to render to
     image_barrier(frame_cmd, scene->shadow_map.handle, scene->shadow_map.aspects,

@@ -1,6 +1,6 @@
 #include "importer.h"
 
-#include "data_structures/dynarray.h"
+#include "utils/dynarray.h"
 
 #include "core/logger.h"
 #include "core/asserts.h"
@@ -10,31 +10,50 @@
 #include "resources/importers/gltfimporter.h"
 #include "resources/importers/pmximporter.h"
 
-// TODO: Place the default pipelines into the pipelines memeber of import_payload
+// TODO: 
+// - Better inclusion of assigning default pipeline/shaders
+// - Better flattening of node hierarchy
+// - Vertex and index information into one big buffer
+//   inside of import_gltf and not in scene_init or the
+//   end of import_files function.
+// - Multiple vertex and index streams
+//   
+
 import_payload import_files(u32 file_count, const char* const* paths) {
     ETASSERT(paths);
     import_payload payload = {
-        .mat_index_to_mat_id = dynarray_create(1, sizeof(mat_id)),
-        .pipelines = dynarray_create(1, sizeof(import_pipeline)),
+        .pipelines = dynarray_create_data(
+            IMPORT_PIPELINE_TYPE_COUNT,
+            sizeof(import_pipeline),
+            IMPORT_PIPELINE_TYPE_COUNT,
+            default_import_pipelines
+        ),
         
         .images = dynarray_create(1, sizeof(import_image)),
         .textures = dynarray_create(RESERVED_TEXTURE_INDEX_COUNT, sizeof(import_texture)),
         .samplers = dynarray_create(1, sizeof(import_sampler)),
-        
-        .vertex_count = 0,
-        .index_count = 0,
+
+        .vertices.statics = dynarray_create(1, sizeof(vertex)),
+        .vertices.skinned = dynarray_create(1, sizeof(skin_vertex)),
+        .indices = dynarray_create(1, sizeof(u32)),
         .geometries = dynarray_create(1, sizeof(import_geometry)),
         .meshes = dynarray_create(1, sizeof(import_mesh)),
-        .nodes = dynarray_create(1, sizeof(import_node)),
 
         .skins = dynarray_create(1, sizeof(import_skin)),
         .animations = dynarray_create(1, sizeof(import_animation)),
 
+        .nodes = dynarray_create(1, sizeof(import_node)),
         .root_nodes = dynarray_create(1, sizeof(u32)),
+
+        .skin_instances = dynarray_create(1, sizeof(import_skin_instance)),
+        .transforms = transforms_init(file_count),
     };
 
+    for (u8 i = 0; i < IMPORT_PIPELINE_TYPE_COUNT; ++i) {
+        payload.pipelines[i].instances = dynarray_create(0, payload.pipelines[i].inst_size);
+    }
+
     // HACK: Place default dummy positions in the texture array for importing
-    // NOTE: there should be a better way than this
     dynarray_resize((void**)&payload.textures, RESERVED_TEXTURE_INDEX_COUNT);
     // HACK: END
 
@@ -51,9 +70,10 @@ import_payload import_files(u32 file_count, const char* const* paths) {
             ETASSERT(false);
             if (!import_pmx(&payload, path)) {
                 ETWARN("Unable to import pmx file %s.", path);
+                failure_count++;
             }
         } else {
-            ETWARN("Attempting to load file %s with unsupported extension %s.", path, ext);
+            ETWARN("Attempting to load file %s with unsupported file extension %s.", path, ext);
         }
     }
     ETASSERT(failure_count == 0);
@@ -65,30 +85,15 @@ import_payload import_files(u32 file_count, const char* const* paths) {
         }
     }
 
-    // TODO: Vertex and index buffer placement here
-    // TODO: Unused pipeline removal here
-    // TODO: Flatten nodes to transforms here
-
     return payload;
 }
-// TODO: END
 
 void import_payload_destroy(import_payload* payload) {
-    dynarray_destroy(payload->mat_index_to_mat_id);
-
     u32 pipeline_count = dynarray_length(payload->pipelines);
     for (u32 i = 0; i < pipeline_count; ++i) {
         dynarray_destroy(payload->pipelines[i].instances);
     }
     dynarray_destroy(payload->pipelines);
-
-    u32 geometry_count = dynarray_length(payload->geometries);
-    for (u32 i = 0; i < geometry_count; ++i) {
-        dynarray_destroy(payload->geometries[i].vertices);
-        dynarray_destroy(payload->geometries[i].indices);
-    }
-    dynarray_destroy(payload->geometries);
-
     dynarray_destroy(payload->textures);
     dynarray_destroy(payload->samplers);
 
@@ -101,8 +106,7 @@ void import_payload_destroy(import_payload* payload) {
 
     u32 mesh_count = dynarray_length(payload->meshes);
     for (u32 i = 0; i < mesh_count; ++i) {
-        dynarray_destroy(payload->meshes[i].geometry_indices);
-        dynarray_destroy(payload->meshes[i].material_indices);
+        // TODO: Free mesh allocations
     }
     dynarray_destroy(payload->meshes);
 

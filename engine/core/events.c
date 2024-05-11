@@ -4,7 +4,7 @@
 #include "core/logger.h"
 #include "memory/etmemory.h"
 
-#include "data_structures/dynarray.h"
+#include "utils/dynarray.h"
 
 /* Events are immediate & blocking for now. */
 /* Queue eventually; To make events deffered. */

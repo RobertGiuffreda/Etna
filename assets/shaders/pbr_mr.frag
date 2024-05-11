@@ -39,19 +39,21 @@ vec3 get_normal_from_map() {
 
     vec3 Q1 = dFdx(in_position);
     vec3 Q2 = dFdy(in_position);
-    vec2 st1 = dFdx(in_uv);
-    vec2 st2 = dFdy(in_uv);
+    vec2 uv_dx = dFdx(in_uv);
+    vec2 uv_dy = dFdy(in_uv);
 
-    if (length(st1) <= 1e-2) {
-        st1 = vec2(1.0, 0.0);
+    if (length(uv_dx) <= 1e-2) {
+        uv_dx = vec2(1.0, 0.0);
     }
 
-    if (length(st2) <= 1e-2) {
-        st2 = vec2(0.0, 1.0);
+    if (length(uv_dy) <= 1e-2) {
+        uv_dy = vec2(0.0, 1.0);
     }
+
+    vec3 t_ = (uv_dy.t * dFdx(in_position) - uv_dx.t * dFdy(in_position)) / (uv_dx.s * uv_dy.t - uv_dy.s * uv_dx.t);
 
     vec3 N = normalize(in_normal);
-    vec3 T = normalize(Q1*st2.t - Q2*st1.t);
+    vec3 T = normalize(t_ - N * dot(N, t_));
     vec3 B = -normalize(cross(N, T));
     mat3 TBN = mat3(T, B, N);
 

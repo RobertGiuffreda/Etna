@@ -70,47 +70,54 @@ void _immediate_end(renderer_state* state) {
     VK_CHECK(vkWaitForFences(state->device.handle, 1, &state->imm_fence, VK_TRUE, 0xFFFFFFFFFFFFFFFF));
 }
 
-// TODO: Remove the VK_MEMORY_PROPERTY_HOST_COHERENT_BIT bit from the staging buffer and flush manually
 // TODO: Use queue from dedicated transfer queue family(state->device.transfer_queue) to do transfers
-mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* indices, u32 vertex_count, vertex* vertices) {
-    const u64 vertex_buffer_size = vertex_count * sizeof(vertex);
-    const u64 index_buffer_size = index_count * sizeof(u32);
+vertex_index_buffers vertex_index_buffers_create(
+    renderer_state* state,
+    u32 index_count,
+    u32* indices,
+    u32 vertex_count,
+    vertex* vertices,
+    u32 extra_vertex_count
+) {
+    const u64 extra_vertex_data_size = extra_vertex_count * sizeof(vertex);
+    const u64 vertex_data_size = vertex_count * sizeof(vertex);
+    const u64 index_data_size = index_count * sizeof(u32);
 
-    mesh_buffers new_surface;
+    vertex_index_buffers buffers;
 
     // Create Vertex Buffer
     buffer_create(
         state,
-        vertex_buffer_size,
+        vertex_data_size + extra_vertex_data_size,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
         | VK_BUFFER_USAGE_TRANSFER_DST_BIT
         | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &new_surface.vertex_buffer
+        &buffers.vertex_buffer
     );
     // Create Index Buffer
     buffer_create(
         state,
-        index_buffer_size,
+        index_data_size,
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        &new_surface.index_buffer
+        &buffers.index_buffer
     );
     
     // Create staging buffer to transfer memory from VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT to VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
     buffer staging;
     buffer_create(
         state,
-        vertex_buffer_size + index_buffer_size,
+        vertex_data_size + index_data_size,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         &staging
     );
     void* mapped_memory;
-    vkMapMemory(state->device.handle, staging.memory, 0, vertex_buffer_size + index_buffer_size, 0, &mapped_memory);
+    vkMapMemory(state->device.handle, staging.memory, 0, vertex_data_size + index_data_size, 0, &mapped_memory);
 
-    etcopy_memory(mapped_memory, vertices, vertex_buffer_size);
-    etcopy_memory((u8*)mapped_memory + vertex_buffer_size, indices, index_buffer_size);
+    etcopy_memory(mapped_memory, vertices, vertex_data_size);
+    etcopy_memory((u8*)mapped_memory + vertex_data_size, indices, index_data_size);
 
     vkUnmapMemory(state->device.handle, staging.memory);
 
@@ -118,19 +125,19 @@ mesh_buffers upload_mesh_immediate(renderer_state* state, u32 index_count, u32* 
         VkBufferCopy vertex_copy = {
             .dstOffset = 0,
             .srcOffset = 0,
-            .size = vertex_buffer_size};
+            .size = vertex_data_size};
 
-        vkCmdCopyBuffer(cmd, staging.handle, new_surface.vertex_buffer.handle, 1, &vertex_copy);
+        vkCmdCopyBuffer(cmd, staging.handle, buffers.vertex_buffer.handle, 1, &vertex_copy);
 
         VkBufferCopy index_copy = {
             .dstOffset = 0,
-            .srcOffset = vertex_buffer_size,
-            .size = index_buffer_size};
+            .srcOffset = vertex_data_size,
+            .size = index_data_size};
 
-        vkCmdCopyBuffer(cmd, staging.handle, new_surface.index_buffer.handle, 1, &index_copy);
+        vkCmdCopyBuffer(cmd, staging.handle, buffers.index_buffer.handle, 1, &index_copy);
     });
 
     buffer_destroy(state, &staging);
 
-    return new_surface;
+    return buffers;
 }

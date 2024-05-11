@@ -58,7 +58,7 @@ void main() {
 		command.index_count = geo.index_count;
 		command.instance_count = 1;
 		command.first_index = geo.start_index;
-		command.vertex_offset = geo.vertex_offset;
+		command.vertex_offset = obj.vertex_offset;
 		command.first_instance = 0;
 		command.material_id = obj.mat_id;
 		command.transform_id = obj.transform_id;

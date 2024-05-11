@@ -46,3 +46,27 @@ typedef struct scene_data {
     u32 shadow_map_id;
     u32 debug_view;
 } scene_data;
+
+// TEMP: Just to get things to work for now, better later
+typedef struct {
+    u32 mesh;
+    i32 vertex_offset;
+} skin_mesh_inst;
+typedef struct {
+    u32 skin;
+    u64 joints_addr;
+    buffer joints_buffer;
+    skin_mesh_inst* meshes; // dynarray
+} skin_instance;
+
+typedef struct animation_push {
+    u64 joints_addr;
+    u64 targets_addr;
+    u64 weights_addr;
+    u32 in_vertex_start;
+    u32 out_vertex_start;
+    u32 vertex_count;
+    u32 morph_stride;
+    u32 morph_count;
+} animation_push;
+// TEMP: END

@@ -1,6 +1,6 @@
 #include "swapchain.h"
 
-#include "data_structures/dynarray.h"
+#include "utils/dynarray.h"
 #include "core/logger.h"
 #include "memory/etmemory.h"
 #include "renderer/src/renderer.h"

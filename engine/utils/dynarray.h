@@ -101,6 +101,7 @@ static inline u64 dynarray_grow(void** array_ptr, u64 count) {
     return array_length;
 }
 
+// TODO: Rename dynarray_concat
 #define _DYNARRAY_APPEND_TYPED_FUNC(type)                                               \
 static inline void dynarray_append_##type(type** dst_ptr, type* src) {                  \
     u64 src_length = ((dynarray*)src - 1)->length;                                      \

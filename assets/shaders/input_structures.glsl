@@ -3,15 +3,6 @@
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
-// Per instance differences:
-// Geometry: 	Transform, Material Pipeline, Material Instance
-// Skin:		Joint Matrices
-// Instantiated Geometry elements:
-// Pipeline used to render the geometry
-// Material used to render the geometry
-// Transform used to render the geometry
-// Joint matrices to skin the vertices (if skinned)
-
 struct point_light {
 	vec4 color;
 	vec4 position;
@@ -88,6 +79,7 @@ struct object {
 	uint pipe_id;		// PipelineShaderObject, one per shader/material
 	uint mat_id;		// Material Instance
 	uint geo_id;		// Geometry
+	int vertex_offset;	// Vertex offset
 	uint transform_id;	// Transform
 };
 layout(set = 0, binding = 3, std430) readonly buffer object_buffer {
@@ -97,7 +89,7 @@ layout(set = 0, binding = 3, std430) readonly buffer object_buffer {
 struct geometry {
 	uint start_index;
 	uint index_count;
-	int vertex_offset;
+	uint padd;
 	float radius;
 	vec4 origin;
 	vec4 extent;
@@ -113,7 +105,7 @@ struct vertex {
     float uv_y;
     vec4 color;
 };
-layout(set = 0, binding = 5, std430) readonly buffer vertex_buffer {
+layout(set = 0, binding = 5, std430) buffer vertex_buffer {
 	vertex vertices[];
 };
 
@@ -131,17 +123,3 @@ layout(set = 0, binding = 7, std430) readonly buffer transform_buffer {
 };
 
 layout(set = 0, binding = 8) uniform sampler2D textures[];
-
-// How I would do things if I were not compute skinning
-// struct skinned_object {
-// 	uint geometry_index;
-// 	uint pipeline_index;
-// 	uint material_index;
-// 	uint transform_index;
-// 	uint joint_offset;
-// };
-
-// Would have all joint matrices for each instance of each skinned mesh
-// layout(set = 0, binding = _, std430) readonly buffer joint_matrices_buffer {
-// 	mat4 joints[];
-// };
