@@ -255,7 +255,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
     // TODO: END
 
     for (u32 i = 0; i < static_vertex_count; ++i) {
-        payload->vertices.statics[i] = (vertex) {
+        payload->vertices.statics[static_vertex_start + i] = (vertex) {
             .position = (v3s){0, 0, 0},
             .normal = (v3s){1, 0, 0},
             .uv_x = 0.0f,
@@ -265,7 +265,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
     }
 
     for (u32 i = 0; i < skinned_vertex_count; ++i) {
-        payload->vertices.skinned[i] = (skin_vertex) {
+        payload->vertices.skinned[skinned_vertex_start + i] = (skin_vertex) {
             .vertex = {
                 .position = (v3s){0, 0, 0},
                 .normal = (v3s){1, 0, 0},

@@ -148,7 +148,6 @@ b8 scene_init(scene** scn, scene_config config) {
         }
     }
 
-    // TODO: Skinned mesh animations
     object* objects = dynarray_create(1, sizeof(object));
     for (u32 i = 0; i < node_count; ++i) {
         if (payload->nodes[i].has_mesh) {
