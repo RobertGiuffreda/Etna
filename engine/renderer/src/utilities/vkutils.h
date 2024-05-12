@@ -1,10 +1,6 @@
 #pragma once
-
 #include "renderer/src/vk_types.h"
-
-/** TODO:
- * Turn simple functions to macros
- */
+// TODO: Macros
 
 i32 find_memory_index(const VkPhysicalDeviceMemoryProperties* memory_properties,
     u32 memory_type_bits_requirement, VkMemoryPropertyFlags required_properties);

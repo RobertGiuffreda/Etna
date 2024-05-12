@@ -48,7 +48,8 @@ typedef struct import_sampler {
 // HACK: END
 
 typedef enum reserved_texture_index {
-    RESERVED_TEXTURE_WHITE_INDEX = 0,
+    RESERVED_TEXTURE_ERROR_INDEX = 0,
+    RESERVED_TEXTURE_WHITE_INDEX,
     RESERVED_TEXTURE_BLACK_INDEX,
     RESERVED_TEXTURE_NORMAL_INDEX,
     RESERVED_TEXTURE_SHADOW_MAP_INDEX,
@@ -109,6 +110,27 @@ static const import_pipeline default_import_pipelines[IMPORT_PIPELINE_TYPE_COUNT
         .instances = NULL,
         .transparent = true,
     },
+};
+
+static const pbr_mr_instance default_pbr_instance = {
+    .color_factors = {.raw = {1.f, 1.f, 1.f, 1.f}},
+    .color_tex_index = RESERVED_TEXTURE_ERROR_INDEX,
+    .metalness = 0.0f,
+    .roughness = 0.5f,
+    .mr_tex_index = RESERVED_TEXTURE_WHITE_INDEX,
+    .normal_index = RESERVED_TEXTURE_NORMAL_INDEX,
+};
+
+static const cel_instance default_cel_instance = {
+    .color_factors = {.raw = {1.f, 1.f, 1.f, 1.f}},
+    .color_tex_index = RESERVED_TEXTURE_ERROR_INDEX,
+};
+
+static const void* default_pipeline_default_instances[IMPORT_PIPELINE_TYPE_COUNT] = {
+    [IMPORT_PIPELINE_TYPE_GLTF_DEFAULT] = &default_pbr_instance,
+    [IMPORT_PIPELINE_TYPE_PMX_DEFAULT] = &default_cel_instance,
+    [IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT] = &default_pbr_instance,
+    [IMPORT_PIPELINE_TYPE_PMX_TRANSPARENT] = &default_cel_instance,
 };
 
 typedef struct import_skin {

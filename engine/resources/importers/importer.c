@@ -10,15 +10,6 @@
 #include "resources/importers/gltfimporter.h"
 #include "resources/importers/pmximporter.h"
 
-// TODO: 
-// - Better inclusion of assigning default pipeline/shaders
-// - Better flattening of node hierarchy
-// - Vertex and index information into one big buffer
-//   inside of import_gltf and not in scene_init or the
-//   end of import_files function.
-// - Multiple vertex and index streams
-//   
-
 import_payload import_files(u32 file_count, const char* const* paths) {
     ETASSERT(paths);
     import_payload payload = {
@@ -51,6 +42,7 @@ import_payload import_files(u32 file_count, const char* const* paths) {
 
     for (u8 i = 0; i < IMPORT_PIPELINE_TYPE_COUNT; ++i) {
         payload.pipelines[i].instances = dynarray_create(0, payload.pipelines[i].inst_size);
+        dynarray_push((void**)&payload.pipelines[i].instances, default_pipeline_default_instances[i]);
     }
 
     // HACK: Place default dummy positions in the texture array for importing

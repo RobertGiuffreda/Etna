@@ -18,6 +18,7 @@ layout(buffer_reference, std430) readonly buffer float_buffer {
     float floats[];
 };
 
+// TODO: Reduce push constant size for cache friendliness
 layout(push_constant) uniform block {
     uint64_t joints;
     uint64_t targets;

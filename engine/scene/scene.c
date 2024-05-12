@@ -86,8 +86,9 @@ b8 scene_init(scene** scn, scene_config config) {
     u32 pipeline_count = dynarray_length(payload->pipelines);
     u32* pipe_index_to_id = etallocate(sizeof(u32) * pipeline_count, MEMORY_TAG_SCENE);
     for (u32 i = 0; i < pipeline_count; ++i) {
+        // Only default material instance in pipeline instances
         u32 instance_count = dynarray_length(payload->pipelines[i].instances);
-        if (instance_count) {
+        if (instance_count <= 1) {
             mat_pipe_config config = {
                 .vert_path = payload->pipelines[i].vert_path,
                 .frag_path = payload->pipelines[i].frag_path,
@@ -1017,8 +1018,23 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     // TEMP: END
 
     // Texture defaults using default samplers and images from renderer_state
+    VkDescriptorImageInfo error_texture_info = {
+        .sampler = state->nearest_smpl,
+        .imageView = state->default_error.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    };
+    VkWriteDescriptorSet error_texture_write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = 0,
+        .descriptorCount = 1,
+        .dstArrayElement = RESERVED_TEXTURE_ERROR_INDEX,
+        .dstBinding = SCENE_SET_TEXTURES_BINDING,
+        .dstSet = scene->scene_set,
+        .pImageInfo = &error_texture_info,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+    };
     VkDescriptorImageInfo white_texture_info = {
-        .sampler = state->linear_smpl,
+        .sampler = state->nearest_smpl,
         .imageView = state->default_white.view,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };
@@ -1033,7 +1049,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
     };
     VkDescriptorImageInfo black_texture_info = {
-        .sampler = state->linear_smpl,
+        .sampler = state->nearest_smpl,
         .imageView = state->default_black.view,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };
@@ -1078,6 +1094,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
     };
     VkWriteDescriptorSet reserved_texture_writes[RESERVED_TEXTURE_INDEX_COUNT] = {
+        error_texture_write,
         white_texture_write,
         black_texture_write,
         normal_texture_write,
