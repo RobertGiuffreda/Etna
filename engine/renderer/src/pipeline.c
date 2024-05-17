@@ -40,14 +40,12 @@ void pipeline_builder_destroy(pipeline_builder* builder) {}
 VkPipeline pipeline_builder_build(pipeline_builder* builder, renderer_state* state) {
     VkPipelineViewportStateCreateInfo viewport_state = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-        .pNext = 0,
         .viewportCount = 1,
         .scissorCount = 1,
     };
 
     VkPipelineColorBlendStateCreateInfo color_blending = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .pNext = 0,
         .logicOpEnable = VK_FALSE,
         .logicOp = VK_LOGIC_OP_COPY,
         .attachmentCount = 1,
@@ -154,7 +152,7 @@ void pipeline_builder_enable_blending_additive(pipeline_builder* builder) {
     builder->color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     builder->color_blend_attachment.blendEnable = VK_TRUE;
     builder->color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    builder->color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+    builder->color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
     builder->color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
     builder->color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     builder->color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
@@ -164,8 +162,8 @@ void pipeline_builder_enable_blending_additive(pipeline_builder* builder) {
 void pipeline_builder_enable_blending_alphablend(pipeline_builder* builder) {
     builder->color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     builder->color_blend_attachment.blendEnable = VK_TRUE;
-    builder->color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-    builder->color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_DST_ALPHA;
+    builder->color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    builder->color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     builder->color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
     builder->color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     builder->color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;

@@ -10,6 +10,53 @@
 #include "resources/importers/gltfimporter.h"
 #include "resources/importers/pmximporter.h"
 
+static const import_pipeline default_import_pipelines[IMPORT_PIPELINE_TYPE_COUNT] = {
+    [IMPORT_PIPELINE_TYPE_GLTF_DEFAULT] = {
+        .vert_path = "assets/shaders/pbr_mr.vert.spv.opt",
+        .frag_path = "assets/shaders/pbr_mr.frag.spv.opt",
+        .inst_size = sizeof(pbr_mr_instance),
+        .instances = NULL,
+        .transparent = false,
+    },
+    // TODO: Get shadow information in shaders
+    [IMPORT_PIPELINE_TYPE_PMX_DEFAULT] = {
+        .vert_path = "assets/shaders/cel.vert.spv.opt",
+        .frag_path = "assets/shaders/cel.frag.spv.opt",
+        .inst_size = sizeof(cel_instance),
+        .instances = NULL,
+        .transparent = false,
+    },
+    [IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT] = {
+        .vert_path = "assets/shaders/pbr_mr.vert.spv.opt",
+        .frag_path = "assets/shaders/pbr_mr.frag.spv.opt",
+        .inst_size = sizeof(pbr_mr_instance),
+        .instances = NULL,
+        .transparent = true,
+    },
+    // TODO: Get shadow information in shaders
+    [IMPORT_PIPELINE_TYPE_PMX_TRANSPARENT] = {
+        .vert_path = "assets/shaders/cel.vert.spv.opt",
+        .frag_path = "assets/shaders/cel.frag.spv.opt",
+        .inst_size = sizeof(cel_instance),
+        .instances = NULL,
+        .transparent = true,
+    },
+};
+
+const pbr_mr_instance default_pbr_instance = {
+    .color_factors = {.raw = {1.f, 1.f, 1.f, 1.f}},
+    .color_tex_index = RESERVED_TEXTURE_ERROR_INDEX,
+    .metalness = 0.0f,
+    .roughness = 0.5f,
+    .mr_tex_index = RESERVED_TEXTURE_WHITE_INDEX,
+    .normal_index = RESERVED_TEXTURE_NORMAL_INDEX,
+};
+
+const cel_instance default_cel_instance = {
+    .color_factors = {.raw = {1.f, 1.f, 1.f, 1.f}},
+    .color_tex_index = RESERVED_TEXTURE_ERROR_INDEX,
+};
+
 import_payload import_files(u32 file_count, const char* const* paths) {
     ETASSERT(paths);
     import_payload payload = {
@@ -42,8 +89,12 @@ import_payload import_files(u32 file_count, const char* const* paths) {
 
     for (u8 i = 0; i < IMPORT_PIPELINE_TYPE_COUNT; ++i) {
         payload.pipelines[i].instances = dynarray_create(0, payload.pipelines[i].inst_size);
-        dynarray_push((void**)&payload.pipelines[i].instances, default_pipeline_default_instances[i]);
     }
+
+    dynarray_push((void**)&payload.pipelines[IMPORT_PIPELINE_TYPE_GLTF_DEFAULT].instances, &default_pbr_instance);
+    dynarray_push((void**)&payload.pipelines[IMPORT_PIPELINE_TYPE_PMX_DEFAULT].instances, &default_cel_instance);
+
+    // gltf_dump_json(paths[0]);
 
     // HACK: Place default dummy positions in the texture array for importing
     dynarray_resize((void**)&payload.textures, RESERVED_TEXTURE_INDEX_COUNT);
@@ -92,7 +143,7 @@ void import_payload_destroy(import_payload* payload) {
     u32 image_count = dynarray_length(payload->images);
     for (u32 i = 0; i < image_count; ++i) {
         stbi_image_free(payload->images[i].data);
-        str_duplicate_free(payload->images[i].name);
+        str_free(payload->images[i].name);
     }
     dynarray_destroy(payload->images);
 
@@ -128,4 +179,6 @@ void import_payload_destroy(import_payload* payload) {
     dynarray_destroy(payload->animations);
 
     dynarray_destroy(payload->root_nodes);
+
+    transforms_deinit(payload->transforms);
 }

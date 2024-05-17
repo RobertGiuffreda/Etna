@@ -72,7 +72,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
     for (u32 i = 0; i < data->images_count; ++i) {
         import_image* image = &payload->images[img_start + i];
         image->data = load_image_data(&data->images[i], path, &image->width, &image->height, &image->channels);
-        image->name = (data->images[i].name) ? str_duplicate_allocate(data->images[i].name) : str_duplicate_allocate("NamelessImage");
+        image->name = (data->images[i].name) ? str_dup_alloc(data->images[i].name) : str_dup_alloc("NamelessImage");
     }
 
     u32 sampler_start = dynarray_grow((void**)&payload->samplers, data->samplers_count);
@@ -149,7 +149,6 @@ b8 import_gltf(import_payload* payload, const char* path) {
         skin_insts_map[i].skin = (u32)-1;
     }
 
-    u32 skin_inst_count = 0;
     u32 mesh_start = dynarray_grow((void**)&payload->meshes, data->meshes_count);
     u32 skin_start = dynarray_grow((void**)&payload->skins, data->skins_count);
     u32 node_start = dynarray_grow((void**)&payload->nodes, data->nodes_count);
@@ -170,7 +169,6 @@ b8 import_gltf(import_payload* payload, const char* path) {
                 node.skin_index = skin_start + local_skin_index;
 
                 if (skin_insts_map[local_skin_index].skin == (u32)-1) {
-                    skin_inst_count++;
                     skin_insts_map[local_skin_index].skin = node.skin_index;
                     skin_insts_map[local_skin_index].meshes = dynarray_create(1, sizeof(u32));
                 }
@@ -260,7 +258,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
             .normal = (v3s){1, 0, 0},
             .uv_x = 0.0f,
             .uv_y = 0.0f,
-            .color = (v4s){1, 1, 1, 1},
+            .color = (v4s){1.f, 1.f, 1.f, 1.f},
         };
     }
 
@@ -271,10 +269,10 @@ b8 import_gltf(import_payload* payload, const char* path) {
                 .normal = (v3s){1, 0, 0},
                 .uv_x = 0.0f,
                 .uv_y = 0.0f,
-                .color = (v4s){1, 1, 1, 1},
+                .color = (v4s){1.f, 1.f, 1.f, 1.f},
             },
             .joints = (iv4s){0, 0, 0, 0},
-            .weights = (v4s){0, 0, 0, 0},
+            .weights = (v4s){0.f, 0.f, 0.f, 0.f},
         };
     }
 
@@ -376,6 +374,7 @@ b8 import_gltf(import_payload* payload, const char* path) {
                             ((vertex*)vert)->normal = ((v3s*)accessor_data)[l];
                             break;
                         case cgltf_attribute_type_texcoord:
+                            // if (attribute->index != 0) break;
                             ((vertex*)vert)->uv_x = ((v2s*)accessor_data)[l].x;
                             ((vertex*)vert)->uv_y = ((v2s*)accessor_data)[l].y;
                             break;
@@ -451,19 +450,25 @@ b8 import_gltf(import_payload* payload, const char* path) {
                 );
             }
 
-            mesh->materials[j] = mat_index_to_mat_id[
-                (data->meshes[i].primitives[j].material ? 
+            mesh->materials[j] = (mat_id) {
+                .pipe_id = IMPORT_PIPELINE_TYPE_GLTF_DEFAULT,
+                .inst_id = 0
+            };
+            if (data->meshes[i].primitives[j].material) {
+                mesh->materials[j] = mat_index_to_mat_id[
                     cgltf_material_index(
                         data,
                         data->meshes[i].primitives[j].material
-                    ) : 0
-                )
-            ];
+                    )
+                ];
+            }
 
             vertex_start += vertex_count;
             index_start += index_count;
         }
     }
+
+    etfree(mesh_info, sizeof(mesh_info[0]) * data->meshes_count, MEMORY_TAG_IMPORTER);
 
     for (u32 i = 0; i < data->skins_count; ++i) {
         ETASSERT_MESSAGE(data->skins[i].inverse_bind_matrices, "Inverse Bind Matrices Assumption Failure");
@@ -490,7 +495,11 @@ b8 import_gltf(import_payload* payload, const char* path) {
         }
     }
 
-    etfree(skin_insts_map, sizeof(import_skin_instance), MEMORY_TAG_IMPORTER);
+    etfree(
+        skin_insts_map,
+        sizeof(skin_insts_map[0]) * data->skins_count,
+        MEMORY_TAG_IMPORTER
+    );
 
     u32 animation_start = dynarray_grow((void**)&payload->animations, data->animations_count);
     for (u32 i = 0; i < data->animations_count; ++i) {
@@ -582,7 +591,7 @@ m4s mat4s_add4(m4s m0, m4s m1, m4s m2, m4s m3) {
     return return_mat;
 }
 
-b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
+b8 gltf_dump_json(const char* gltf_path) {
     cgltf_options options = {0};
     cgltf_data* data = 0;
     cgltf_result result = cgltf_parse_file(&options, gltf_path, &data);
@@ -591,22 +600,26 @@ b8 dump_gltf_json(const char* gltf_path, const char* dump_file_path) {
         return false;
     }
 
+    u32 len = str_char_offset(gltf_path, rev_str_char_search(gltf_path, '.'));    
+    char* dump_path = sub_strs_concat_alloc(gltf_path, len, ".json", 5);
+
     etfile* json_file = NULL;
-    b8 file_result = file_open(dump_file_path, FILE_WRITE_FLAG, &json_file);
+    b8 file_result = file_open(dump_path, FILE_WRITE_FLAG, &json_file);
     if (!file_result) {
-        ETERROR("%s failed to open.", dump_file_path);
+        ETERROR("%s failed to open.", dump_path);
         return false;
     }
 
     u64 bytes_written = 0;
     file_result = file_write(json_file, data->json_size, (void*)data->json, &bytes_written);
     if (!file_result) {
-        ETERROR("Failed to write %s's json data to %s.", gltf_path, dump_file_path);
+        ETERROR("Failed to write %s's json data to %s.", gltf_path, dump_path);
         return false;
     }
 
     file_close(json_file);
-    ETINFO("Json from %s successfully dumped to %s", gltf_path, dump_file_path);
+    ETINFO("Json from %s successfully dumped to %s", gltf_path, dump_path);
+    str_free(dump_path);
     return true;
 }
 

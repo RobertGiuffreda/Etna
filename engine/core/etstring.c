@@ -1,9 +1,15 @@
 #include "etstring.h"
 
 #include "memory/etmemory.h"
+#include "core/asserts.h"
 
 #include <string.h>
 
+// TODO: Create etstring that is a fat pointer
+// typedef struct {
+//     size_t size;
+//     char* string;
+// } etstring;
 
 u64 str_length(const char* str) {
     return strlen(str);
@@ -41,14 +47,35 @@ char* rev_str_char_search(const char* str, char c) {
     return (char *)&str[str_len];
 }
 
-char* str_duplicate_allocate(const char* str) {
-    u32 len = strlen(str);
-    char* str2 = etallocate(sizeof(char) * len + 1, MEMORY_TAG_STRING);
-    etcopy_memory(str2, str, sizeof(char) * len);
-    str2[len] = '\0';
-    return str2;
+char* sub_strs_concat_alloc(const char* str0, u32 num0, const char* str1, u32 num1) {
+    ETASSERT(num0 <= str_length(str0));
+    ETASSERT(num1 <= str_length(str1));
+    
+    char* concat = str_alloc(num0 + num1);
+    etcopy_memory(concat, str0, num0);
+    etcopy_memory(concat + num0, str1, num1);
+    return concat;
 }
 
-void str_duplicate_free(char* str) {
+u32 str_char_offset(const char* str, const char* c) {
+    // ASSERT the char is within the string
+    ETASSERT_DEBUG((u64)c > (u64)str && (u64)c < ((u64)str + strlen(str)));
+    return (u64)c - (u64)str;
+}
+
+char* str_dup_alloc(const char* str) {
+    u32 len = strlen(str);
+    char* alloc = str_alloc(len);
+    etcopy_memory(alloc, str, sizeof(char) * len);
+    return alloc;
+}
+
+char* str_alloc(u64 size) {
+    char* alloc = etallocate(sizeof(char) * (size + 1), MEMORY_TAG_STRING);
+    alloc[size] = '\0';
+    return alloc;
+}
+
+void str_free(char* str) {
     etfree(str, sizeof(char) * (strlen(str) + 1), MEMORY_TAG_STRING);
 }

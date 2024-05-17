@@ -88,7 +88,7 @@ b8 scene_init(scene** scn, scene_config config) {
     for (u32 i = 0; i < pipeline_count; ++i) {
         // Only default material instance in pipeline instances
         u32 instance_count = dynarray_length(payload->pipelines[i].instances);
-        if (instance_count <= 1) {
+        if (instance_count) {
             mat_pipe_config config = {
                 .vert_path = payload->pipelines[i].vert_path,
                 .frag_path = payload->pipelines[i].frag_path,
@@ -404,7 +404,6 @@ void scene_update(scene* scene, f64 dt) {
         import_animation curr_ani = scene->payload.animations[scene->current_animation];
         scene->timestamp = fmod(scene->timestamp + dt, curr_ani.duration);
         apply_animation(scene->transforms, curr_ani, scene->timestamp);
-        // transforms_recompute_global(scene->transforms);
     }
 
     // TEMP: Apply inverse binds, until we do not use transforms like gltf does nodes
@@ -1019,7 +1018,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     // Texture defaults using default samplers and images from renderer_state
     VkDescriptorImageInfo error_texture_info = {
-        .sampler = state->nearest_smpl,
+        .sampler = state->linear_smpl,
         .imageView = state->default_error.view,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };
@@ -1034,7 +1033,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
     };
     VkDescriptorImageInfo white_texture_info = {
-        .sampler = state->nearest_smpl,
+        .sampler = state->linear_smpl,
         .imageView = state->default_white.view,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };
@@ -1049,7 +1048,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
     };
     VkDescriptorImageInfo black_texture_info = {
-        .sampler = state->nearest_smpl,
+        .sampler = state->linear_smpl,
         .imageView = state->default_black.view,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     };
@@ -1555,6 +1554,8 @@ void draw_command_generation(renderer_state* state, scene* scene, VkCommandBuffe
 }
 
 void compute_skinning(renderer_state* state, scene* scene, VkCommandBuffer cmd) {
+    // Bind the pipeline before the loop so we only do it once
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->skinning_pipeline);
     push_constant push = {0};
     u32 skin_inst_count = dynarray_length(scene->skins);
     for (u32 i = 0; i < skin_inst_count; ++i) {
@@ -1567,7 +1568,6 @@ void compute_skinning(renderer_state* state, scene* scene, VkCommandBuffer cmd) 
             push.u32s[7] = mesh_inst.vertex_offset;
             push.u32s[8] = mesh.vertex_count;
 
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, scene->skinning_pipeline);
             vkCmdPushConstants(
                 cmd,
                 scene->set0_layout,

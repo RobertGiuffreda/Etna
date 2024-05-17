@@ -51,13 +51,17 @@ vec3 get_normal_from_map() {
     }
 
     vec3 t_ = (uv_dy.t * dFdx(in_position) - uv_dx.t * dFdy(in_position)) / (uv_dx.s * uv_dy.t - uv_dy.s * uv_dx.t);
-
     vec3 N = normalize(in_normal);
     vec3 T = normalize(t_ - N * dot(N, t_));
-    vec3 B = -normalize(cross(N, T));
+    vec3 B = cross(N, T);
+
+    // vec3 N = normalize(in_normal);
+    // vec3 T = normalize(Q1 * uv_dy.t - Q2 * uv_dx.t);
+    // vec3 B = -normalize(cross(N, T));
+
     mat3 TBN = mat3(T, B, N);
 
-    return normalize(TBN * tangent_normal);
+    return normalize(TBN * normalize(tangent_normal));
 }
 
 void main() {
@@ -156,14 +160,26 @@ void main() {
     // gamma correction
     color = pow(color, INV_GAMMA);
 
-    out_frag_color = vec4(color, 1.0f);
-    if (frame_data.debug_view == DEBUG_VIEW_TYPE_SHADOW) {
-        out_frag_color = vec4(vec3(1.f - shadow), 1.0f);
+    out_frag_color = vec4(color, albedo_sample.a);
+    if (frame_data.debug_view == DEBUG_VIEW_TYPE_ALBEDO) {
+        out_frag_color = vec4(albedo_sample.rgb, 1.0f);
+    }
+    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_ALBEDO_ALPHA) {
+        out_frag_color = vec4(albedo_sample.aaa, 1.0f);
+    }
+    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_VERTEX_COLOR) {
+        out_frag_color = vec4(in_color, 1.0f);
     }
     else if (frame_data.debug_view == DEBUG_VIEW_TYPE_METAL_ROUGH) {
-        out_frag_color = vec4(shadow_coords.xy, 0.0f, 1.0f);
+        out_frag_color = vec4(mr_sample.rgb, 1.0f);
     }
-    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_NORMAL) {
+    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_VERTEX_NORMAL) {
+        out_frag_color = vec4(normalize(in_normal), 1.0);
+    }
+    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_TEXTURE_NORMAL) {
         out_frag_color = vec4(N, 1.0);
+    }
+    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_SHADOW) {
+        out_frag_color = vec4(vec3(1.f - shadow), 1.0f);
     }
 }

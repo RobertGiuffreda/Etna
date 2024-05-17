@@ -49,14 +49,14 @@ b8 file_open(const char* path, etfile_flags flags, etfile** out_file) {
 
     *out_file = etallocate(sizeof(struct etfile), MEMORY_TAG_FILE);
     (*out_file)->handle = file;
-    (*out_file)->path = str_duplicate_allocate(path);
+    (*out_file)->path = str_dup_alloc(path);
     return true;
 }
 
 void file_close(etfile* file) {
     if (file && file->handle) {
         fclose(file->handle);
-        str_duplicate_free(file->path);
+        str_free(file->path);
         etfree(file, sizeof(struct etfile), MEMORY_TAG_FILE);
     }
 }

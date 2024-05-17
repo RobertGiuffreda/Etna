@@ -74,64 +74,10 @@ typedef enum import_pipeline_type {
 typedef struct import_pipeline {
     const char* vert_path;
     const char* frag_path;
+    u64 inst_size;      // Stride?
     void* instances;
-    u64 inst_size;
     b8 transparent;
 } import_pipeline;
-
-static const import_pipeline default_import_pipelines[IMPORT_PIPELINE_TYPE_COUNT] = {
-    [IMPORT_PIPELINE_TYPE_GLTF_DEFAULT] = {
-        .vert_path = "assets/shaders/pbr_mr.vert.spv.opt",
-        .frag_path = "assets/shaders/pbr_mr.frag.spv.opt",
-        .inst_size = sizeof(pbr_mr_instance),
-        .instances = NULL,
-        .transparent = false,
-    },
-    // TODO: Get shadow information in shaders
-    [IMPORT_PIPELINE_TYPE_PMX_DEFAULT] = {
-        .vert_path = "assets/shaders/cel.vert.spv.opt",
-        .frag_path = "assets/shaders/cel.frag.spv.opt",
-        .inst_size = sizeof(cel_instance),
-        .instances = NULL,
-        .transparent = false,
-    },
-    [IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT] = {
-        .vert_path = "assets/shaders/pbr_mr.vert.spv.opt",
-        .frag_path = "assets/shaders/pbr_mr.frag.spv.opt",
-        .inst_size = sizeof(pbr_mr_instance),
-        .instances = NULL,
-        .transparent = true,
-    },
-    // TODO: Get shadow information in shaders
-    [IMPORT_PIPELINE_TYPE_PMX_TRANSPARENT] = {
-        .vert_path = "assets/shaders/cel.vert.spv.opt",
-        .frag_path = "assets/shaders/cel.frag.spv.opt",
-        .inst_size = sizeof(cel_instance),
-        .instances = NULL,
-        .transparent = true,
-    },
-};
-
-static const pbr_mr_instance default_pbr_instance = {
-    .color_factors = {.raw = {1.f, 1.f, 1.f, 1.f}},
-    .color_tex_index = RESERVED_TEXTURE_ERROR_INDEX,
-    .metalness = 0.0f,
-    .roughness = 0.5f,
-    .mr_tex_index = RESERVED_TEXTURE_WHITE_INDEX,
-    .normal_index = RESERVED_TEXTURE_NORMAL_INDEX,
-};
-
-static const cel_instance default_cel_instance = {
-    .color_factors = {.raw = {1.f, 1.f, 1.f, 1.f}},
-    .color_tex_index = RESERVED_TEXTURE_ERROR_INDEX,
-};
-
-static const void* default_pipeline_default_instances[IMPORT_PIPELINE_TYPE_COUNT] = {
-    [IMPORT_PIPELINE_TYPE_GLTF_DEFAULT] = &default_pbr_instance,
-    [IMPORT_PIPELINE_TYPE_PMX_DEFAULT] = &default_cel_instance,
-    [IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT] = &default_pbr_instance,
-    [IMPORT_PIPELINE_TYPE_PMX_TRANSPARENT] = &default_cel_instance,
-};
 
 typedef struct import_skin {
     u32* joint_indices;         // dynarray
@@ -201,6 +147,7 @@ typedef enum {
     VERTEX_SKIN_MORPH,    // Mesh vertices modified via skinning & morph targets
 } vertex_e;
 
+// TODO: Remove padding
 typedef struct {
     u32 index_start;
     u32 index_count;
@@ -210,9 +157,7 @@ typedef struct {
     v4s extent;             // Bounding box extent
 } import_geometry;
 
-// NOTE: Morphs: 2 verts, 3 morph_targets, position & normal
-//|P0P1P2|N0N1N2|P0P1P2|N0N1N2|
-//|   Vertex 1  |  Vertex 2   |
+// TODO: 
 typedef struct {
     vertex_e vertex_type;
     u32 morph_count;
@@ -224,6 +169,9 @@ typedef struct {
     u32* geometries;
     mat_id* materials;
 } import_mesh;
+// NOTE: Morphs: 2 verts, 3 morph_targets, position & normal
+//|P0P1P2|N0N1N2|P0P1P2|N0N1N2|
+//|   Vertex 1  |  Vertex 2   |
 
 /** NOTE:
  * The rendering system is still GLTF centric in regards to the node logic. 

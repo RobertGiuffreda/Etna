@@ -28,7 +28,7 @@ void image_manager_shutdown(image_manager* manager) {
         if (manager->images[i].id == INVALID_ID) {
             continue;
         }
-        str_duplicate_free(manager->images[i].name);
+        str_free(manager->images[i].name);
         image_destroy(manager->state, manager->images + i);
     }
     etfree(manager, sizeof(image_manager), MEMORY_TAG_RESOURCE);
@@ -46,7 +46,7 @@ u32 image2D_submit(image_manager* manager, image2D_config* config) {
     image* new_image = &manager->images[id];
 
     if (config->data) {
-        new_image->name = (config->name) ? str_duplicate_allocate(config->name) : str_duplicate_allocate("Unknown Name");
+        new_image->name = (config->name) ? str_dup_alloc(config->name) : str_dup_alloc("Unknown Name");
         new_image->id = id;
 
         VkExtent3D image_size = {

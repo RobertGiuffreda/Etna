@@ -17,6 +17,13 @@ typedef ivec4s iv4s;
 typedef mat3s m3s;
 typedef mat4s m4s;
 
+typedef struct vert {
+    f32 pos[3];
+    f32 uv[4];
+    f32 normal[3];
+    f32 color[4];
+} vert;
+
 typedef struct vertex {
     v3s position;
     f32 uv_x;

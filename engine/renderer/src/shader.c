@@ -77,7 +77,7 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
     SpvReflectShaderModule spv_reflect_module = {0};
     SPIRV_REFLECT_CHECK(spvReflectCreateShaderModule2(SPV_REFLECT_MODULE_FLAG_NONE, code_size, shader_code, &spv_reflect_module));
 
-    shader->entry_point = str_duplicate_allocate(spv_reflect_module.entry_point_name);
+    shader->entry_point = str_dup_alloc(spv_reflect_module.entry_point_name);
     shader->stage = spv_reflect_shader_stage_to_vulkan_shader_stage(spv_reflect_module.shader_stage);
 
     u32 set_count = 0;
@@ -104,7 +104,7 @@ b8 load_shader(renderer_state* state, const char* path, shader* shader) {
             binding_layout* binding = &set->bindings[j];
             SpvReflectDescriptorBinding* spv_binding = spv_set->bindings[j];
             
-            binding->name = str_duplicate_allocate(spv_binding->name);
+            binding->name = str_dup_alloc(spv_binding->name);
             binding->index = spv_binding->binding;
             binding->descriptor_type = convert_spv_reflect_descriptor_type(spv_binding->descriptor_type);
 
@@ -151,7 +151,7 @@ void unload_shader(renderer_state* state, shader* shader) {
         set_layout* set = &shader->sets[i];
         for (u32 j = 0; j < set->binding_count; ++j) {
             binding_layout* binding = &set->bindings[j];
-            str_duplicate_free(binding->name);
+            str_free(binding->name);
             if (!is_descriptor_type_image(binding->descriptor_type)) {
                 free_block_variables(&binding->block);
             }
@@ -159,13 +159,13 @@ void unload_shader(renderer_state* state, shader* shader) {
         etfree(set->bindings, sizeof(binding_layout) * set->binding_count, MEMORY_TAG_SHADER);
     }
     etfree(shader->sets, sizeof(set_layout) * shader->set_count, MEMORY_TAG_SHADER);
-    str_duplicate_free(shader->entry_point);
+    str_free(shader->entry_point);
 
     vkDestroyShaderModule(state->device.handle, shader->module, state->allocator);
 }
 
 void reflect_block_variables(block_variable* block, SpvReflectBlockVariable* spv_block) {
-    block->name = str_duplicate_allocate(spv_block->name);
+    block->name = str_dup_alloc(spv_block->name);
     block->offset = spv_block->offset;
     block->absolute_offset = spv_block->absolute_offset;
     block->size = spv_block->size;
@@ -195,7 +195,7 @@ void reflect_block_variables(block_variable* block, SpvReflectBlockVariable* spv
 }
 
 void free_block_variables(block_variable* block) {
-    str_duplicate_free(block->name);
+    str_free(block->name);
     if (!block->member_count) return;
     for (u32 i = 0; i < block->member_count; ++i)
         free_block_variables(block->members + i);
