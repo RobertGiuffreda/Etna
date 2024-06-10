@@ -1,11 +1,6 @@
 #extension GL_GOOGLE_include_directive : require
 
 #include "../input_structures.glsl"
-// NOTE: Push constant elements used:
-// buffer0: Joint Matrix buffer (joint transform * inverse bind matrix)
-// buffer1: Vertex buffer for input
-// buffer2: Vertex buffer for output
-// uint0: Number of vertices in vertex buffer we are skinning
 
 layout(buffer_reference, std430) readonly buffer joints {
     uint indices[];

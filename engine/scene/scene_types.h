@@ -9,10 +9,7 @@
 typedef enum debug_view_type {
     DEBUG_VIEW_TYPE_OFF = 0,
     DEBUG_VIEW_TYPE_ALBEDO,
-    DEBUG_VIEW_TYPE_ALBEDO_ALPHA,
-    DEBUG_VIEW_TYPE_VERTEX_COLOR,
     DEBUG_VIEW_TYPE_METAL_ROUGH,
-    DEBUG_VIEW_TYPE_VERTEX_NORMAL,
     DEBUG_VIEW_TYPE_TEXTURE_NORMAL,
     DEBUG_VIEW_TYPE_SHADOW,
     DEBUG_VIEW_TYPE_MAX,
@@ -48,6 +45,7 @@ typedef struct scene_data {
     u32 max_draw_count;
     u32 shadow_draw_id;
     u32 shadow_map_id;
+    v2s shadow_map_size;
     u32 debug_view;
 } scene_data;
 
@@ -56,6 +54,7 @@ typedef struct {
     u32 mesh;
     i32 vertex_offset;
 } skin_mesh_inst;
+
 typedef struct {
     u32 skin;
     u64 joints_addr;

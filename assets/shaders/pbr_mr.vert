@@ -43,12 +43,12 @@ void main() {
     // TODO: Compute the normal matrix on the CPU and not GPU
     out_normal = (transpose(inverse(model)) * vec4(v.normal, 0.0f)).xyz;
 
-    out_color = v.color.rgb * mat_insts[nonuniformEXT(draw.material_id)].color_factors.rgb;
+    out_color = v.color.rgb * mat_insts[draw.material_id].color_factors.rgb;
     out_uv.x = v.uv_x;
     out_uv.y = v.uv_y;
 
     out_mat_id = draw.material_id;
-    out_color_id = mat_insts[nonuniformEXT(draw.material_id)].color_index;
-    out_mr_id = mat_insts[nonuniformEXT(draw.material_id)].metal_rough_index;
-    out_normal_id = mat_insts[nonuniformEXT(draw.material_id)].normal_index;
+    out_color_id = mat_insts[draw.material_id].color_index;
+    out_mr_id = mat_insts[draw.material_id].metal_rough_index;
+    out_normal_id = mat_insts[draw.material_id].normal_index;
 }

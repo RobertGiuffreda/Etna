@@ -74,11 +74,13 @@ typedef union push_constant {
     u64 u64s[8];
 } push_constant;
 
+// TODO: _id --> _index
 typedef struct draw_command {
     VkDrawIndexedIndirectCommand draw;
     u32 material_inst_id;
     u32 transform_id;
 } draw_command;
+// TODO: END
 
 typedef struct device {
     VkDevice handle;

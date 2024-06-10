@@ -35,6 +35,7 @@ typedef struct mat_pipe_config {
 } mat_pipe_config;
 
 b8 mat_pipe_init(mat_pipe* material, scene* scene, renderer_state* state, const mat_pipe_config* config);
+
 void mat_pipe_shutdown(mat_pipe* material, scene* scene, renderer_state* state);
 
 // NOTE: Returns material instance id

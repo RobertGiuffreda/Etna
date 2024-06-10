@@ -1,5 +1,5 @@
 #pragma once
-
+#include "defines.h"
 #include "renderer/src/vk_types.h"
 
 // NOTE: Taken from SPIRV-Reflect

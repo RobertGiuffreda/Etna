@@ -67,6 +67,17 @@ b8 scene_init(scene** scn, scene_config config) {
     vertex* vertices = payload->vertices.statics;
     skin_vertex* skin_vertices = payload->vertices.skinned;
     u32* indices = payload->indices;
+
+    // u32 skin_vertices_count = dynarray_length(skin_vertices);
+    // for (u32 i = 0; i < skin_vertices_count; ++i) {
+    //     u32 max_joint = skin_vertices[i].joints.a;
+    //     u32 min_joint = skin_vertices[i].joints.a;
+    //     for (u32 j = 1; j < 4; ++j) {
+    //         max_joint = max(max_joint, skin_vertices[i].joints.raw[j]);
+    //         min_joint = min(min_joint, skin_vertices[i].joints.raw[j]);
+    //     }
+    //     ETASSERT((max_joint - min_joint) < 255);
+    // }
     
     u32 geo_count = dynarray_length(payload->geometries);
     geometry* geometries = dynarray_create(geo_count, sizeof(geometry));
@@ -406,7 +417,7 @@ void scene_update(scene* scene, f64 dt) {
         apply_animation(scene->transforms, curr_ani, scene->timestamp);
     }
 
-    // TEMP: Apply inverse binds, until we do not use transforms like gltf does nodes
+    // TODO: Each skin has inverse binds GPU memory and apply in skinning shader
     transforms_recompute_global(scene->transforms);
     u32 skin_inst_count = dynarray_length(scene->skins);
     for (u32 i = 0; i < skin_inst_count; ++i) {
@@ -420,8 +431,7 @@ void scene_update(scene* scene, f64 dt) {
             );
         }
     }
-
-    // TEMP: END
+    // TODO: END
 }
 
 b8 scene_renderer_init(scene* scene, scene_config config) {
@@ -983,8 +993,8 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     // TEMP: More robust shadow mapping code
     VkExtent3D shadow_map_resolution = {
-        .width = 2048,
-        .height = 2048,
+        .width = 1024,
+        .height = 1024,
         .depth = 1};
     image2D_create(
         state,
@@ -1134,7 +1144,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
         &scene->set0_layout));
     SET_DEBUG_NAME(state, VK_OBJECT_TYPE_PIPELINE_LAYOUT, scene->set0_layout, "DescriptorSet0PipelineLayout");
 
-    const char* draw_gen_path = "assets/shaders/draws.comp.spv.opt";
+    const char* draw_gen_path = SHADER_PATH("draws.comp");
     shader draw_gen;
     if (!load_shader(state, draw_gen_path, &draw_gen)) {
         ETFATAL("Unable to load draw generation shader.");
@@ -1209,6 +1219,10 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     scene->data.alpha_cutoff = 0.5f;
     scene->data.shadow_draw_id = scene->mat_pipe_count;
     scene->data.shadow_map_id = RESERVED_TEXTURE_SHADOW_MAP_INDEX;
+    scene->data.shadow_map_size = (v2s) {
+        .x = shadow_map_resolution.width,
+        .y = shadow_map_resolution.height,
+    };
     // TEMP: END
 
     // TEMP: Shadow mapping placement
@@ -1224,7 +1238,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
     vkUnmapMemory(state->device.handle, scene->draws_buffer.memory);
 
     shader shadow_draw_gen;
-    if (!load_shader(state, "assets/shaders/shadow_draws.comp.spv.opt", &shadow_draw_gen)) {
+    if (!load_shader(state, SHADER_PATH("shadow_draws.comp"), &shadow_draw_gen)) {
         ETFATAL("Unable to load the shadow map draw command gerneration shader.");
         return false;
     }
@@ -1251,7 +1265,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     // TODO: Light passing through alpha-mask texture
     shader shadow_map_vert;
-    if (!load_shader(state, "assets/shaders/shadow.vert.spv.opt", &shadow_map_vert)) {
+    if (!load_shader(state, SHADER_PATH("shadow.vert"), &shadow_map_vert)) {
         ETFATAL("Unable to load the shadow map vertex shader.");
         return false;
     };
@@ -1279,7 +1293,7 @@ b8 scene_renderer_init(scene* scene, scene_config config) {
 
     // TEMP: Skin stuff placement
     shader skinning_comp;
-    if (!load_shader(state, "assets/shaders/skinning.comp.spv.opt", &skinning_comp)) {
+    if (!load_shader(state, SHADER_PATH("skinning.comp"), &skinning_comp)) {
         ETFATAL("Unable to load the skinning compute shader.");
         return false;
     }

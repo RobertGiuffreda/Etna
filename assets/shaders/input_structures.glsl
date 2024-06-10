@@ -38,18 +38,11 @@ layout(set = 0, binding = 0) uniform frame_data_block {
 	// TEMP: These will eventually be defined per shadow casting light
 	uint shadow_draws_id;
 	uint shadow_map_id;
+	vec2 shadow_map_size;
 	// TEMP: END
 	
 	uint debug_view;
 } frame_data;
-
-#define DEBUG_VIEW_TYPE_ALBEDO 1
-#define DEBUG_VIEW_TYPE_ALBEDO_ALPHA 2
-#define DEBUG_VIEW_TYPE_VERTEX_COLOR 3
-#define DEBUG_VIEW_TYPE_METAL_ROUGH 4
-#define DEBUG_VIEW_TYPE_VERTEX_NORMAL 5
-#define DEBUG_VIEW_TYPE_TEXTURE_NORMAL 6
-#define DEBUG_VIEW_TYPE_SHADOW 7
 
 layout(set = 0, binding = 1, std430) buffer draw_counts {
 	uint counts[];

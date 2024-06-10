@@ -12,31 +12,31 @@
 
 static const import_pipeline default_import_pipelines[IMPORT_PIPELINE_TYPE_COUNT] = {
     [IMPORT_PIPELINE_TYPE_GLTF_DEFAULT] = {
-        .vert_path = "assets/shaders/pbr_mr.vert.spv.opt",
-        .frag_path = "assets/shaders/pbr_mr.frag.spv.opt",
+        .vert_path = SHADER_PATH("pbr_mr.vert"),
+        .frag_path = SHADER_PATH("pbr_mr.frag"),
         .inst_size = sizeof(pbr_mr_instance),
         .instances = NULL,
         .transparent = false,
     },
     // TODO: Get shadow information in shaders
     [IMPORT_PIPELINE_TYPE_PMX_DEFAULT] = {
-        .vert_path = "assets/shaders/cel.vert.spv.opt",
-        .frag_path = "assets/shaders/cel.frag.spv.opt",
+        .vert_path = SHADER_PATH("cel.vert"),
+        .frag_path = SHADER_PATH("cel.frag"),
         .inst_size = sizeof(cel_instance),
         .instances = NULL,
         .transparent = false,
     },
     [IMPORT_PIPELINE_TYPE_GLTF_TRANSPARENT] = {
-        .vert_path = "assets/shaders/pbr_mr.vert.spv.opt",
-        .frag_path = "assets/shaders/pbr_mr.frag.spv.opt",
+        .vert_path = SHADER_PATH("pbr_mr.vert"),
+        .frag_path = SHADER_PATH("pbr_mr.frag"),
         .inst_size = sizeof(pbr_mr_instance),
         .instances = NULL,
         .transparent = true,
     },
     // TODO: Get shadow information in shaders
     [IMPORT_PIPELINE_TYPE_PMX_TRANSPARENT] = {
-        .vert_path = "assets/shaders/cel.vert.spv.opt",
-        .frag_path = "assets/shaders/cel.frag.spv.opt",
+        .vert_path = SHADER_PATH("cel.vert"),
+        .frag_path = SHADER_PATH("cel.frag"),
         .inst_size = sizeof(cel_instance),
         .instances = NULL,
         .transparent = true,

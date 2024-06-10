@@ -34,9 +34,7 @@ layout (location = 8) flat in uint in_normal_id;
 
 layout(location = 0) out vec4 out_frag_color;
 
-vec3 get_normal_from_map() {
-    vec3 tangent_normal = texture(textures[nonuniformEXT(in_normal_id)], in_uv).xyz * 2.0 - 1.0;
-
+mat3 get_TBN() {
     vec3 Q1 = dFdx(in_position);
     vec3 Q2 = dFdy(in_position);
     vec2 uv_dx = dFdx(in_uv);
@@ -61,7 +59,7 @@ vec3 get_normal_from_map() {
 
     mat3 TBN = mat3(T, B, N);
 
-    return normalize(TBN * normalize(tangent_normal));
+    return TBN;
 }
 
 void main() {
@@ -73,7 +71,8 @@ void main() {
     float metallic = clamp(mat_insts[nonuniformEXT(in_mat_id)].metalness * mr_sample.b, 0.0f, 1.0f);
     float roughness = clamp(mat_insts[nonuniformEXT(in_mat_id)].roughness * mr_sample.g, 0.0f, 1.0f);
 
-    vec3 N = get_normal_from_map();
+    vec4 normal_sample = texture(textures[nonuniformEXT(in_normal_id)], in_uv);
+    vec3 N = normalize(get_TBN() * (normal_sample.xyz * vec3(2.0f) - vec3(1.0f)));
     vec3 V = normalize(frame_data.view_pos.xyz - in_position);
 
     // calculate reflectance at normal incidence; if dielectric (like plastic) use F0 
@@ -107,7 +106,7 @@ void main() {
     float bias = max(max_bias_factor * (1.0f - NdotLs), min_bias_factor);
 
     float shadow = 0.f;
-    vec2 texel_size = 1.f / textureSize(textures[frame_data.shadow_map_id], 0);
+    vec2 texel_size = 1.f / frame_data.shadow_map_size;
     for (int x = -1; x <= 1; ++x) {
         for(int y = -1; y <= 1; ++y) {
             float map_depth = texture(textures[frame_data.shadow_map_id], shadow_uv + vec2(x, y) * texel_size).x;
@@ -161,25 +160,20 @@ void main() {
     color = pow(color, INV_GAMMA);
 
     out_frag_color = vec4(color, albedo_sample.a);
-    if (frame_data.debug_view == DEBUG_VIEW_TYPE_ALBEDO) {
+    switch (frame_data.debug_view) {
+    case 1:
         out_frag_color = vec4(albedo_sample.rgb, 1.0f);
-    }
-    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_ALBEDO_ALPHA) {
-        out_frag_color = vec4(albedo_sample.aaa, 1.0f);
-    }
-    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_VERTEX_COLOR) {
-        out_frag_color = vec4(in_color, 1.0f);
-    }
-    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_METAL_ROUGH) {
+        break;
+    case 2:
         out_frag_color = vec4(mr_sample.rgb, 1.0f);
-    }
-    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_VERTEX_NORMAL) {
-        out_frag_color = vec4(normalize(in_normal), 1.0);
-    }
-    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_TEXTURE_NORMAL) {
+        break;
+    case 3:
         out_frag_color = vec4(N, 1.0);
-    }
-    else if (frame_data.debug_view == DEBUG_VIEW_TYPE_SHADOW) {
+        break;
+    case 4:
         out_frag_color = vec4(vec3(1.f - shadow), 1.0f);
+        break;
+    default:
+        break;
     }
 }

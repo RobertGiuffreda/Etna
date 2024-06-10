@@ -15,7 +15,12 @@ typedef struct image_manager image_manager;
 #define MAX_TEXTURE_COUNT 1024
 #define MAX_MATERIAL_COUNT 512
 
-// TODO: Change id to index
+/** TODO:
+ * Rename Geometry to submesh??
+ * Rename Object to instance??
+ */ 
+
+// TODO: _id --> _index
 typedef struct mat_id {
     u32 pipe_id;
     u32 inst_id;
@@ -31,7 +36,7 @@ typedef struct geometry {
     v4s extent;
 } geometry;
 
-// TODO: Change id to index
+// TODO: _id --> _index
 typedef struct object {
     u32 pipe_id;            // Pipeline shader object index
     u32 mat_id;             // Material instance index

@@ -65,3 +65,11 @@ do {                \
 #else
     #define DEBUG_RELEASE(debug, release) release
 #endif
+
+#ifdef _DEBUG
+    #define SHADER_EXT ".spv.opt"
+#else
+    #define SHADER_EXT ".spv.opt"
+#endif
+#define SHADER_DIR "assets/shaders/"
+#define SHADER_PATH(name) SHADER_DIR name SHADER_EXT
